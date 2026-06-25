@@ -34,7 +34,7 @@ type Config struct {
 	BackupInfoCacheRetention           time.Duration `envconfig:"BACKUP_INFO_CACHE_RETENTION" default:"168h" validate:"min=5m"`
 	Environment                        string        `envconfig:"ENVIRONMENT"`
 	SandboxNetwork                     string        `envconfig:"SANDBOX_NETWORK"`
-	RunscPath                          string        `envconfig:"RUNSC_PATH" default:"runsc"`
+	RunscPath                          string        `envconfig:"RUNSC_PATH" default:"/usr/local/bin/runsc"`
 	RunscRoot                          string        `envconfig:"RUNSC_ROOT" default:"/run/daytona-runsc"`
 	RunscConfigFile                    string        `envconfig:"RUNSC_CONFIG_FILE"`
 	RunscExtraArgs                     string        `envconfig:"RUNSC_EXTRA_ARGS"`

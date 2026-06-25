@@ -27,6 +27,10 @@ func NewClientFromConfig(logger *slog.Logger) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	runscPath, err := resolveRunscPath(cfg.RunscPath)
+	if err != nil {
+		return nil, err
+	}
 
 	globalArgs := make([]string, 0)
 	if cfg.RunscRoot != "" {
@@ -44,10 +48,21 @@ func NewClientFromConfig(logger *slog.Logger) (*Client, error) {
 	}
 
 	return &Client{
-		path:       cfg.RunscPath,
+		path:       runscPath,
 		globalArgs: globalArgs,
 		logger:     logger.With(slog.String("component", "gvisor-client")),
 	}, nil
+}
+
+func resolveRunscPath(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("RUNSC_PATH is required")
+	}
+	resolvedPath, err := exec.LookPath(path)
+	if err != nil {
+		return "", fmt.Errorf("runsc binary not found or not executable at RUNSC_PATH=%q: %w", path, err)
+	}
+	return resolvedPath, nil
 }
 
 func (c *Client) Version(ctx context.Context) string {
