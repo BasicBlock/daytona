@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:18
     ports:
-      - '5432:5432'
+      - '15432:5432'
     environment:
       POSTGRES_PASSWORD: pass
       POSTGRES_USER: user
@@ -40,7 +40,7 @@ services:
   registry:
     image: registry:2.8.2
     ports:
-      - '5000:5000'
+      - '15000:5000'
     environment:
       REGISTRY_STORAGE_DELETE_ENABLED: 'true'
     healthcheck:

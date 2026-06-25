@@ -83,7 +83,7 @@ jobs:
           (cd /tmp && sha512sum -c runsc.sha512)
           sudo install -m 0755 /tmp/runsc /usr/local/bin/runsc
 
-          echo '{"insecure-registries":["localhost:5000"],"runtimes":{"runsc":{"path":"/usr/local/bin/runsc","runtimeArgs":[]}}}' | sudo tee /etc/docker/daemon.json
+          echo '{"insecure-registries":["localhost:15000"],"runtimes":{"runsc":{"path":"/usr/local/bin/runsc","runtimeArgs":[]}}}' | sudo tee /etc/docker/daemon.json
           sudo systemctl restart docker
           sudo systemctl is-active docker
           docker info --format '{{json .Runtimes}}'

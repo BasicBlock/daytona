@@ -10,6 +10,8 @@ import (
 	"fmt"
 
 	apiclient "github.com/daytonaio/daytona/libs/api-client-go"
+	"github.com/daytonaio/runner/pkg/api/dto"
+	"github.com/daytonaio/runner/pkg/common"
 )
 
 func (e *Executor) forkSandbox(ctx context.Context, job *apiclient.Job) (any, error) {
@@ -25,5 +27,12 @@ func (e *Executor) forkSandbox(ctx context.Context, job *apiclient.Job) (any, er
 		return nil, fmt.Errorf("new sandbox id is required")
 	}
 
-	return nil, fmt.Errorf("gVisor sandbox fork requires the raw runsc sandbox lifecycle backend; Docker restore/checkpoint fallback is intentionally disabled")
+	daemonVersion, err := e.docker.ForkSandbox(ctx, payload.SourceSandboxId, payload.NewSandboxId, payload.TargetAuthToken)
+	if err != nil {
+		return nil, common.FormatRecoverableError(err)
+	}
+
+	return dto.StartSandboxResponse{
+		DaemonVersion: daemonVersion,
+	}, nil
 }

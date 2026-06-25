@@ -20,6 +20,15 @@ import (
 func (d *DockerClient) Start(ctx context.Context, containerId string, authToken *string, metadata map[string]string) (*container.InspectResponse, string, error) {
 	defer timer.Timer()()
 
+	if d.runscRuntime != nil && d.runscRuntime.Exists(containerId) {
+		_, daemonVersion, err := d.runscRuntime.Start(ctx, containerId, authToken, metadata)
+		if err != nil {
+			return nil, "", err
+		}
+		inspect, err := d.runscRuntime.Inspect(ctx, containerId)
+		return inspect, daemonVersion, err
+	}
+
 	// Cancel a backup if it's already in progress
 	backup_context, ok := backup_context_map.Get(containerId)
 	if ok {

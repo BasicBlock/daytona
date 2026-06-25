@@ -23,6 +23,10 @@ func (d *DockerClient) GetSandboxState(ctx context.Context, sandboxId string) (e
 		return enums.SandboxStatePullingSnapshot, nil
 	}
 
+	if d.runscRuntime != nil && d.runscRuntime.Exists(sandboxId) {
+		return d.runscRuntime.GetSandboxState(ctx, sandboxId)
+	}
+
 	ct, err := d.ContainerInspect(ctx, sandboxId)
 	if err != nil {
 		if common_errors.IsNotFoundError(err) {

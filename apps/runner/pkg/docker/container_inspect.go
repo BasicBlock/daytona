@@ -13,6 +13,10 @@ import (
 )
 
 func (d *DockerClient) ContainerInspect(ctx context.Context, containerId string) (*container.InspectResponse, error) {
+	if d.runscRuntime != nil && d.runscRuntime.Exists(containerId) {
+		return d.runscRuntime.Inspect(ctx, containerId)
+	}
+
 	container, err := d.apiClient.ContainerInspect(ctx, containerId)
 	if err != nil {
 		errMsg := fmt.Errorf("failed to inspect sandbox container %s: %w", containerId, err)

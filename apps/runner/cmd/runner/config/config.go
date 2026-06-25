@@ -35,9 +35,12 @@ type Config struct {
 	Environment                        string        `envconfig:"ENVIRONMENT"`
 	SandboxNetwork                     string        `envconfig:"SANDBOX_NETWORK"`
 	RunscPath                          string        `envconfig:"RUNSC_PATH" default:"runsc"`
-	RunscRoot                          string        `envconfig:"RUNSC_ROOT" default:"/run/docker/runtime-runc/moby"`
+	RunscRoot                          string        `envconfig:"RUNSC_ROOT" default:"/run/daytona-runsc"`
 	RunscConfigFile                    string        `envconfig:"RUNSC_CONFIG_FILE"`
 	RunscExtraArgs                     string        `envconfig:"RUNSC_EXTRA_ARGS"`
+	RunscStateDir                      string        `envconfig:"RUNSC_STATE_DIR" default:"/var/lib/daytona-runner/runsc"`
+	RunscBridgeName                    string        `envconfig:"RUNSC_BRIDGE_NAME" default:"daytona0"`
+	RunscBridgeCIDR                    string        `envconfig:"RUNSC_BRIDGE_CIDR" default:"172.29.0.1/16"`
 	InterSandboxNetworkEnabled         bool          `envconfig:"INTER_SANDBOX_NETWORK_ENABLED" default:"true"`
 	GpuEnabled                         bool          `envconfig:"GPU_ENABLED" default:"false"`
 	LogFilePath                        string        `envconfig:"LOG_FILE_PATH"`

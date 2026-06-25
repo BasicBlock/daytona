@@ -26,6 +26,10 @@ func (d *DockerClient) Destroy(ctx context.Context, containerId string) error {
 		}
 	}()
 
+	if d.runscRuntime != nil && d.runscRuntime.Exists(containerId) {
+		return d.runscRuntime.Destroy(ctx, containerId)
+	}
+
 	// Tear down the per-sandbox link network on every "container is gone" path
 	// — NotFound on inspect, already destroyed/destroying, NotFound on remove,
 	// and the normal success paths. Skipped only when we bail with a hard

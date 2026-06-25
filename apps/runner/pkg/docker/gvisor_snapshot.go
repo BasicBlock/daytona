@@ -20,6 +20,10 @@ func (d *DockerClient) CreateGvisorSnapshotFromSandbox(ctx context.Context, sand
 		return nil, fmt.Errorf("snapshot store is required")
 	}
 
+	if d.runscRuntime != nil && d.runscRuntime.Exists(sandboxID) {
+		return d.runscRuntime.CreateSnapshotFromSandbox(ctx, sandboxID, name, store)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(d.backupTimeoutMin)*time.Minute)
 	defer cancel()
 

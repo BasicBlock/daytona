@@ -13,6 +13,10 @@ import (
 )
 
 func (d *DockerClient) Stop(ctx context.Context, containerId string, force bool) error {
+	if d.runscRuntime != nil && d.runscRuntime.Exists(containerId) {
+		return d.runscRuntime.Stop(ctx, containerId, force)
+	}
+
 	// Deduce sandbox state first
 	state, err := d.GetSandboxState(ctx, containerId)
 	if err == nil && state == enums.SandboxStateStopped {

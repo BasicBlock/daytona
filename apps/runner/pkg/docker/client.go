@@ -13,6 +13,7 @@ import (
 	"github.com/daytonaio/common-go/pkg/utils"
 	"github.com/daytonaio/runner/pkg/cache"
 	"github.com/daytonaio/runner/pkg/common"
+	"github.com/daytonaio/runner/pkg/gvisor"
 	"github.com/daytonaio/runner/pkg/netrules"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/system"
@@ -45,6 +46,9 @@ type DockerClientConfig struct {
 	InitializeDaemonTelemetry    bool
 	InterSandboxNetworkEnabled   bool
 	GpuEnabled                   bool
+	RunscStateDir                string
+	RunscBridgeName              string
+	RunscBridgeCIDR              string
 }
 
 func NewDockerClient(ctx context.Context, config DockerClientConfig) (*DockerClient, error) {
@@ -126,6 +130,24 @@ func NewDockerClient(ctx context.Context, config DockerClientConfig) (*DockerCli
 		}
 	}
 
+	runscRuntime, err := gvisor.NewRuntime(ctx, gvisor.RuntimeConfig{
+		StateDir:                  config.RunscStateDir,
+		BridgeName:                config.RunscBridgeName,
+		BridgeCIDR:                config.RunscBridgeCIDR,
+		DaemonPath:                config.DaemonPath,
+		ComputerUsePluginPath:     config.ComputerUsePluginPath,
+		ResourceLimitsDisabled:    config.ResourceLimitsDisabled,
+		DaemonStartTimeoutSec:     config.DaemonStartTimeoutSec,
+		SandboxStartTimeoutSec:    config.SandboxStartTimeoutSec,
+		UseSnapshotEntrypoint:     config.UseSnapshotEntrypoint,
+		InitializeDaemonTelemetry: config.InitializeDaemonTelemetry,
+		Logger:                    config.Logger,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize raw runsc lifecycle backend: %w", err)
+	}
+	logger.Info("Raw runsc sandbox lifecycle backend enabled")
+
 	return &DockerClient{
 		apiClient:                    config.ApiClient,
 		backupInfoCache:              config.BackupInfoCache,
@@ -158,6 +180,7 @@ func NewDockerClient(ctx context.Context, config DockerClientConfig) (*DockerCli
 		gpuType:                      gpuType,
 		gpuAllocator:                 newGpuAllocator(gpuCount),
 		filesystem:                   filesystem,
+		runscRuntime:                 runscRuntime,
 	}, nil
 }
 
@@ -215,4 +238,5 @@ type DockerClient struct {
 	gpuCount                     int
 	gpuType                      string
 	gpuAllocator                 *gpuAllocator
+	runscRuntime                 *gvisor.Runtime
 }

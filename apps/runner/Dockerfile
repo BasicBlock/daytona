@@ -66,7 +66,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM docker:28.5.2-dind-alpine3.22 AS runner
 
 RUN apk update && apk upgrade --no-cache openssl pcre2 \
-  && apk add --no-cache curl rsync
+  && apk add --no-cache ca-certificates curl iproute2 iptables rsync
 
 ARG TARGETARCH
 RUN set -eux; \
