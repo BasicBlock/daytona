@@ -38,9 +38,7 @@ type CreateSnapshot struct {
 	// Disk space allocated to the sandbox in GB
 	Disk *int32 `json:"disk,omitempty"`
 	// Build information for the snapshot
-	BuildInfo *CreateBuildInfo `json:"buildInfo,omitempty"`
-	// Target sandbox class. Determines which runners can host sandboxes created from this snapshot.
-	SandboxClass *SandboxClass `json:"sandboxClass,omitempty"`
+	BuildInfo            *CreateBuildInfo `json:"buildInfo,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -344,40 +342,8 @@ func (o *CreateSnapshot) SetBuildInfo(v CreateBuildInfo) {
 	o.BuildInfo = &v
 }
 
-// GetSandboxClass returns the SandboxClass field value if set, zero value otherwise.
-func (o *CreateSnapshot) GetSandboxClass() SandboxClass {
-	if o == nil || IsNil(o.SandboxClass) {
-		var ret SandboxClass
-		return ret
-	}
-	return *o.SandboxClass
-}
-
-// GetSandboxClassOk returns a tuple with the SandboxClass field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CreateSnapshot) GetSandboxClassOk() (*SandboxClass, bool) {
-	if o == nil || IsNil(o.SandboxClass) {
-		return nil, false
-	}
-	return o.SandboxClass, true
-}
-
-// HasSandboxClass returns a boolean if a field has been set.
-func (o *CreateSnapshot) HasSandboxClass() bool {
-	if o != nil && !IsNil(o.SandboxClass) {
-		return true
-	}
-
-	return false
-}
-
-// SetSandboxClass gets a reference to the given SandboxClass and assigns it to the SandboxClass field.
-func (o *CreateSnapshot) SetSandboxClass(v SandboxClass) {
-	o.SandboxClass = &v
-}
-
 func (o CreateSnapshot) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -411,9 +377,6 @@ func (o CreateSnapshot) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.BuildInfo) {
 		toSerialize["buildInfo"] = o.BuildInfo
 	}
-	if !IsNil(o.SandboxClass) {
-		toSerialize["sandboxClass"] = o.SandboxClass
-	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -435,10 +398,10 @@ func (o *CreateSnapshot) UnmarshalJSON(data []byte) (err error) {
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	for _, requiredProperty := range(requiredProperties) {
+	for _, requiredProperty := range requiredProperties {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -466,7 +429,6 @@ func (o *CreateSnapshot) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "memory")
 		delete(additionalProperties, "disk")
 		delete(additionalProperties, "buildInfo")
-		delete(additionalProperties, "sandboxClass")
 		o.AdditionalProperties = additionalProperties
 	}
 
@@ -508,5 +470,3 @@ func (v *NullableCreateSnapshot) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

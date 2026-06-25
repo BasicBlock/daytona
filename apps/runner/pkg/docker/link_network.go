@@ -6,6 +6,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/containerd/errdefs"
@@ -52,6 +53,73 @@ func networkAliasForOwner(owner *container.InspectResponse) string {
 		}
 	}
 	return ""
+}
+
+func networkAliasesForSandbox(sandboxId, sandboxName string) []string {
+	if sandboxName == "" || sandboxName == sandboxId {
+		return []string{}
+	}
+	return []string{sandboxName}
+}
+
+func (d *DockerClient) linkedOwnerExtraHosts(ctx context.Context, ownerId string) ([]string, error) {
+	owner, err := d.ContainerInspect(ctx, ownerId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect linked sandbox %s for hosts entry: %w", ownerId, err)
+	}
+
+	ownerIP := containerIPOnNetwork(owner, "bridge")
+	if ownerIP == "" {
+		ownerIP = containerIPOnNetwork(owner, RUNNER_BRIDGE_NETWORK_NAME)
+	}
+	if ownerIP == "" {
+		var err error
+		ownerIP, err = d.linkNetworkContainerIP(ctx, ownerId, owner.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ownerIP == "" {
+		return nil, fmt.Errorf("linked sandbox %s has no reachable network IP", ownerId)
+	}
+
+	hosts := []string{ownerId + ":" + ownerIP}
+	if alias := networkAliasForOwner(owner); alias != "" && alias != ownerId {
+		hosts = append(hosts, alias+":"+ownerIP)
+	}
+	return hosts, nil
+}
+
+func containerIPOnNetwork(ct *container.InspectResponse, networkName string) string {
+	if ct == nil || ct.NetworkSettings == nil || ct.NetworkSettings.Networks == nil {
+		return ""
+	}
+	endpoint := ct.NetworkSettings.Networks[networkName]
+	if endpoint == nil {
+		return ""
+	}
+	return endpoint.IPAddress
+}
+
+func (d *DockerClient) linkNetworkContainerIP(ctx context.Context, ownerId string, containerID string) (string, error) {
+	name := linkNetworkName(ownerId)
+	netInspect, err := d.apiClient.NetworkInspect(ctx, name, network.InspectOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect link network %s for host entry: %w", name, err)
+	}
+
+	endpoint, ok := netInspect.Containers[containerID]
+	if !ok {
+		return "", nil
+	}
+	ip, _, err := net.ParseCIDR(endpoint.IPv4Address)
+	if err != nil {
+		if endpoint.IPv4Address != "" {
+			return "", fmt.Errorf("invalid link network IP %q for %s: %w", endpoint.IPv4Address, containerID, err)
+		}
+		return "", nil
+	}
+	return ip.String(), nil
 }
 
 // ensureLinkNetwork creates the per-owner link network if it does not yet exist
@@ -275,13 +343,8 @@ func (d *DockerClient) ensureOwnerOnLinkNetwork(ctx context.Context, owner *cont
 func (d *DockerClient) connectFollowerToLinkNetwork(ctx context.Context, ownerId, sandboxId, sandboxName string) error {
 	name := linkNetworkName(ownerId)
 
-	aliases := []string{}
-	if sandboxName != "" && sandboxName != sandboxId {
-		aliases = append(aliases, sandboxName)
-	}
-
 	err := d.apiClient.NetworkConnect(ctx, name, sandboxId, &network.EndpointSettings{
-		Aliases: aliases,
+		Aliases: networkAliasesForSandbox(sandboxId, sandboxName),
 	})
 	if err != nil && !isAlreadyAttachedErr(err) {
 		return fmt.Errorf("failed to connect follower %s to link network %s: %w", sandboxId, name, err)
@@ -380,17 +443,6 @@ func (d *DockerClient) reconcileFollowerLinkNetwork(ctx context.Context, sandbox
 	}
 
 	if err := d.connectFollowerToLinkNetwork(ctx, ownerId, sandboxDto.Id, sandboxDto.Name); err != nil {
-		// Android-device followers pin the link network via HostConfig.NetworkMode at
-		// container create time, so an explicit connect here races with docker's own
-		// attachment and can surface "container not found" if the container hasn't
-		// been created yet, or succeed as a no-op once it has. Non-android followers
-		// always need the explicit connect. Swallow not-found for android-device so
-		// reconcile is safe to call pre-ContainerCreate; any real failure still bubbles
-		// up from the post-create reconcile in the main Create flow.
-		if sandboxDto.IsAndroidSandbox() && (errdefs.IsNotFound(err) || common_errors.IsNotFoundError(err)) {
-			return ownerId, nil
-		}
-
 		return "", err
 	}
 	return ownerId, nil

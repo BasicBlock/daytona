@@ -20,6 +20,21 @@
         }
       ]
     },
+    "copy-daemon-bin-arm64": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cp dist/apps/daemon-arm64 {projectRoot}/pkg/daemon/static/daemon-arm64"
+      },
+      "cache": true,
+      "inputs": [{ "dependentTasksOutputFiles": "**/*", "transitive": true }],
+      "outputs": ["{projectRoot}/pkg/daemon/static/daemon-arm64"],
+      "dependsOn": [
+        {
+          "target": "build-arm64",
+          "projects": "daemon"
+        }
+      ]
+    },
     "copy-computeruse-plugin": {
       "executor": "nx:run-commands",
       "options": {
@@ -46,7 +61,7 @@
         "outputPath": "dist/apps/runner",
         "flags": ["-ldflags \"-X 'github.com/daytonaio/runner/internal.Version=$VERSION'\""]
       },
-      "dependsOn": ["copy-daemon-bin", "copy-computeruse-plugin", "check-version-env"],
+      "dependsOn": ["copy-daemon-bin", "copy-daemon-bin-arm64", "copy-computeruse-plugin", "check-version-env"],
       "inputs": [
         "goProduction",
         "^goProduction",
@@ -66,7 +81,7 @@
         },
         "flags": ["-ldflags \"-X 'github.com/daytonaio/runner/internal.Version=$VERSION'\""]
       },
-      "dependsOn": ["copy-daemon-bin", "copy-computeruse-plugin", "check-version-env"],
+      "dependsOn": ["copy-daemon-bin", "copy-daemon-bin-arm64", "copy-computeruse-plugin", "check-version-env"],
       "inputs": [
         "goProduction",
         "^goProduction",
@@ -90,6 +105,7 @@
           "projects": "daemon"
         },
         "copy-daemon-bin",
+        "copy-daemon-bin-arm64",
         "copy-computeruse-plugin"
       ]
     },

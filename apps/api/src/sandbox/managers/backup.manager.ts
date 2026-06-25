@@ -713,8 +713,8 @@ export class BackupManager implements TrackableJobExecutions, OnApplicationShutd
    * Transition a backup from PENDING to IN_PROGRESS without clobbering a terminal state
    * that a concurrent completion may have already written.
    *
-   * On v2 runners a CREATE_BACKUP job can be claimed and completed (or fail fast, e.g.
-   * "No such container") within milliseconds of being created. The fire-and-forget job
+   * On v2 runners a CREATE_BACKUP job can be claimed and completed or fail fast
+   * within milliseconds of being created. The fire-and-forget job
    * completion handler then writes Completed/Error. An unconditional write here would
    * overwrite that terminal state back to InProgress and strand the sandbox forever
    * (the job is already terminal, so neither the stale-job sweep nor the in-progress

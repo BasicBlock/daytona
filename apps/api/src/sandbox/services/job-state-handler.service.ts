@@ -791,11 +791,9 @@ export class JobStateHandlerService {
         if (!snapshotName) {
           this.logger.error(`SNAPSHOT_SANDBOX job ${job.id} payload missing snapshot name`)
         } else {
-          // Prefer the ref the runner actually pushed. Otherwise reconstruct
-          // from `hash`, matching the runner-side canonical form
-          // (apps/runner/cmd/runner/config/config.go): registry-based VM /
-          // container snapshots use `<registry>/<project>/daytona-<hash>:daytona`,
-          // Windows VM snapshots have no registry and use bare `daytona-<hash>`.
+          // Prefer the ref the runner actually produced. Snapshot-from-sandbox
+          // should return a durable gcs:// manifest ref; the hash fallback only
+          // exists for older in-flight jobs while this branch is experimental.
           const refFromRunner =
             (typeof metadata?.ref === 'string' && metadata.ref) ||
             (typeof metadata?.Ref === 'string' && metadata.Ref) ||

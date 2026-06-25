@@ -38,7 +38,7 @@ const configuration = {
     tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
   },
   defaultSnapshot: process.env.DEFAULT_SNAPSHOT,
-  defaultSandboxClass: (process.env.DEFAULT_SANDBOX_CLASS || SandboxClass.CONTAINER) as SandboxClass,
+  defaultSandboxClass: SandboxClass.LINUX_VM,
   dashboardUrl: process.env.DASHBOARD_URL,
   // Default to empty string - dashboard will then hit '/api'
   dashboardBaseApiUrl: process.env.DASHBOARD_BASE_API_URL || '',

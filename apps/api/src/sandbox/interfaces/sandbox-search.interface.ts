@@ -4,7 +4,6 @@
  */
 
 import { SandboxState } from '../enums/sandbox-state.enum'
-import { SandboxClass } from '../enums/sandbox-class.enum'
 import { SandboxListItemDto } from '../dto/sandbox-list-item.dto'
 import {
   SandboxListSortField as SandboxSearchSortField,
@@ -38,10 +37,6 @@ export interface SandboxSearchFilters {
    * Filter by snapshots
    */
   snapshots?: string[]
-  /**
-   * Filter by sandbox classes
-   */
-  sandboxClasses?: SandboxClass[]
   /**
    * Filter by minimum CPU
    */

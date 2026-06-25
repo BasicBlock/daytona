@@ -14,7 +14,6 @@ import (
 	"github.com/daytonaio/runner/pkg/common"
 
 	"github.com/docker/docker/api/types/container"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func (d *DockerClient) Resize(ctx context.Context, sandboxId string, sandboxDto dto.ResizeSandboxDTO) error {
@@ -138,10 +137,7 @@ func (d *DockerClient) ContainerDiskResize(ctx context.Context, sandboxId string
 				originalContainer.Config,
 				newHostConfig,
 				nil,
-				&v1.Platform{
-					Architecture: "amd64",
-					OS:           "linux",
-				},
+				sandboxPlatform(),
 				sandboxId,
 			)
 			return createErr

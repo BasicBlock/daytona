@@ -9,9 +9,9 @@ import {
   ArrayMinSize,
   ArrayMaxSize,
   IsArray,
-  IsEnum,
   IsObject,
   IsNumber,
+  IsEnum,
   IsOptional,
   IsString,
   Max,
@@ -19,7 +19,6 @@ import {
 } from 'class-validator'
 import { CreateBuildInfoDto } from './create-build-info.dto'
 import { IsSafeDisplayString } from '../../common/validators'
-import { SandboxClass } from '../enums/sandbox-class.enum'
 import { GpuType } from '../enums/gpu-type.enum'
 
 @ApiSchema({ name: 'CreateSnapshot' })
@@ -122,14 +121,4 @@ export class CreateSnapshotDto {
   @IsOptional()
   @IsObject()
   buildInfo?: CreateBuildInfoDto
-
-  @ApiPropertyOptional({
-    description: 'Target sandbox class. Determines which runners can host sandboxes created from this snapshot.',
-    enum: SandboxClass,
-    enumName: 'SandboxClass',
-    example: SandboxClass.LINUX_VM,
-  })
-  @IsOptional()
-  @IsEnum(SandboxClass)
-  sandboxClass?: SandboxClass
 }

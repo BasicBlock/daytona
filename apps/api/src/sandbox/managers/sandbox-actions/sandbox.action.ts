@@ -47,7 +47,7 @@ export abstract class SandboxAction {
     const currentLockCode = await this.redisLockProvider.getCode(lockKey)
 
     // Lost our lock: abort instead of returning. Callers create runner jobs right after the save,
-    // so a silent no-op would still fire them, duplicating containers and leaving a stale runnerId.
+    // so a silent no-op would still fire them, duplicating sandboxes and leaving a stale runnerId.
     // Throwing makes that unreachable; syncInstanceState catches SandboxConflictError and breaks.
     if (currentLockCode === null) {
       this.logger.warn(

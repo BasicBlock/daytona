@@ -23,7 +23,6 @@ import { ForkSandboxDto } from '../dto/fork-sandbox.dto'
 import { ResizeSandboxDto } from '../dto/resize-sandbox.dto'
 import { SandboxState } from '../enums/sandbox-state.enum'
 import { SandboxClass } from '../enums/sandbox-class.enum'
-import { isRegistryBasedSandboxClass } from '../utils/sandbox-class.util'
 import { SandboxDesiredState } from '../enums/sandbox-desired-state.enum'
 import { resolveGpuTypePreferences } from '../utils/gpu-type-preferences.util'
 import { RunnerService } from './runner.service'
@@ -358,10 +357,6 @@ export class SandboxService {
         throw new BadRequestError('GPU sandboxes must be ephemeral - set autoDeleteInterval to 0')
       }
 
-      if (snapshot.sandboxClass === SandboxClass.ANDROID && !createSandboxDto.linkedSandbox) {
-        throw new BadRequestError('Android sandboxes must be linked to another sandbox')
-      }
-
       // Resolve and validate an optional linked sandbox. When set, the new sandbox is pinned
       // to the same runner as the linked sandbox so a local network can be established.
       const linkedSandbox = await this.resolveLinkedSandbox(createSandboxDto)
@@ -397,7 +392,7 @@ export class SandboxService {
 
       // GPU sandboxes are always ephemeral: they get exclusive ownership of a
       // runner for their lifetime and are auto-deleted on first stop. Skip the
-      // warm-pool path entirely so we always provision a fresh container on a
+      // warm-pool path entirely so we always provision a fresh sandbox on a
       // currently-unoccupied GPU runner.
       if (gpu <= 0 && !linkedSandbox && (!createSandboxDto.volumes || createSandboxDto.volumes.length === 0)) {
         const skipWarmPool = (await this.redis.exists(`warm-pool:skip:${snapshot.id}`)) === 1
@@ -691,7 +686,7 @@ export class SandboxService {
       const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented, pendingGpuIncremented } =
         await this.validateSandboxResources(
           target,
-          SandboxClass.CONTAINER,
+          SandboxClass.LINUX_VM,
           cpu,
           mem,
           disk,
@@ -719,7 +714,7 @@ export class SandboxService {
 
       const sandbox = new Sandbox({ target: target.id, name: createSandboxDto.name })
 
-      sandbox.sandboxClass = SandboxClass.CONTAINER
+      sandbox.sandboxClass = SandboxClass.LINUX_VM
       sandbox.osUser = createSandboxDto.osUser || 'daytona'
       sandbox.env = createSandboxDto.env || {}
       sandbox.labels = createSandboxDto.labels || {}
@@ -755,10 +750,6 @@ export class SandboxService {
 
       if (resolvedVolumes !== undefined) {
         sandbox.volumes = resolvedVolumes
-      }
-
-      if (sandbox.sandboxClass !== SandboxClass.CONTAINER) {
-        throw new BadRequestError('Declarative builds are only supported for container-class sandboxes')
       }
 
       const buildInfoSnapshotRef = generateBuildSnapshotRef(
@@ -854,7 +845,7 @@ export class SandboxService {
     } catch (error) {
       await this.rollbackPendingUsage(
         target.id,
-        SandboxClass.CONTAINER,
+        SandboxClass.LINUX_VM,
         pendingCpuIncrement,
         pendingMemoryIncrement,
         pendingDiskIncrement,
@@ -899,7 +890,7 @@ export class SandboxService {
 
     const sourceSandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
-    if (![SandboxClass.LINUX_VM, SandboxClass.WINDOWS].includes(sourceSandbox.sandboxClass)) {
+    if (sourceSandbox.sandboxClass !== SandboxClass.LINUX_VM) {
       throw new HttpException('Forking is not supported for this sandbox', HttpStatus.UNPROCESSABLE_ENTITY)
     }
 
@@ -989,7 +980,7 @@ export class SandboxService {
       try {
         insertedForkedSandbox = await this.sandboxRepository.insert(forkedSandbox, sourceSandbox.id)
         const runnerAdapter = await this.runnerAdapterFactory.create(runner)
-        await runnerAdapter.forkSandbox(sourceSandbox.id, insertedForkedSandbox.id)
+        await runnerAdapter.forkSandbox(sourceSandbox.id, insertedForkedSandbox.id, insertedForkedSandbox.authToken)
       } catch (error) {
         // Rollback source sandbox to its initial state
         await this.sandboxRepository.updateWhere(sourceSandbox.id, {
@@ -1093,11 +1084,9 @@ export class SandboxService {
 
     const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
-    const includeMemory = dto.includeMemory ?? false
-
     try {
-      if (![SandboxState.STARTED, SandboxState.STOPPED].includes(sandbox.state)) {
-        throw new BadRequestError('Sandbox must be in started or stopped state to create a snapshot')
+      if (sandbox.state !== SandboxState.STARTED) {
+        throw new BadRequestError('Sandbox must be in started state to create a snapshot')
       }
 
       if (sandbox.pending) {
@@ -1110,28 +1099,11 @@ export class SandboxService {
 
       const runner = await this.runnerService.findOneOrFail(sandbox.runnerId)
 
-      if (sandbox.sandboxClass === SandboxClass.WINDOWS) {
-        if (includeMemory && sandbox.state !== SandboxState.STARTED) {
-          throw new BadRequestError('Snapshots with memory require the Windows sandbox to be running (STARTED)')
-        }
-        if (!includeMemory && sandbox.state !== SandboxState.STOPPED) {
-          throw new BadRequestError('Filesystem-only snapshots require the Windows sandbox to be stopped (STOPPED)')
-        }
-      } else if (includeMemory) {
-        throw new BadRequestError('includeMemory is only supported for Windows sandboxes')
+      if (sandbox.sandboxClass !== SandboxClass.LINUX_VM) {
+        throw new BadRequestError('Snapshots are only supported for linux-vm sandboxes')
       }
 
       const target = { id: sandbox.target }
-
-      let registry: DockerRegistry | undefined
-      if (isRegistryBasedSandboxClass(sandbox.sandboxClass)) {
-        registry = (await this.dockerRegistryService.getAvailableInternalRegistry(sandbox.target)) ?? undefined
-        if (sandbox.sandboxClass === SandboxClass.CONTAINER && !registry) {
-          throw new BadRequestError(
-            'No internal registry is available for this sandbox target; cannot snapshot a container sandbox',
-          )
-        }
-      }
 
       void target
 
@@ -1149,13 +1121,7 @@ export class SandboxService {
       const runnerAdapter = await this.runnerAdapterFactory.create(runner)
 
       try {
-        await runnerAdapter.createSnapshotFromSandbox(
-          sandbox.id,
-          dto.name,
-          RUNNER_SNAPSHOT_SOURCE,
-          registry,
-          includeMemory,
-        )
+        await runnerAdapter.createSnapshotFromSandbox(sandbox.id, dto.name, RUNNER_SNAPSHOT_SOURCE)
       } catch (error) {
         await this.sandboxRepository.updateWhere(sandbox.id, {
           updateData: {
@@ -1316,7 +1282,6 @@ export class SandboxService {
         includeErroredDeleted: query.includeErroredDeleted,
         states: query.states,
         snapshots: query.snapshots,
-        sandboxClasses: query.sandboxClasses,
         minCpu: query.minCpu,
         maxCpu: query.maxCpu,
         minMemoryGiB: query.minMemoryGiB,
@@ -1688,7 +1653,7 @@ export class SandboxService {
         throw new StateChangeInProgressError()
       }
 
-      if (wasPaused && ![SandboxClass.LINUX_VM, SandboxClass.WINDOWS].includes(sandbox.sandboxClass)) {
+      if (wasPaused && sandbox.sandboxClass !== SandboxClass.LINUX_VM) {
         throw new HttpException('Resuming is not supported for this sandbox', HttpStatus.UNPROCESSABLE_ENTITY)
       }
 
@@ -1799,7 +1764,7 @@ export class SandboxService {
       throw new StateChangeInProgressError()
     }
 
-    if (![SandboxClass.LINUX_VM, SandboxClass.WINDOWS].includes(sandbox.sandboxClass)) {
+    if (sandbox.sandboxClass !== SandboxClass.LINUX_VM) {
       throw new HttpException('Pausing is not supported for this sandbox', HttpStatus.UNPROCESSABLE_ENTITY)
     }
 

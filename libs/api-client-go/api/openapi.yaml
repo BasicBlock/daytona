@@ -104,16 +104,6 @@ paths:
             type: string
           type: array
         style: form
-      - description: List of sandbox classes to filter by
-        explode: true
-        in: query
-        name: sandboxClasses
-        required: false
-        schema:
-          items:
-            $ref: "#/components/schemas/SandboxClass"
-          type: array
-        style: form
       - description: Minimum CPU
         explode: true
         in: query
@@ -2488,6 +2478,62 @@ paths:
       summary: Get sandbox metrics
       tags:
       - sandbox
+  /webhooks/app-portal-access:
+    post:
+      operationId: WebhookController_getAppPortalAccess
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAppPortalAccess"
+          description: App Portal access generated successfully
+      summary: Get Svix Consumer App Portal access
+      tags:
+      - webhooks
+  /webhooks/initialization-status:
+    get:
+      operationId: WebhookController_getInitializationStatus
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookInitializationStatus"
+          description: Webhook initialization status
+        "404":
+          description: Webhook initialization status not found
+      summary: Get webhook initialization status
+      tags:
+      - webhooks
+  /webhooks/initialize:
+    post:
+      operationId: WebhookController_initializeWebhooks
+      parameters: []
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookInitializationStatus"
+          description: Webhooks initialized successfully
+      summary: Initialize webhooks
+      tags:
+      - webhooks
+  /webhooks/refresh-endpoints:
+    post:
+      operationId: WebhookController_refreshEndpoints
+      parameters: []
+      responses:
+        "204":
+          description: Endpoint flag refreshed
+        "404":
+          description: Webhook initialization status not found
+      summary: Refresh cached endpoint presence flag
+      tags:
+      - webhooks
 components:
   schemas:
     DaytonaConfiguration:
@@ -2578,18 +2624,6 @@ components:
       - paused
       - resuming
       type: string
-    SandboxClass:
-      enum:
-      - linux-vm
-      - container
-      - android
-      - windows
-      type: string
-      x-enum-varnames:
-      - LINUX_VM
-      - CONTAINER
-      - ANDROID
-      - WINDOWS
     SandboxListSortField:
       enum:
       - name
@@ -2604,6 +2638,13 @@ components:
       - asc
       - desc
       type: string
+    SandboxClass:
+      description: The class of the sandbox
+      enum:
+      - linux-vm
+      type: string
+      x-enum-varnames:
+      - LINUX_VM
     SandboxDesiredState:
       description: The desired state of the sandbox
       enum:
@@ -3099,16 +3140,10 @@ components:
           description: The class of the sandbox
           enum:
           - linux-vm
-          - container
-          - android
-          - windows
           example: linux-vm
           type: string
           x-enum-varnames:
           - LINUX_VM
-          - CONTAINER
-          - ANDROID
-          - WINDOWS
         daemonVersion:
           description: The version of the daemon running in the sandbox
           example: 1.0.0
@@ -3487,19 +3522,12 @@ components:
       type: object
     CreateSandboxSnapshot:
       example:
-        includeMemory: false
         name: my-dev-env-v1
       properties:
         name:
           description: Name for the new snapshot
           example: my-dev-env-v1
           type: string
-        includeMemory:
-          default: false
-          description: Include the VM's memory in the snapshot. VM sandboxes only.
-            When true the sandbox must be STARTED; when false (default) VM sandboxes
-            must be STOPPED. Container sandboxes do not support memory snapshots.
-          type: boolean
       required:
       - name
       type: object
@@ -3717,12 +3745,6 @@ components:
       - decommissioned
       - unresponsive
       type: string
-    RunnerClass:
-      description: The class of the runner. Deprecated and always returns "container"
-        for backward compatibility - use sandboxClass instead.
-      enum:
-      - container
-      type: string
     RunnerFull:
       example:
         currentStartedSandboxes: 5
@@ -3756,7 +3778,6 @@ components:
         disk: 100
         domain: runner1.example.com
         name: runner1
-        runnerClass: container
         lastChecked: 2024-10-01T12:00:00Z
       properties:
         id:
@@ -3882,13 +3903,6 @@ components:
           description: The api version of the runner
           example: "0"
           type: string
-        runnerClass:
-          allOf:
-          - $ref: "#/components/schemas/RunnerClass"
-          deprecated: true
-          description: The class of the runner. Deprecated and always returns "container"
-            for backward compatibility - use sandboxClass instead.
-          example: container
         appVersion:
           deprecated: true
           description: The app version of the runner
@@ -3902,7 +3916,6 @@ components:
       - id
       - memory
       - name
-      - runnerClass
       - state
       - tags
       - target
@@ -3965,7 +3978,6 @@ components:
         disk: 100
         domain: runner1.example.com
         name: runner1
-        runnerClass: container
         lastChecked: 2024-10-01T12:00:00Z
       properties:
         id:
@@ -4091,13 +4103,6 @@ components:
           description: The api version of the runner
           example: "0"
           type: string
-        runnerClass:
-          allOf:
-          - $ref: "#/components/schemas/RunnerClass"
-          deprecated: true
-          description: The class of the runner. Deprecated and always returns "container"
-            for backward compatibility - use sandboxClass instead.
-          example: container
         appVersion:
           deprecated: true
           description: The app version of the runner
@@ -4111,7 +4116,6 @@ components:
       - id
       - memory
       - name
-      - runnerClass
       - state
       - tags
       - target
@@ -4268,7 +4272,6 @@ components:
         gpu: 0
         gpuType:
         - H100
-        sandboxClass: linux-vm
       properties:
         name:
           description: The name of the snapshot
@@ -4311,12 +4314,6 @@ components:
           allOf:
           - $ref: "#/components/schemas/CreateBuildInfo"
           description: Build information for the snapshot
-        sandboxClass:
-          allOf:
-          - $ref: "#/components/schemas/SandboxClass"
-          description: Target sandbox class. Determines which runners can host sandboxes
-            created from this snapshot.
-          example: linux-vm
       required:
       - name
       type: object
@@ -4414,16 +4411,10 @@ components:
           description: The sandbox class of the snapshot
           enum:
           - linux-vm
-          - container
-          - android
-          - windows
           example: linux-vm
           type: string
           x-enum-varnames:
           - LINUX_VM
-          - CONTAINER
-          - ANDROID
-          - WINDOWS
       required:
       - cpu
       - createdAt
@@ -5278,6 +5269,66 @@ components:
           type: array
       required:
       - series
+      type: object
+    WebhookAppPortalAccess:
+      example:
+        url: https://app.svix.com/app_1234567890
+        token: appsk_...
+      properties:
+        token:
+          description: The authentication token for the Svix consumer app portal
+          example: appsk_...
+          type: string
+        url:
+          description: The URL to the webhook app portal
+          example: https://app.svix.com/app_1234567890
+          type: string
+      required:
+      - token
+      - url
+      type: object
+    WebhookInitializationStatus:
+      example:
+        createdAt: 2023-01-01T00:00:00.000Z
+        lastError: Failed to create Svix application
+        retryCount: 3
+        applicationId: default
+        svixApplicationId: app_1234567890
+        updatedAt: 2023-01-01T00:00:00.000Z
+      properties:
+        applicationId:
+          description: Webhook application ID
+          example: default
+          type: string
+        svixApplicationId:
+          description: The ID of the Svix application
+          example: app_1234567890
+          nullable: true
+          type: string
+        lastError:
+          description: The error reason for the last initialization attempt
+          example: Failed to create Svix application
+          nullable: true
+          type: string
+        retryCount:
+          description: The number of times the initialization has been attempted
+          example: 3
+          type: number
+        createdAt:
+          description: When the webhook initialization was created
+          example: 2023-01-01T00:00:00.000Z
+          type: string
+        updatedAt:
+          description: When the webhook initialization was last updated
+          example: 2023-01-01T00:00:00.000Z
+          type: string
+      required:
+      - applicationId
+      - createdAt
+      - lastError
+      - retryCount
+      - svixApplicationId
+      - updatedAt
       type: object
     HealthController_check_200_response_info_value:
       additionalProperties: true

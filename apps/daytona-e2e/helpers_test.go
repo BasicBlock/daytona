@@ -12,6 +12,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -185,9 +186,62 @@ func sandboxLabels(runID string) map[string]string {
 }
 
 func setToolboxAuthorizationHeader(req *http.Request, cfg Config) {
-	setToolboxAuthorization(req.Header, cfg)
+	setToolboxAuthorizationForURL(req.Header, cfg, req.URL)
 }
 
-func setToolboxAuthorization(headers http.Header, _ Config) {
-	headers.Set("X-Daytona-Preview-Token", "e2e-preview-token")
+func setToolboxAuthorizationForURL(headers http.Header, cfg Config, requestURL *url.URL) {
+	sandboxID, err := sandboxIDFromToolboxURL(requestURL)
+	if err != nil {
+		panic(err)
+	}
+
+	token, err := toolboxPreviewToken(cfg, sandboxID)
+	if err != nil {
+		panic(err)
+	}
+
+	headers.Set("X-Daytona-Preview-Token", token)
+}
+
+func sandboxIDFromToolboxURL(requestURL *url.URL) (string, error) {
+	parts := strings.Split(strings.Trim(requestURL.Path, "/"), "/")
+	for i, part := range parts {
+		if part == "toolbox" && i+1 < len(parts) && parts[i+1] != "" {
+			return parts[i+1], nil
+		}
+	}
+
+	return "", fmt.Errorf("toolbox URL %q does not contain a sandbox ID", requestURL.String())
+}
+
+func toolboxPreviewToken(cfg Config, sandboxID string) (string, error) {
+	tokenURL := strings.TrimRight(cfg.BaseURL, "/") +
+		"/sandbox/" + url.PathEscape(sandboxID) + "/ports/2280/preview-url"
+
+	resp, err := http.Get(tokenURL) //nolint:gosec // local e2e helper
+	if err != nil {
+		return "", fmt.Errorf("get toolbox preview token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read toolbox preview token response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("get toolbox preview token returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var preview struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(body, &preview); err != nil {
+		return "", fmt.Errorf("decode toolbox preview token response: %w", err)
+	}
+	if preview.Token == "" {
+		return "", fmt.Errorf("toolbox preview token response missing token")
+	}
+
+	return preview.Token, nil
 }

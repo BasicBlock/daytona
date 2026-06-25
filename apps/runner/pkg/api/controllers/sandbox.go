@@ -4,7 +4,6 @@
 package controllers
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 
@@ -12,12 +11,11 @@ import (
 	"github.com/daytonaio/runner/pkg/common"
 	"github.com/daytonaio/runner/pkg/models/enums"
 	"github.com/daytonaio/runner/pkg/runner"
+	"github.com/daytonaio/runner/pkg/storage"
 	"github.com/gin-gonic/gin"
 
 	common_errors "github.com/daytonaio/common-go/pkg/errors"
 )
-
-var errInvalidSnapshotFromSandboxRegistry = errors.New("registry is required for sandbox snapshot")
 
 // Create 			godoc
 //
@@ -153,7 +151,7 @@ func CreateBackup(logger *slog.Logger) gin.HandlerFunc {
 //
 //	@Tags			sandbox
 //	@Summary		Snapshot a running sandbox
-//	@Description	Commit the sandbox container filesystem and push the image to the supplied registry under the canonical daytona-{hash}:daytona tag.
+//	@Description	Create a gVisor memory/filesystem snapshot bundle and store it in GCS.
 //	@Produce		json
 //	@Param			sandboxId	path		string									true	"Sandbox ID"
 //	@Param			body		body		dto.CreateSnapshotFromSandboxRequestDTO	true	"Snapshot from sandbox"
@@ -175,18 +173,19 @@ func SnapshotFromSandbox(ctx *gin.Context) {
 		return
 	}
 
-	if request.Registry == nil {
-		ctx.Error(common_errors.NewBadRequestError(errInvalidSnapshotFromSandboxRegistry))
-		return
-	}
-
 	r, err := runner.GetInstance(nil)
 	if err != nil {
 		ctx.Error(err)
 		return
 	}
 
-	info, err := r.Docker.CreateSnapshotFromSandbox(ctx.Request.Context(), sandboxId, request.Registry)
+	store, err := storage.GetSnapshotStoreClient(ctx.Request.Context())
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	info, err := r.Docker.CreateGvisorSnapshotFromSandbox(ctx.Request.Context(), sandboxId, request.Name, store)
 	if err != nil {
 		ctx.Error(err)
 		return

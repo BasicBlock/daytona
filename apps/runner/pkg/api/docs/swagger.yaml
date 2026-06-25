@@ -85,10 +85,6 @@ definitions:
         type: string
       registry:
         $ref: '#/definitions/RegistryDTO'
-      sandboxClass:
-        description: Optional for backward compatibility, but when provided, indicates
-          the class of sandbox to create.
-        type: string
       skipStart:
         type: boolean
       snapshot:
@@ -110,11 +106,8 @@ definitions:
       name:
         example: my-snapshot:latest
         type: string
-      registry:
-        $ref: '#/definitions/RegistryDTO'
     required:
       - name
-      - registry
     type: object
   ErrorResponse:
     description: Error response
@@ -175,8 +168,6 @@ definitions:
         type: string
       registry:
         $ref: '#/definitions/RegistryDTO'
-      sandboxClass:
-        type: string
       snapshot:
         type: string
     required:
@@ -854,8 +845,8 @@ paths:
         - sandbox
   /sandboxes/{sandboxId}/snapshot-from-sandbox:
     post:
-      description: Commit the sandbox container filesystem and push the image to the
-        supplied registry under the canonical daytona-{hash}:daytona tag.
+      description: Create a gVisor memory/filesystem snapshot bundle and store it
+        in GCS.
       operationId: SnapshotFromSandbox
       parameters:
         - description: Sandbox ID

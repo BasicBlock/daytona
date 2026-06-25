@@ -69,9 +69,6 @@ export enum SandboxDesiredState {
 export enum SandboxClass {
   UNKNOWN_DEFAULT_OPEN_API = 'unknown_default_open_api',
   LINUX_VM = 'linux-vm',
-  CONTAINER = 'container',
-  ANDROID = 'android',
-  WINDOWS = 'windows',
 }
 
 export enum SandboxListSortField {
@@ -234,8 +231,6 @@ export type CreateSnapshot = {
   memory?: number
   disk?: number
   buildInfo?: BuildInfo
-  sandboxClass?: SandboxClass
-  target?: string
 }
 
 export type SnapshotDto = {
@@ -325,7 +320,6 @@ export type Runner = {
   version?: string
   appVersion?: string
   apiVersion?: string
-  runnerClass?: string
   [key: string]: unknown
 }
 
@@ -500,7 +494,6 @@ export class SandboxApi extends ResourceApi {
     states?: SandboxState[],
     snapshots?: string[],
     _targets?: string[],
-    sandboxClasses?: SandboxClass[],
     minCpu?: number,
     maxCpu?: number,
     minMemoryGiB?: number,
@@ -528,7 +521,6 @@ export class SandboxApi extends ResourceApi {
           includeErroredDeleted,
           states,
           snapshots,
-          sandboxClasses,
           minCpu,
           maxCpu,
           minMemoryGiB,
@@ -581,10 +573,7 @@ export class SandboxApi extends ResourceApi {
     return this.request({ method: 'POST', url: `/sandbox/${encodeURIComponent(sandboxIdOrName)}/archive` })
   }
 
-  createSandboxSnapshot(
-    sandboxIdOrName: string,
-    body: { name: string; includeMemory?: boolean },
-  ): ApiResponse<Sandbox> {
+  createSandboxSnapshot(sandboxIdOrName: string, body: { name: string }): ApiResponse<Sandbox> {
     return this.request({
       method: 'POST',
       url: `/sandbox/${encodeURIComponent(sandboxIdOrName)}/snapshot`,

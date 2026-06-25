@@ -18,10 +18,6 @@ export class Migration1776089826204 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "sandbox_fork" ADD CONSTRAINT "sandbox_fork_childId_fk" FOREIGN KEY ("childId") REFERENCES "sandbox"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     )
-    await queryRunner.query(`CREATE TYPE "public"."runner_runnerclass_enum" AS ENUM('container', 'vm')`)
-    await queryRunner.query(
-      `ALTER TABLE "runner" ADD "runnerClass" "public"."runner_runnerclass_enum" NOT NULL DEFAULT 'container'`,
-    )
     await queryRunner.query(`ALTER TYPE "public"."sandbox_state_enum" ADD VALUE IF NOT EXISTS 'snapshotting'`)
     await queryRunner.query(`ALTER TYPE "public"."sandbox_state_enum" ADD VALUE IF NOT EXISTS 'forking'`)
   }
@@ -30,7 +26,5 @@ export class Migration1776089826204 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "sandbox_fork" DROP CONSTRAINT "sandbox_fork_childId_fk"`)
     await queryRunner.query(`ALTER TABLE "sandbox_fork" DROP CONSTRAINT "sandbox_fork_parentId_fk"`)
     await queryRunner.query(`DROP TABLE "sandbox_fork"`)
-    await queryRunner.query(`ALTER TABLE "runner" DROP COLUMN "runnerClass"`)
-    await queryRunner.query(`DROP TYPE "public"."runner_runnerclass_enum"`)
   }
 }

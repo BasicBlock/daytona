@@ -11,6 +11,7 @@ import (
 
 	apiclient "github.com/daytonaio/daytona/libs/api-client-go"
 	"github.com/daytonaio/runner/pkg/common"
+	"github.com/daytonaio/runner/pkg/storage"
 )
 
 type snapshotSandboxJobResult struct {
@@ -27,8 +28,9 @@ func (e *Executor) snapshotSandbox(ctx context.Context, job *apiclient.Job) (any
 		return nil, fmt.Errorf("failed to unmarshal snapshot sandbox payload: %w", err)
 	}
 
-	if payload.Registry == nil {
-		return nil, fmt.Errorf("registry is required for sandbox snapshot")
+	store, err := storage.GetSnapshotStoreClient(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	containerID := job.GetResourceId()
@@ -36,7 +38,7 @@ func (e *Executor) snapshotSandbox(ctx context.Context, job *apiclient.Job) (any
 		return nil, fmt.Errorf("job resource id (sandbox id) is required")
 	}
 
-	info, err := e.docker.CreateSnapshotFromSandbox(ctx, containerID, payload.Registry)
+	info, err := e.docker.CreateGvisorSnapshotFromSandbox(ctx, containerID, payload.Name, store)
 	if err != nil {
 		return nil, common.FormatRecoverableError(err)
 	}

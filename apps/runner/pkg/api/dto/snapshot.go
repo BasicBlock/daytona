@@ -24,12 +24,9 @@ type InspectSnapshotInRegistryRequestDTO struct {
 } //	@name	InspectSnapshotInRegistryRequest
 
 // CreateSnapshotFromSandboxRequestDTO is the body sent by the API to ask the
-// runner to commit the given sandbox container, push the resulting image to
-// the supplied internal registry under the canonical
-// `daytona-{hash}:daytona` tag, and return the resulting image metadata.
+// runner to create a gVisor memory/filesystem snapshot bundle in GCS.
 type CreateSnapshotFromSandboxRequestDTO struct {
-	Name     string       `json:"name" validate:"required" example:"my-snapshot:latest"`
-	Registry *RegistryDTO `json:"registry" validate:"required"`
+	Name string `json:"name" validate:"required" example:"my-snapshot:latest"`
 } //	@name	CreateSnapshotFromSandboxRequest
 
 func HashWithoutPrefix(hash string) string {

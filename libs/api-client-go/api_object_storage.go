@@ -19,14 +19,13 @@ import (
 	"net/url"
 )
 
-
 type ObjectStorageAPI interface {
 
 	/*
-	GetPushAccess Get temporary storage access for pushing objects
+		GetPushAccess Get temporary storage access for pushing objects
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ObjectStorageAPIGetPushAccessRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ObjectStorageAPIGetPushAccessRequest
 	*/
 	GetPushAccess(ctx context.Context) ObjectStorageAPIGetPushAccessRequest
 
@@ -39,7 +38,7 @@ type ObjectStorageAPI interface {
 type ObjectStorageAPIService service
 
 type ObjectStorageAPIGetPushAccessRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService ObjectStorageAPI
 }
 
@@ -50,24 +49,25 @@ func (r ObjectStorageAPIGetPushAccessRequest) Execute() (*StorageAccessDto, *htt
 /*
 GetPushAccess Get temporary storage access for pushing objects
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ObjectStorageAPIGetPushAccessRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ObjectStorageAPIGetPushAccessRequest
 */
 func (a *ObjectStorageAPIService) GetPushAccess(ctx context.Context) ObjectStorageAPIGetPushAccessRequest {
 	return ObjectStorageAPIGetPushAccessRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return StorageAccessDto
+//
+//	@return StorageAccessDto
 func (a *ObjectStorageAPIService) GetPushAccessExecute(r ObjectStorageAPIGetPushAccessRequest) (*StorageAccessDto, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *StorageAccessDto
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *StorageAccessDto
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ObjectStorageAPIService.GetPushAccess")

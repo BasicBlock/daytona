@@ -7,7 +7,6 @@ import { ApiProperty, ApiSchema } from '@nestjs/swagger'
 import { IsBoolean, IsOptional, IsString, IsArray, IsEnum, IsInt, Min, IsDate } from 'class-validator'
 import { Transform, Type } from 'class-transformer'
 import { SandboxState } from '../enums/sandbox-state.enum'
-import { SandboxClass } from '../enums/sandbox-class.enum'
 import { ToArray } from '../../common/decorators/to-array.decorator'
 import { PageLimit } from '../../common/decorators/page-limit.decorator'
 
@@ -118,20 +117,6 @@ export class ListSandboxesQueryDto {
   @IsArray()
   @IsString({ each: true })
   snapshots?: string[]
-
-  @ApiProperty({
-    name: 'sandboxClasses',
-    description: 'List of sandbox classes to filter by',
-    required: false,
-    enum: SandboxClass,
-    enumName: 'SandboxClass',
-    isArray: true,
-  })
-  @IsOptional()
-  @ToArray()
-  @IsArray()
-  @IsEnum(SandboxClass, { each: true })
-  sandboxClasses?: SandboxClass[]
 
   @ApiProperty({
     name: 'minCpu',

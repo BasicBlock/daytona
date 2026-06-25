@@ -64,9 +64,9 @@ export class Runner {
 
   @Column({
     type: 'character varying',
-    default: SandboxClass.CONTAINER,
+    default: SandboxClass.LINUX_VM,
   })
-  sandboxClass: SandboxClass = SandboxClass.CONTAINER
+  sandboxClass: SandboxClass = SandboxClass.LINUX_VM
 
   @Column({
     type: 'float',
@@ -212,7 +212,7 @@ export class Runner {
     this.domain = params.domain ?? null
     this.apiUrl = params.apiUrl
     this.proxyUrl = params.proxyUrl
-    this.sandboxClass = params.sandboxClass ?? SandboxClass.CONTAINER
+    this.sandboxClass = params.sandboxClass ?? SandboxClass.LINUX_VM
     this.apiVersion = params.apiVersion
     this.appVersion = params.appVersion ?? null
     this.gpu = null

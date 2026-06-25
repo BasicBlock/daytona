@@ -575,7 +575,7 @@
     },
     "/sandboxes/{sandboxId}/snapshot-from-sandbox": {
       "post": {
-        "description": "Commit the sandbox container filesystem and push the image to the supplied registry under the canonical daytona-{hash}:daytona tag.",
+        "description": "Create a gVisor memory/filesystem snapshot bundle and store it in GCS.",
         "produces": ["application/json"],
         "tags": ["sandbox"],
         "summary": "Snapshot a running sandbox",
@@ -1509,10 +1509,6 @@
         "registry": {
           "$ref": "#/definitions/RegistryDTO"
         },
-        "sandboxClass": {
-          "description": "Optional for backward compatibility, but when provided, indicates the class of sandbox to create.",
-          "type": "string"
-        },
         "skipStart": {
           "type": "boolean"
         },
@@ -1533,14 +1529,11 @@
     },
     "CreateSnapshotFromSandboxRequest": {
       "type": "object",
-      "required": ["name", "registry"],
+      "required": ["name"],
       "properties": {
         "name": {
           "type": "string",
           "example": "my-snapshot:latest"
-        },
-        "registry": {
-          "$ref": "#/definitions/RegistryDTO"
         }
       }
     },
@@ -1620,9 +1613,6 @@
         },
         "registry": {
           "$ref": "#/definitions/RegistryDTO"
-        },
-        "sandboxClass": {
-          "type": "string"
         },
         "snapshot": {
           "type": "string"

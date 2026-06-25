@@ -68,13 +68,29 @@ FROM docker:28.5.2-dind-alpine3.22 AS runner
 RUN apk update && apk upgrade --no-cache openssl pcre2 \
   && apk add --no-cache curl rsync
 
+ARG TARGETARCH
+RUN set -eux; \
+  arch="${TARGETARCH:-$(apk --print-arch)}"; \
+  case "$arch" in \
+    amd64|x86_64) gvisor_arch="x86_64" ;; \
+    arm64|aarch64) gvisor_arch="aarch64" ;; \
+    *) echo "unsupported TARGETARCH=$arch"; exit 1 ;; \
+  esac; \
+  curl -fsSL -o /tmp/runsc "https://storage.googleapis.com/gvisor/releases/release/latest/${gvisor_arch}/runsc"; \
+  curl -fsSL -o /tmp/runsc.sha512 "https://storage.googleapis.com/gvisor/releases/release/latest/${gvisor_arch}/runsc.sha512"; \
+  cd /tmp; \
+  sha512sum -c runsc.sha512; \
+  install -m 0755 /tmp/runsc /usr/local/bin/runsc; \
+  rm -f /tmp/runsc /tmp/runsc.sha512; \
+  runsc --version
+
 WORKDIR /usr/local/bin
 
 COPY --from=build /daytona/dist/apps/runner daytona-runner
 
 RUN chmod +x daytona-runner
 
-RUN mkdir -p /etc/docker && echo '{"insecure-registries": ["registry:6000"]}' > /etc/docker/daemon.json
+RUN mkdir -p /etc/docker && echo '{"insecure-registries":["registry:6000"],"runtimes":{"runsc":{"path":"/usr/local/bin/runsc","runtimeArgs":[]}}}' > /etc/docker/daemon.json
 
 HEALTHCHECK CMD [ "curl", "-f", "http://localhost:3003/" ]
 

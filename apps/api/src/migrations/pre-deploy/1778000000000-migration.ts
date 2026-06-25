@@ -10,22 +10,22 @@ export class Migration1778000000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE IF EXISTS "sandbox" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'container'`,
+      `ALTER TABLE IF EXISTS "sandbox" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'linux-vm'`,
     )
     await queryRunner.query(
-      `ALTER TABLE IF EXISTS "snapshot" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'container'`,
+      `ALTER TABLE IF EXISTS "snapshot" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'linux-vm'`,
     )
     await queryRunner.query(
-      `ALTER TABLE IF EXISTS "runner" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'container'`,
+      `ALTER TABLE IF EXISTS "runner" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'linux-vm'`,
     )
     await queryRunner.query(
-      `ALTER TABLE IF EXISTS "sandbox_usage_periods" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'container'`,
+      `ALTER TABLE IF EXISTS "sandbox_usage_periods" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'linux-vm'`,
     )
     await queryRunner.query(
-      `ALTER TABLE IF EXISTS "sandbox_usage_periods_archive" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'container'`,
+      `ALTER TABLE IF EXISTS "sandbox_usage_periods_archive" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'linux-vm'`,
     )
     await queryRunner.query(
-      `ALTER TABLE IF EXISTS "region_quota" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'container'`,
+      `ALTER TABLE IF EXISTS "region_quota" ADD COLUMN IF NOT EXISTS "sandboxClass" character varying NOT NULL DEFAULT 'linux-vm'`,
     )
   }
 

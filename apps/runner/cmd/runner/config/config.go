@@ -33,8 +33,11 @@ type Config struct {
 	OtelHeaders                        string        `envconfig:"OTEL_EXPORTER_OTLP_HEADERS"`
 	BackupInfoCacheRetention           time.Duration `envconfig:"BACKUP_INFO_CACHE_RETENTION" default:"168h" validate:"min=5m"`
 	Environment                        string        `envconfig:"ENVIRONMENT"`
-	ContainerRuntime                   string        `envconfig:"CONTAINER_RUNTIME"`
-	ContainerNetwork                   string        `envconfig:"CONTAINER_NETWORK"`
+	SandboxNetwork                     string        `envconfig:"SANDBOX_NETWORK"`
+	RunscPath                          string        `envconfig:"RUNSC_PATH" default:"runsc"`
+	RunscRoot                          string        `envconfig:"RUNSC_ROOT" default:"/run/docker/runtime-runc/moby"`
+	RunscConfigFile                    string        `envconfig:"RUNSC_CONFIG_FILE"`
+	RunscExtraArgs                     string        `envconfig:"RUNSC_EXTRA_ARGS"`
 	InterSandboxNetworkEnabled         bool          `envconfig:"INTER_SANDBOX_NETWORK_ENABLED" default:"true"`
 	GpuEnabled                         bool          `envconfig:"GPU_ENABLED" default:"false"`
 	LogFilePath                        string        `envconfig:"LOG_FILE_PATH"`
@@ -46,7 +49,6 @@ type Config struct {
 	ResourceLimitsDisabled             bool          `envconfig:"RESOURCE_LIMITS_DISABLED"`
 	DaemonStartTimeoutSec              int           `envconfig:"DAEMON_START_TIMEOUT_SEC"`
 	SandboxStartTimeoutSec             int           `envconfig:"SANDBOX_START_TIMEOUT_SEC"`
-	AndroidBootTimeoutSec              int           `envconfig:"ANDROID_BOOT_TIMEOUT_SEC"`
 	UseSnapshotEntrypoint              bool          `envconfig:"USE_SNAPSHOT_ENTRYPOINT"`
 	Domain                             string        `envconfig:"RUNNER_DOMAIN" validate:"omitempty,hostname|ip"`
 	VolumeCleanupInterval              time.Duration `envconfig:"VOLUME_CLEANUP_INTERVAL" default:"30s" validate:"min=10s"`
@@ -61,6 +63,9 @@ type Config struct {
 	HealthcheckTimeout                 time.Duration `envconfig:"HEALTHCHECK_TIMEOUT" default:"10s"`
 	BackupTimeoutMin                   int           `envconfig:"BACKUP_TIMEOUT_MIN" default:"60" validate:"min=1"`
 	SnapshotPullTimeout                time.Duration `envconfig:"SNAPSHOT_PULL_TIMEOUT" default:"60m" validate:"min=1m"`
+	SnapshotGCSBucket                  string        `envconfig:"SNAPSHOT_GCS_BUCKET"`
+	SnapshotGCSPrefix                  string        `envconfig:"SNAPSHOT_GCS_PREFIX" default:"daytona-snapshots"`
+	SnapshotCacheDir                   string        `envconfig:"SNAPSHOT_CACHE_DIR" default:"/var/lib/daytona-runner/snapshots"`
 	BuildTimeoutMin                    int           `envconfig:"BUILD_TIMEOUT_MIN" default:"120" validate:"min=1"`
 	BuildCPUCores                      int64         `envconfig:"BUILD_CPU_CORES" default:"4" validate:"min=1"`
 	BuildMemoryGB                      int64         `envconfig:"BUILD_MEMORY_GB" default:"8" validate:"min=1"`
@@ -69,7 +74,6 @@ type Config struct {
 	SnapshotErrorCacheRetention        time.Duration `envconfig:"SNAPSHOT_ERROR_CACHE_RETENTION" default:"10m" validate:"min=5m"`
 	BuildEngine                        string        `envconfig:"BUILD_ENGINE" default:"buildkit" validate:"oneof=buildkit legacy"`
 	ForceSnapshotRemoval               bool          `envconfig:"FORCE_SNAPSHOT_REMOVAL" default:"true"`
-	MountKvmToAndroidSandbox           bool          `envconfig:"MOUNT_KVM_TO_ANDROID_SANDBOX" default:"false"`
 }
 
 var DEFAULT_API_PORT int = 8080
@@ -151,12 +155,8 @@ func (c *Config) GetOtelHeaders() map[string]string {
 	return headers
 }
 
-func GetContainerRuntime() string {
-	return config.ContainerRuntime
-}
-
-func GetContainerNetwork() string {
-	return config.ContainerNetwork
+func GetSandboxNetwork() string {
+	return config.SandboxNetwork
 }
 
 func GetEnvironment() string {

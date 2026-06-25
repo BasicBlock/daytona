@@ -11,6 +11,8 @@ import (
 	apiclient "github.com/daytonaio/daytona/libs/api-client-go"
 	"github.com/daytonaio/runner/cmd/runner/config"
 	"github.com/daytonaio/runner/pkg/api/dto"
+	"github.com/daytonaio/runner/pkg/snapshotbundle"
+	"github.com/daytonaio/runner/pkg/storage"
 )
 
 func (e *Executor) buildSnapshot(ctx context.Context, job *apiclient.Job) (any, error) {
@@ -48,6 +50,24 @@ func (e *Executor) pullSnapshot(ctx context.Context, job *apiclient.Job) (any, e
 		return nil, err
 	}
 
+	if storage.IsSnapshotStoreRef(request.Snapshot) {
+		store, err := storage.GetSnapshotStoreClient(ctx)
+		if err != nil {
+			return nil, err
+		}
+		cached, err := snapshotbundle.CacheFromRef(ctx, store, request.Snapshot)
+		if err != nil {
+			return nil, err
+		}
+		return dto.SnapshotInfoResponse{
+			Name:       request.Snapshot,
+			SizeGB:     float64(cached.Manifest.SizeBytes) / (1024 * 1024 * 1024),
+			Entrypoint: cached.Manifest.Config.Entrypoint,
+			Cmd:        cached.Manifest.Config.Cmd,
+			Hash:       cached.Manifest.Hash,
+		}, nil
+	}
+
 	err = e.docker.PullSnapshot(ctx, request)
 	if err != nil {
 		return nil, err
@@ -70,6 +90,9 @@ func (e *Executor) pullSnapshot(ctx context.Context, job *apiclient.Job) (any, e
 }
 
 func (e *Executor) removeSnapshot(ctx context.Context, job *apiclient.Job) (any, error) {
+	if storage.IsSnapshotStoreRef(job.ResourceId) {
+		return nil, nil
+	}
 	return nil, e.docker.RemoveImage(ctx, job.ResourceId, config.GetForceSnapshotRemoval())
 }
 

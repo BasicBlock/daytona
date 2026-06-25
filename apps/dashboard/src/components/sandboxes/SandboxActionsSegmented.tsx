@@ -74,7 +74,7 @@ export function SandboxActionsSegmented({
   onRecover,
   onDelete,
 }: SandboxActionsSegmentedProps) {
-  const isVmSandbox = sandbox.sandboxClass === SandboxClass.LINUX_VM || sandbox.sandboxClass === SandboxClass.WINDOWS
+  const isVmSandbox = sandbox.sandboxClass === SandboxClass.LINUX_VM
   const pauseResumeAvailable = isVmSandbox && writePermitted
 
   const actionsLocked = actionsDisabled || isTransitioning(sandbox)

@@ -20,14 +20,13 @@ import (
 	"strings"
 )
 
-
 type VolumesAPI interface {
 
 	/*
-	CreateVolume Create a new volume
+		CreateVolume Create a new volume
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return VolumesAPICreateVolumeRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return VolumesAPICreateVolumeRequest
 	*/
 	CreateVolume(ctx context.Context) VolumesAPICreateVolumeRequest
 
@@ -36,11 +35,11 @@ type VolumesAPI interface {
 	CreateVolumeExecute(r VolumesAPICreateVolumeRequest) (*VolumeDto, *http.Response, error)
 
 	/*
-	DeleteVolume Delete volume
+		DeleteVolume Delete volume
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param volumeId ID of the volume
-	@return VolumesAPIDeleteVolumeRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param volumeId ID of the volume
+		@return VolumesAPIDeleteVolumeRequest
 	*/
 	DeleteVolume(ctx context.Context, volumeId string) VolumesAPIDeleteVolumeRequest
 
@@ -48,11 +47,11 @@ type VolumesAPI interface {
 	DeleteVolumeExecute(r VolumesAPIDeleteVolumeRequest) (*http.Response, error)
 
 	/*
-	GetVolume Get volume details
+		GetVolume Get volume details
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param volumeId ID of the volume
-	@return VolumesAPIGetVolumeRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param volumeId ID of the volume
+		@return VolumesAPIGetVolumeRequest
 	*/
 	GetVolume(ctx context.Context, volumeId string) VolumesAPIGetVolumeRequest
 
@@ -61,11 +60,11 @@ type VolumesAPI interface {
 	GetVolumeExecute(r VolumesAPIGetVolumeRequest) (*VolumeDto, *http.Response, error)
 
 	/*
-	GetVolumeByName Get volume details by name
+		GetVolumeByName Get volume details by name
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param name Name of the volume
-	@return VolumesAPIGetVolumeByNameRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param name Name of the volume
+		@return VolumesAPIGetVolumeByNameRequest
 	*/
 	GetVolumeByName(ctx context.Context, name string) VolumesAPIGetVolumeByNameRequest
 
@@ -74,10 +73,10 @@ type VolumesAPI interface {
 	GetVolumeByNameExecute(r VolumesAPIGetVolumeByNameRequest) (*VolumeDto, *http.Response, error)
 
 	/*
-	ListVolumes List all volumes
+		ListVolumes List all volumes
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return VolumesAPIListVolumesRequest
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return VolumesAPIListVolumesRequest
 	*/
 	ListVolumes(ctx context.Context) VolumesAPIListVolumesRequest
 
@@ -90,8 +89,8 @@ type VolumesAPI interface {
 type VolumesAPIService service
 
 type VolumesAPICreateVolumeRequest struct {
-	ctx context.Context
-	ApiService VolumesAPI
+	ctx          context.Context
+	ApiService   VolumesAPI
 	createVolume *CreateVolume
 }
 
@@ -107,24 +106,25 @@ func (r VolumesAPICreateVolumeRequest) Execute() (*VolumeDto, *http.Response, er
 /*
 CreateVolume Create a new volume
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return VolumesAPICreateVolumeRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return VolumesAPICreateVolumeRequest
 */
 func (a *VolumesAPIService) CreateVolume(ctx context.Context) VolumesAPICreateVolumeRequest {
 	return VolumesAPICreateVolumeRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return VolumeDto
+//
+//	@return VolumeDto
 func (a *VolumesAPIService) CreateVolumeExecute(r VolumesAPICreateVolumeRequest) (*VolumeDto, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *VolumeDto
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *VolumeDto
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "VolumesAPIService.CreateVolume")
@@ -198,9 +198,9 @@ func (a *VolumesAPIService) CreateVolumeExecute(r VolumesAPICreateVolumeRequest)
 }
 
 type VolumesAPIDeleteVolumeRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService VolumesAPI
-	volumeId string
+	volumeId   string
 }
 
 func (r VolumesAPIDeleteVolumeRequest) Execute() (*http.Response, error) {
@@ -210,24 +210,24 @@ func (r VolumesAPIDeleteVolumeRequest) Execute() (*http.Response, error) {
 /*
 DeleteVolume Delete volume
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param volumeId ID of the volume
- @return VolumesAPIDeleteVolumeRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param volumeId ID of the volume
+	@return VolumesAPIDeleteVolumeRequest
 */
 func (a *VolumesAPIService) DeleteVolume(ctx context.Context, volumeId string) VolumesAPIDeleteVolumeRequest {
 	return VolumesAPIDeleteVolumeRequest{
 		ApiService: a,
-		ctx: ctx,
-		volumeId: volumeId,
+		ctx:        ctx,
+		volumeId:   volumeId,
 	}
 }
 
 // Execute executes the request
 func (a *VolumesAPIService) DeleteVolumeExecute(r VolumesAPIDeleteVolumeRequest) (*http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
-		localVarPostBody     interface{}
-		formFiles            []formFile
+		localVarHTTPMethod = http.MethodDelete
+		localVarPostBody   interface{}
+		formFiles          []formFile
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "VolumesAPIService.DeleteVolume")
@@ -288,9 +288,9 @@ func (a *VolumesAPIService) DeleteVolumeExecute(r VolumesAPIDeleteVolumeRequest)
 }
 
 type VolumesAPIGetVolumeRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService VolumesAPI
-	volumeId string
+	volumeId   string
 }
 
 func (r VolumesAPIGetVolumeRequest) Execute() (*VolumeDto, *http.Response, error) {
@@ -300,26 +300,27 @@ func (r VolumesAPIGetVolumeRequest) Execute() (*VolumeDto, *http.Response, error
 /*
 GetVolume Get volume details
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param volumeId ID of the volume
- @return VolumesAPIGetVolumeRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param volumeId ID of the volume
+	@return VolumesAPIGetVolumeRequest
 */
 func (a *VolumesAPIService) GetVolume(ctx context.Context, volumeId string) VolumesAPIGetVolumeRequest {
 	return VolumesAPIGetVolumeRequest{
 		ApiService: a,
-		ctx: ctx,
-		volumeId: volumeId,
+		ctx:        ctx,
+		volumeId:   volumeId,
 	}
 }
 
 // Execute executes the request
-//  @return VolumeDto
+//
+//	@return VolumeDto
 func (a *VolumesAPIService) GetVolumeExecute(r VolumesAPIGetVolumeRequest) (*VolumeDto, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *VolumeDto
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *VolumeDto
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "VolumesAPIService.GetVolume")
@@ -389,9 +390,9 @@ func (a *VolumesAPIService) GetVolumeExecute(r VolumesAPIGetVolumeRequest) (*Vol
 }
 
 type VolumesAPIGetVolumeByNameRequest struct {
-	ctx context.Context
+	ctx        context.Context
 	ApiService VolumesAPI
-	name string
+	name       string
 }
 
 func (r VolumesAPIGetVolumeByNameRequest) Execute() (*VolumeDto, *http.Response, error) {
@@ -401,26 +402,27 @@ func (r VolumesAPIGetVolumeByNameRequest) Execute() (*VolumeDto, *http.Response,
 /*
 GetVolumeByName Get volume details by name
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param name Name of the volume
- @return VolumesAPIGetVolumeByNameRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param name Name of the volume
+	@return VolumesAPIGetVolumeByNameRequest
 */
 func (a *VolumesAPIService) GetVolumeByName(ctx context.Context, name string) VolumesAPIGetVolumeByNameRequest {
 	return VolumesAPIGetVolumeByNameRequest{
 		ApiService: a,
-		ctx: ctx,
-		name: name,
+		ctx:        ctx,
+		name:       name,
 	}
 }
 
 // Execute executes the request
-//  @return VolumeDto
+//
+//	@return VolumeDto
 func (a *VolumesAPIService) GetVolumeByNameExecute(r VolumesAPIGetVolumeByNameRequest) (*VolumeDto, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *VolumeDto
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *VolumeDto
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "VolumesAPIService.GetVolumeByName")
@@ -490,8 +492,8 @@ func (a *VolumesAPIService) GetVolumeByNameExecute(r VolumesAPIGetVolumeByNameRe
 }
 
 type VolumesAPIListVolumesRequest struct {
-	ctx context.Context
-	ApiService VolumesAPI
+	ctx            context.Context
+	ApiService     VolumesAPI
 	includeDeleted *bool
 }
 
@@ -508,24 +510,25 @@ func (r VolumesAPIListVolumesRequest) Execute() ([]VolumeDto, *http.Response, er
 /*
 ListVolumes List all volumes
 
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return VolumesAPIListVolumesRequest
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return VolumesAPIListVolumesRequest
 */
 func (a *VolumesAPIService) ListVolumes(ctx context.Context) VolumesAPIListVolumesRequest {
 	return VolumesAPIListVolumesRequest{
 		ApiService: a,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
 // Execute executes the request
-//  @return []VolumeDto
+//
+//	@return []VolumeDto
 func (a *VolumesAPIService) ListVolumesExecute(r VolumesAPIListVolumesRequest) ([]VolumeDto, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodGet
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  []VolumeDto
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue []VolumeDto
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "VolumesAPIService.ListVolumes")

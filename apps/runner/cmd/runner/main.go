@@ -5,9 +5,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -128,7 +130,13 @@ func run() int {
 	}
 	defer netRulesManager.Stop()
 
-	daemonPath, err := daemon.WriteStaticBinary("daemon-amd64")
+	daemonBinary, err := daemonBinaryName()
+	if err != nil {
+		logger.Error("Error selecting daemon binary", "error", err)
+		return 2
+	}
+
+	daemonPath, err := daemon.WriteStaticBinary(daemonBinary)
 	if err != nil {
 		logger.Error("Error writing daemon binary", "error", err)
 		return 2
@@ -156,7 +164,6 @@ func run() int {
 		ResourceLimitsDisabled:       cfg.ResourceLimitsDisabled,
 		DaemonStartTimeoutSec:        cfg.DaemonStartTimeoutSec,
 		SandboxStartTimeoutSec:       cfg.SandboxStartTimeoutSec,
-		AndroidBootTimeoutSec:        cfg.AndroidBootTimeoutSec,
 		UseSnapshotEntrypoint:        cfg.UseSnapshotEntrypoint,
 		VolumeCleanupInterval:        cfg.VolumeCleanupInterval,
 		VolumeCleanupDryRun:          cfg.VolumeCleanupDryRun,
@@ -169,7 +176,6 @@ func run() int {
 		InitializeDaemonTelemetry:    cfg.InitializeDaemonTelemetry,
 		InterSandboxNetworkEnabled:   cfg.InterSandboxNetworkEnabled,
 		GpuEnabled:                   cfg.GpuEnabled,
-		MountKvmToAndroidSandbox:     cfg.MountKvmToAndroidSandbox,
 	})
 	if err != nil {
 		logger.Error("Error creating Docker client wrapper", "error", err)
@@ -335,5 +341,14 @@ func run() int {
 	case err := <-monitorErrChan:
 		logger.Error("Docker monitor error", "error", err)
 		return 1
+	}
+}
+
+func daemonBinaryName() (string, error) {
+	switch runtime.GOARCH {
+	case "amd64", "arm64":
+		return "daemon-" + runtime.GOARCH, nil
+	default:
+		return "", fmt.Errorf("unsupported runner architecture %q", runtime.GOARCH)
 	}
 }

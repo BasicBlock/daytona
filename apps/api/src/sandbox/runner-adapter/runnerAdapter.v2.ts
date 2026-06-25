@@ -20,7 +20,6 @@ import { Job } from '../entities/job.entity'
 import { BuildInfo } from '../entities/build-info.entity'
 import { DockerRegistry } from '../../docker-registry/entities/docker-registry.entity'
 import { SandboxState } from '../enums/sandbox-state.enum'
-import { SandboxClass } from '../enums/sandbox-class.enum'
 import { JobType } from '../enums/job-type.enum'
 import { JobStatus } from '../enums/job-status.enum'
 import { ResourceType } from '../enums/resource-type.enum'
@@ -342,12 +341,10 @@ export class RunnerAdapterV2 implements RunnerAdapter {
     destinationRegistry?: DockerRegistry,
     destinationRef?: string,
     newTag?: string,
-    sandboxClass?: SandboxClass,
   ): Promise<void> {
     const payload: PullSnapshotRequestDTO = {
       snapshot: snapshotName,
       newTag,
-      sandboxClass,
     }
 
     if (registry) {
@@ -556,8 +553,8 @@ export class RunnerAdapterV2 implements RunnerAdapter {
     this.logger.debug(`Created PAUSE_SANDBOX job for sandbox ${sandboxId} on runner ${this.runner.id}`)
   }
 
-  async forkSandbox(sourceSandboxId: string, newSandboxId: string): Promise<void> {
-    const payload = { sourceSandboxId, newSandboxId }
+  async forkSandbox(sourceSandboxId: string, newSandboxId: string, targetAuthToken: string): Promise<void> {
+    const payload = { sourceSandboxId, newSandboxId, targetAuthToken }
 
     await this.jobService.createJob(
       null,
@@ -581,21 +578,10 @@ export class RunnerAdapterV2 implements RunnerAdapter {
     sandboxId: string,
     snapshotName: string,
     _snapshotSource: string,
-    registry?: DockerRegistry,
-    includeMemory?: boolean,
   ): Promise<undefined> {
     const payload = {
       sandboxId,
       name: snapshotName,
-      includeMemory: includeMemory ?? false,
-      registry: registry
-        ? {
-            url: registry.url.replace(/^(https?:\/\/)/, ''),
-            username: registry.username ?? undefined,
-            password: registry.password ?? undefined,
-            project: registry.project ?? undefined,
-          }
-        : undefined,
     }
 
     await this.jobService.createJob(

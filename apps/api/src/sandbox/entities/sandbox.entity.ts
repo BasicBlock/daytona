@@ -80,9 +80,9 @@ export class Sandbox {
 
   @Column({
     type: 'character varying',
-    default: SandboxClass.CONTAINER,
+    default: SandboxClass.LINUX_VM,
   })
-  sandboxClass: SandboxClass = SandboxClass.CONTAINER
+  sandboxClass: SandboxClass = SandboxClass.LINUX_VM
 
   @Column({
     type: 'enum',

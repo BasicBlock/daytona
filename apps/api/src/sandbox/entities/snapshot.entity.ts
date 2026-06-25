@@ -75,9 +75,9 @@ export class Snapshot {
 
   @Column({
     type: 'character varying',
-    default: SandboxClass.CONTAINER,
+    default: SandboxClass.LINUX_VM,
   })
-  sandboxClass: SandboxClass = SandboxClass.CONTAINER
+  sandboxClass: SandboxClass = SandboxClass.LINUX_VM
 
   @OneToMany(() => SnapshotRunner, (runner) => runner.snapshotRef)
   runners: SnapshotRunner[]

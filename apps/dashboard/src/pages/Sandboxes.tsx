@@ -29,9 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { DAYTONA_DOCS_URL } from '@/constants/ExternalLinks'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/constants/Pagination'
 import { mutationKeys } from '@/hooks/mutations/mutationKeys'
@@ -61,7 +59,6 @@ import { formatDuration, pluralize } from '@/lib/utils'
 import {
   ListSandboxesResponse,
   Sandbox,
-  SandboxClass,
   SandboxDesiredState,
   SandboxListItem,
   SandboxListSortDirection,
@@ -87,7 +84,6 @@ import { toast } from 'sonner'
 type CreateSandboxSnapshotVariables = {
   sandboxId: string
   name: string
-  includeMemory: boolean
 }
 
 const SANDBOX_SORT_FIELDS: SandboxListSortField[] = [
@@ -97,7 +93,6 @@ const SANDBOX_SORT_FIELDS: SandboxListSortField[] = [
 ]
 const SANDBOX_SORT_DIRECTIONS = Object.values(SandboxListSortDirection)
 const SANDBOX_STATES = Object.values(SandboxState)
-const SANDBOX_CLASSES = Object.values(SandboxClass)
 const DEFAULT_SANDBOXES: SandboxListItem[] = []
 const SANDBOX_LIST_REVALIDATION_DEBOUNCE_MS = 2000
 
@@ -119,7 +114,6 @@ const sandboxViewSearchParams = {
   states: parseAsArrayOf(parseAsString).withDefault([]),
   snapshots: parseAsArrayOf(parseAsString).withDefault([]),
   targets: parseAsArrayOf(parseAsString).withDefault([]),
-  sandboxClasses: parseAsArrayOf(parseAsString).withDefault([]),
   labels: labelsParser,
   minCpu: parseAsFloat,
   maxCpu: parseAsFloat,
@@ -157,10 +151,6 @@ function normalizeSorting(field: string, direction: string): SandboxSorting {
 
 function getValidatedStates(states: string[]): SandboxState[] {
   return states.filter((state): state is SandboxState => SANDBOX_STATES.includes(state as SandboxState))
-}
-
-function getValidatedSandboxClasses(classes: string[]): SandboxClass[] {
-  return classes.filter((c): c is SandboxClass => SANDBOX_CLASSES.includes(c as SandboxClass))
 }
 
 function getNonEmptyLabels(labels: Record<string, string>) {
@@ -299,11 +289,9 @@ const Sandboxes: React.FC = () => {
     const search = viewParams.search.trim()
     const states = getValidatedStates(viewParams.states)
     const labels = getNonEmptyLabels(viewParams.labels)
-    const sandboxClasses = getValidatedSandboxClasses(viewParams.sandboxClasses)
 
     if (search) nextFilters.name = search
     if (states.length > 0) nextFilters.states = states
-    if (sandboxClasses.length > 0) nextFilters.sandboxClasses = sandboxClasses
     if (viewParams.snapshots.length > 0) nextFilters.snapshots = viewParams.snapshots
     if (viewParams.targets.length > 0) nextFilters.targets = viewParams.targets
     if (Object.keys(labels).length > 0) nextFilters.labels = labels
@@ -336,7 +324,6 @@ const Sandboxes: React.FC = () => {
     viewParams.minDisk,
     viewParams.minMemory,
     viewParams.targets,
-    viewParams.sandboxClasses,
     viewParams.search,
     viewParams.snapshots,
     viewParams.states,
@@ -411,7 +398,6 @@ const Sandboxes: React.FC = () => {
         states: newFilters.states?.length ? newFilters.states : null,
         snapshots: newFilters.snapshots?.length ? newFilters.snapshots : null,
         targets: newFilters.targets?.length ? newFilters.targets : null,
-        sandboxClasses: newFilters.sandboxClasses?.length ? newFilters.sandboxClasses : null,
         labels: Object.keys(labels).length > 0 ? labels : null,
         minCpu: newFilters.minCpu ?? null,
         maxCpu: newFilters.maxCpu ?? null,
@@ -484,7 +470,6 @@ const Sandboxes: React.FC = () => {
   const [recursiveDeleteSandboxId, setRecursiveDeleteSandboxId] = useState<string | null>(null)
   const [sandboxToSnapshot, setSandboxToSnapshot] = useState<string | null>(null)
   const [snapshotName, setSnapshotName] = useState('')
-  const [snapshotIncludeMemory, setSnapshotIncludeMemory] = useState(false)
   const [selectedSandbox, setSelectedSandbox] = useState<SandboxListItem | null>(null)
   const [orderedSandboxItems, setOrderedSandboxItems] = useState<SandboxListItem[] | null>(null)
   const [showCreateSshDialog, setShowCreateSshDialog] = useState(false)
@@ -572,8 +557,8 @@ const Sandboxes: React.FC = () => {
 
   const createSandboxSnapshotMutation = useMutation({
     mutationKey: mutationKeys.sandboxes.createSnapshot(),
-    mutationFn: async ({ sandboxId, name, includeMemory }: CreateSandboxSnapshotVariables) => {
-      await sandboxApi.createSandboxSnapshot(sandboxId, { name, includeMemory })
+    mutationFn: async ({ sandboxId, name }: CreateSandboxSnapshotVariables) => {
+      await sandboxApi.createSandboxSnapshot(sandboxId, { name })
     },
   })
 
@@ -778,10 +763,8 @@ const Sandboxes: React.FC = () => {
   }, [sandboxFromLoadedResults, sandboxIdParam, seedSandboxDetailsCache])
 
   const handleCreateSnapshot = (id: string) => {
-    const sandbox = sandboxes.find((s) => s.id === id)
     setSandboxToSnapshot(id)
     setSnapshotName('')
-    setSnapshotIncludeMemory(sandbox?.sandboxClass === SandboxClass.WINDOWS && sandbox?.state === SandboxState.STARTED)
   }
 
   const handleFork = async (id: string) => {
@@ -1181,12 +1164,10 @@ const Sandboxes: React.FC = () => {
       await createSandboxSnapshotMutation.mutateAsync({
         sandboxId: sandboxToSnapshot,
         name: snapshotName.trim(),
-        includeMemory: snapshotIncludeMemory,
       })
       toast.success('Snapshot creation started')
       setSandboxToSnapshot(null)
       setSnapshotName('')
-      setSnapshotIncludeMemory(false)
     } catch (error) {
       handleApiError(error, 'Failed to create snapshot')
     }
@@ -1290,7 +1271,6 @@ const Sandboxes: React.FC = () => {
               if (!isOpen) {
                 setSandboxToSnapshot(null)
                 setSnapshotName('')
-                setSnapshotIncludeMemory(false)
               }
             }}
           >
@@ -1305,21 +1285,6 @@ const Sandboxes: React.FC = () => {
                 placeholder="Snapshot name"
                 disabled={createSandboxSnapshotMutation.isPending}
               />
-              {sandboxes.find((s) => s.id === sandboxToSnapshot)?.sandboxClass === SandboxClass.WINDOWS && (
-                <div className="flex items-start gap-3">
-                  <Checkbox id="snapshot-include-memory" checked={snapshotIncludeMemory} disabled className="mt-0.5" />
-                  <div className="grid gap-1 leading-none">
-                    <Label htmlFor="snapshot-include-memory" className="text-sm">
-                      Include memory state
-                    </Label>
-                    <p className="text-muted-foreground text-xs">
-                      {snapshotIncludeMemory
-                        ? 'Sandbox is running — memory will be captured. Stop the sandbox first for a filesystem-only snapshot.'
-                        : 'Sandbox is stopped — filesystem-only snapshot. Start the sandbox first to capture memory.'}
-                    </p>
-                  </div>
-                </div>
-              )}
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={createSandboxSnapshotMutation.isPending}>Cancel</AlertDialogCancel>
                 <AlertDialogAction

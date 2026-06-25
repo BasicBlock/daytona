@@ -127,12 +127,7 @@ export class SnapshotService {
       throw new BadRequestException(imageValidationError)
     }
 
-    const sandboxClass = createSnapshotDto.sandboxClass ?? this.configService.getOrThrow('defaultSandboxClass')
-    if (sandboxClass === SandboxClass.WINDOWS) {
-      throw new BadRequestException(
-        'Windows snapshots cannot be created via this endpoint; they are produced by snapshot-from-sandbox flows.',
-      )
-    }
+    const sandboxClass = SandboxClass.LINUX_VM
 
     const target = this.configService.getOrThrow('defaultTarget.id')
     await this.assertHasSchedulableRunner(target, sandboxClass)
@@ -175,12 +170,7 @@ export class SnapshotService {
       throw new BadRequestException('Must specify build information')
     }
 
-    const sandboxClass = createSnapshotDto.sandboxClass ?? this.configService.getOrThrow('defaultSandboxClass')
-    if (sandboxClass === SandboxClass.WINDOWS) {
-      throw new BadRequestException(
-        'Windows snapshots cannot be created via this endpoint; they are produced by snapshot-from-sandbox flows.',
-      )
-    }
+    const sandboxClass = SandboxClass.LINUX_VM
 
     const target = this.configService.getOrThrow('defaultTarget.id')
     await this.assertHasSchedulableRunner(target, sandboxClass)

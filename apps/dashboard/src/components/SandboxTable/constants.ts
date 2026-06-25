@@ -4,8 +4,8 @@
  */
 
 import { SandboxClass, SandboxState } from '@daytona/api-client'
-import { AndroidLogoIcon, LinuxLogoIcon, WindowsLogoIcon } from '@phosphor-icons/react'
-import { AlertTriangle, Archive, CheckCircle, Circle, Container, LucideIcon, Timer } from 'lucide-react'
+import { LinuxLogoIcon } from '@phosphor-icons/react'
+import { AlertTriangle, Archive, CheckCircle, Circle, LucideIcon, Timer } from 'lucide-react'
 import { FacetedFilterOption } from './types'
 
 const STATE_PRIORITY_ORDER_ARRAY = [
@@ -115,54 +115,33 @@ export function getStateLabel(state?: SandboxState): string {
 }
 
 const SANDBOX_CLASS_LABEL_MAPPING: Record<SandboxClass, string> = {
-  [SandboxClass.CONTAINER]: 'Container',
   [SandboxClass.LINUX_VM]: 'Linux VM',
-  [SandboxClass.ANDROID]: 'Android',
-  [SandboxClass.WINDOWS]: 'Windows',
   [SandboxClass.UNKNOWN_DEFAULT_OPEN_API]: 'Unknown',
 }
 
 const SANDBOX_CLASS_ICON_MAPPING: Record<SandboxClass, LucideIcon> = {
-  [SandboxClass.CONTAINER]: Container,
   [SandboxClass.LINUX_VM]: LinuxLogoIcon,
-  [SandboxClass.ANDROID]: AndroidLogoIcon,
-  [SandboxClass.WINDOWS]: WindowsLogoIcon,
-  [SandboxClass.UNKNOWN_DEFAULT_OPEN_API]: Container,
+  [SandboxClass.UNKNOWN_DEFAULT_OPEN_API]: LinuxLogoIcon,
 }
 
 export const SANDBOX_CLASS_OPTIONS: FacetedFilterOption[] = [
-  {
-    label: SANDBOX_CLASS_LABEL_MAPPING[SandboxClass.CONTAINER],
-    value: SandboxClass.CONTAINER,
-    icon: SANDBOX_CLASS_ICON_MAPPING[SandboxClass.CONTAINER],
-  },
   {
     label: SANDBOX_CLASS_LABEL_MAPPING[SandboxClass.LINUX_VM],
     value: SandboxClass.LINUX_VM,
     icon: SANDBOX_CLASS_ICON_MAPPING[SandboxClass.LINUX_VM],
   },
-  {
-    label: SANDBOX_CLASS_LABEL_MAPPING[SandboxClass.ANDROID],
-    value: SandboxClass.ANDROID,
-    icon: SANDBOX_CLASS_ICON_MAPPING[SandboxClass.ANDROID],
-  },
-  {
-    label: SANDBOX_CLASS_LABEL_MAPPING[SandboxClass.WINDOWS],
-    value: SandboxClass.WINDOWS,
-    icon: SANDBOX_CLASS_ICON_MAPPING[SandboxClass.WINDOWS],
-  },
 ]
 
 export function getSandboxClassLabel(sandboxClass?: SandboxClass): string {
   if (!sandboxClass) {
-    return SANDBOX_CLASS_LABEL_MAPPING[SandboxClass.CONTAINER]
+    return SANDBOX_CLASS_LABEL_MAPPING[SandboxClass.LINUX_VM]
   }
   return SANDBOX_CLASS_LABEL_MAPPING[sandboxClass]
 }
 
 export function getSandboxClassIcon(sandboxClass?: SandboxClass): LucideIcon {
   if (!sandboxClass) {
-    return SANDBOX_CLASS_ICON_MAPPING[SandboxClass.CONTAINER]
+    return SANDBOX_CLASS_ICON_MAPPING[SandboxClass.LINUX_VM]
   }
   return SANDBOX_CLASS_ICON_MAPPING[sandboxClass]
 }

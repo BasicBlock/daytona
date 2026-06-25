@@ -38,7 +38,7 @@ export function SandboxTableActions({
   onViewForks,
   onOpenTerminal,
 }: SandboxTableActionsProps) {
-  const isVmSandbox = sandbox.sandboxClass === SandboxClass.LINUX_VM || sandbox.sandboxClass === SandboxClass.WINDOWS
+  const isVmSandbox = sandbox.sandboxClass === SandboxClass.LINUX_VM
   const primaryActionTooltip =
     sandbox.state === SandboxState.STARTING
       ? 'Starting sandbox'

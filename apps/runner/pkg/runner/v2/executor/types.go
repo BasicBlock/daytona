@@ -5,15 +5,18 @@
 
 package executor
 
-import "github.com/daytonaio/runner/pkg/api/dto"
-
 type StartSandboxPayload struct {
 	AuthToken *string           `json:"authToken,omitempty"`
 	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
 type SnapshotSandboxPayload struct {
-	SandboxId string           `json:"sandboxId"`
-	Name      string           `json:"name"`
-	Registry  *dto.RegistryDTO `json:"registry,omitempty"`
+	SandboxId string `json:"sandboxId"`
+	Name      string `json:"name"`
+}
+
+type ForkSandboxPayload struct {
+	SourceSandboxId string `json:"sourceSandboxId"`
+	NewSandboxId    string `json:"newSandboxId"`
+	TargetAuthToken string `json:"targetAuthToken,omitempty"`
 }

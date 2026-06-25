@@ -4,7 +4,6 @@
  */
 
 import {
-  Boxes,
   Calendar,
   CalendarPlus,
   Camera,
@@ -20,7 +19,6 @@ import {
   Wrench,
 } from 'lucide-react'
 import { DataTableConfigMenu } from '@/components/DataTableConfigMenu'
-import { useAvailableSandboxClassesForDashboard } from '@/hooks/useAvailableSandboxClasses'
 import { cn } from '@/lib/utils'
 import { SearchInput } from '../SearchInput'
 import TooltipButton from '../TooltipButton'
@@ -40,7 +38,6 @@ import { LabelFilter, LabelFilterIndicator } from './filters/LabelFilter'
 import { LastEventFilter, LastEventFilterIndicator } from './filters/LastEventFilter'
 import { TargetFilter, TargetFilterIndicator } from './filters/TargetFilter'
 import { ResourceFilter, ResourceFilterIndicator, ResourceFilterValue } from './filters/ResourceFilter'
-import { SandboxClassFilter, SandboxClassFilterIndicator } from './filters/SandboxClassFilter'
 import { SnapshotFilter, SnapshotFilterIndicator } from './filters/SnapshotFilter'
 import { StateFilter, StateFilterIndicator } from './filters/StateFilter'
 import { SandboxTableHeaderProps } from './types'
@@ -79,11 +76,7 @@ export function SandboxTableHeader({
   onRefresh,
   isRefreshing = false,
 }: SandboxTableHeaderProps) {
-  const availableSandboxClasses = useAvailableSandboxClassesForDashboard()
-  const sandboxClassColumn = table.getColumn('sandboxClass')
-  const showClassFilter = availableSandboxClasses.length > 1 && Boolean(sandboxClassColumn)
   const hasStateFilter = ((table.getColumn('state')?.getFilterValue() as string[]) || []).length > 0
-  const hasClassFilter = ((sandboxClassColumn?.getFilterValue() as string[]) || []).length > 0
   const hasSnapshotFilter = ((table.getColumn('snapshot')?.getFilterValue() as string[]) || []).length > 0
   const hasTargetFilter = ((table.getColumn('target')?.getFilterValue() as string[]) || []).length > 0
   const hasLabelsFilter = ((table.getColumn('labels')?.getFilterValue() as string[]) || []).length > 0
@@ -97,7 +90,6 @@ export function SandboxTableHeader({
 
   const hasActiveFilters =
     hasStateFilter ||
-    hasClassFilter ||
     hasSnapshotFilter ||
     hasTargetFilter ||
     hasLabelsFilter ||
@@ -141,22 +133,6 @@ export function SandboxTableHeader({
                   </DropdownMenuSubContent>
                 </DropdownMenuPortal>
               </DropdownMenuSub>
-              {showClassFilter && (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Boxes className="w-4 h-4" />
-                    Class
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent className="p-0 w-64">
-                      <SandboxClassFilter
-                        value={(sandboxClassColumn?.getFilterValue() as string[]) || []}
-                        onFilterChange={(value) => sandboxClassColumn?.setFilterValue(value)}
-                      />
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
-              )}
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <Camera className="w-4 h-4" />
@@ -320,12 +296,6 @@ export function SandboxTableHeader({
               snapshotsDataIsLoading={snapshotsDataIsLoading}
               snapshotsDataHasMore={snapshotsDataHasMore}
               onChangeSnapshotSearchValue={onChangeSnapshotSearchValue}
-            />
-          )}
-          {hasClassFilter && (
-            <SandboxClassFilterIndicator
-              value={(sandboxClassColumn?.getFilterValue() as string[]) || []}
-              onFilterChange={(value) => sandboxClassColumn?.setFilterValue(value)}
             />
           )}
           {hasTargetFilter && (

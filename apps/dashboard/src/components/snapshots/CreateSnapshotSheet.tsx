@@ -21,16 +21,13 @@ import {
 } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
 import { useCreateSnapshotMutation } from '@/hooks/mutations/useCreateSnapshotMutation'
-import { useAvailableTargetsQuery } from '@/hooks/queries/useTargetsQuery'
-import { useAvailableSandboxClasses } from '@/hooks/useAvailableSandboxClasses'
 import { handleApiError } from '@/lib/error-handling'
 import { GPU_TYPE_LABELS } from '@/lib/gpu-types'
-import { EMPTY_TARGETS } from '@/lib/targets'
 import { imageNameSchema } from '@/lib/schema'
-import { cn, getTargetFullDisplayName } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { SnapshotDto } from '@daytona/api-client'
-import { GpuType, SandboxClass } from '@daytona/api-client'
-import { useForm, useStore } from '@tanstack/react-form'
+import { GpuType } from '@daytona/api-client'
+import { useForm } from '@tanstack/react-form'
 import { Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -43,18 +40,7 @@ const snapshotNameSchema = z
   .min(1, 'Snapshot name is required')
   .refine((name) => IMAGE_NAME_REGEX.test(name), 'Only letters, digits, dots, colons, slashes and dashes are allowed')
 
-const SANDBOX_CLASS_OPTIONS: { value: SandboxClass; label: string }[] = [
-  { value: SandboxClass.CONTAINER, label: 'Container' },
-  { value: SandboxClass.LINUX_VM, label: 'Linux VM' },
-  { value: SandboxClass.ANDROID, label: 'Android' },
-]
-
 const SELECTABLE_GPU_TYPES = (Object.values(GpuType) as GpuType[]).filter((t) => t !== GpuType.UNKNOWN_DEFAULT_OPEN_API)
-
-const resolveAllowedGpuTypes = (targetAllowed: GpuType[] | null | undefined): GpuType[] => {
-  const filteredTarget = (targetAllowed ?? []).filter((t) => t !== GpuType.UNKNOWN_DEFAULT_OPEN_API)
-  return filteredTarget.length > 0 ? filteredTarget : SELECTABLE_GPU_TYPES
-}
 
 const formSchema = z.object({
   name: snapshotNameSchema,
@@ -65,8 +51,6 @@ const formSchema = z.object({
   disk: z.number().min(1).optional(),
   gpu: z.boolean().optional(),
   gpuType: z.nativeEnum(GpuType).optional(),
-  target: z.string().optional(),
-  sandboxClass: z.nativeEnum(SandboxClass).optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -80,8 +64,6 @@ const defaultValues: FormValues = {
   disk: undefined,
   gpu: false,
   gpuType: undefined,
-  target: undefined,
-  sandboxClass: SandboxClass.CONTAINER,
 }
 
 export const CreateSnapshotSheet = ({
@@ -95,16 +77,9 @@ export const CreateSnapshotSheet = ({
 }) => {
   const [open, setOpen] = useState(false)
 
-  const { data: targets = EMPTY_TARGETS, isLoading: loadingTargets } = useAvailableTargetsQuery()
   const { reset: resetCreateSnapshotMutation, ...createSnapshotMutation } = useCreateSnapshotMutation()
   const formRef = useRef<HTMLFormElement>(null)
-  const formDefaultValues = useMemo<FormValues>(
-    () => ({
-      ...defaultValues,
-      target: undefined,
-    }),
-    [],
-  )
+  const formDefaultValues = useMemo<FormValues>(() => defaultValues, [])
 
   useImperativeHandle(ref, () => ({
     open: () => setOpen(true),
@@ -138,8 +113,6 @@ export const CreateSnapshotSheet = ({
             disk: value.disk,
             gpu: value.gpu ? 1 : undefined,
             gpuType: value.gpu && value.gpuType ? [value.gpuType] : undefined,
-            target: value.target,
-            sandboxClass: value.sandboxClass,
           },
         })
 
@@ -163,19 +136,6 @@ export const CreateSnapshotSheet = ({
       resetState()
     }
   }, [open, resetState])
-
-  const selectedTarget = useStore(form.store, (state) => state.values.target)
-  const availableSandboxClasses = useAvailableSandboxClasses(selectedTarget)
-
-  useEffect(() => {
-    if (availableSandboxClasses.length === 0) return
-    const current = form.getFieldValue('sandboxClass')
-    if (current && availableSandboxClasses.includes(current)) return
-    const preferred = availableSandboxClasses.includes(SandboxClass.CONTAINER)
-      ? SandboxClass.CONTAINER
-      : availableSandboxClasses[0]
-    form.setFieldValue('sandboxClass', preferred)
-  }, [availableSandboxClasses, form])
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -252,58 +212,6 @@ export const CreateSnapshotSheet = ({
               }}
             </form.Field>
 
-            <form.Field name="target">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Target</FieldLabel>
-                  <Select value={field.state.value} onValueChange={field.handleChange}>
-                    <SelectTrigger className="h-8" id={field.name} disabled={loadingTargets} loading={loadingTargets}>
-                      <SelectValue placeholder={loadingTargets ? 'Loading targets...' : 'Select a target'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {targets.map((target) => (
-                        <SelectItem key={target.id} value={target.id}>
-                          {getTargetFullDisplayName(target)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription>The target where the snapshot will be available.</FieldDescription>
-                </Field>
-              )}
-            </form.Field>
-
-            {availableSandboxClasses.length > 1 && (
-              <form.Field name="sandboxClass">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor={field.name}>Sandbox Class</FieldLabel>
-                    <Select
-                      value={field.state.value ?? SandboxClass.CONTAINER}
-                      onValueChange={(value) => field.handleChange(value as SandboxClass)}
-                      disabled={!selectedTarget}
-                    >
-                      <SelectTrigger className="h-8" id={field.name}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SANDBOX_CLASS_OPTIONS.filter((option) => availableSandboxClasses.includes(option.value)).map(
-                          (option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ),
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>
-                      The target platform sandboxes created from this snapshot will run on.
-                    </FieldDescription>
-                  </Field>
-                )}
-              </form.Field>
-            )}
-
             <div className="flex flex-col gap-2">
               <Label className="text-sm font-medium">Resources</Label>
               <div className="flex flex-col gap-2">
@@ -361,75 +269,67 @@ export const CreateSnapshotSheet = ({
                     </div>
                   )}
                 </form.Field>
-                <form.Subscribe selector={(state) => state.values.target}>
-                  {(target) => {
-                    if (!target) return null
-                    const allowedGpuTypes = resolveAllowedGpuTypes(undefined)
-                    return (
-                      <div className="flex flex-col gap-3">
-                        <form.Field name="gpu">
+                <div className="flex flex-col gap-3">
+                  <form.Field name="gpu">
+                    {(field) => (
+                      <div className="flex items-start gap-2 pt-1">
+                        <Checkbox
+                          id={field.name}
+                          className="mt-0.5"
+                          checked={field.state.value ?? false}
+                          onCheckedChange={(checked) => {
+                            const isChecked = checked === true
+                            field.handleChange(isChecked)
+                            if (isChecked) {
+                              if (!form.getFieldValue('gpuType') && SELECTABLE_GPU_TYPES.length > 0) {
+                                form.setFieldValue('gpuType', SELECTABLE_GPU_TYPES[0])
+                              }
+                            } else {
+                              form.setFieldValue('gpuType', undefined)
+                            }
+                          }}
+                        />
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={field.name} className="text-sm font-normal">
+                            Allocate GPU
+                          </Label>
+                          <FieldDescription>
+                            Sandboxes created from this snapshot must be ephemeral - set autoDeleteInterval to 0 when
+                            creating the sandbox.
+                          </FieldDescription>
+                        </div>
+                      </div>
+                    )}
+                  </form.Field>
+                  <form.Subscribe selector={(state) => state.values.gpu}>
+                    {(gpuEnabled) =>
+                      gpuEnabled && SELECTABLE_GPU_TYPES.length > 0 ? (
+                        <form.Field name="gpuType">
                           {(field) => (
-                            <div className="flex items-start gap-2 pt-1">
-                              <Checkbox
-                                id={field.name}
-                                className="mt-0.5"
-                                checked={field.state.value ?? false}
-                                onCheckedChange={(checked) => {
-                                  const isChecked = checked === true
-                                  field.handleChange(isChecked)
-                                  if (isChecked) {
-                                    if (!form.getFieldValue('gpuType') && allowedGpuTypes.length > 0) {
-                                      form.setFieldValue('gpuType', allowedGpuTypes[0])
-                                    }
-                                  } else {
-                                    form.setFieldValue('gpuType', undefined)
-                                  }
-                                }}
-                              />
-                              <div className="flex flex-col gap-1">
-                                <Label htmlFor={field.name} className="text-sm font-normal">
-                                  Allocate GPU
-                                </Label>
-                                <FieldDescription>
-                                  Sandboxes created from this snapshot must be ephemeral - set autoDeleteInterval to 0
-                                  when creating the sandbox.
-                                </FieldDescription>
-                              </div>
-                            </div>
+                            <Field>
+                              <FieldLabel htmlFor={field.name}>GPU type</FieldLabel>
+                              <Select
+                                value={field.state.value ?? SELECTABLE_GPU_TYPES[0]}
+                                onValueChange={(val) => field.handleChange(val as GpuType)}
+                              >
+                                <SelectTrigger className="h-8" id={field.name}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {SELECTABLE_GPU_TYPES.map((gpuType) => (
+                                    <SelectItem key={gpuType} value={gpuType}>
+                                      {GPU_TYPE_LABELS[gpuType] || gpuType}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </Field>
                           )}
                         </form.Field>
-                        <form.Subscribe selector={(state) => state.values.gpu}>
-                          {(gpuEnabled) =>
-                            gpuEnabled && allowedGpuTypes.length > 0 ? (
-                              <form.Field name="gpuType">
-                                {(field) => (
-                                  <Field>
-                                    <FieldLabel htmlFor={field.name}>GPU type</FieldLabel>
-                                    <Select
-                                      value={field.state.value ?? allowedGpuTypes[0]}
-                                      onValueChange={(val) => field.handleChange(val as GpuType)}
-                                    >
-                                      <SelectTrigger className="h-8" id={field.name}>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {allowedGpuTypes.map((gpuType) => (
-                                          <SelectItem key={gpuType} value={gpuType}>
-                                            {GPU_TYPE_LABELS[gpuType] || gpuType}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </Field>
-                                )}
-                              </form.Field>
-                            ) : null
-                          }
-                        </form.Subscribe>
-                      </div>
-                    )
-                  }}
-                </form.Subscribe>
+                      ) : null
+                    }
+                  </form.Subscribe>
+                </div>
               </div>
               <FieldDescription>
                 If not specified, default values will be used (1 vCPU, 1 GiB memory, 3 GiB storage).

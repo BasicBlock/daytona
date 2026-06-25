@@ -8,7 +8,6 @@ import type { QueryKey } from '@tanstack/react-query'
 import { useApi } from '@/hooks/useApi'
 import {
   type SandboxListItem,
-  SandboxClass,
   SandboxListSortDirection,
   SandboxListSortField,
   SandboxState,
@@ -25,7 +24,6 @@ export interface SandboxFilters {
   states?: SandboxState[]
   snapshots?: string[]
   targets?: string[]
-  sandboxClasses?: SandboxClass[]
   minCpu?: number
   maxCpu?: number
   minMemoryGib?: number
@@ -93,7 +91,6 @@ export function useSandboxesQuery(params: SandboxQueryParams) {
         filters.states,
         filters.snapshots,
         filters.targets,
-        filters.sandboxClasses,
         filters.minCpu,
         filters.maxCpu,
         filters.minMemoryGib,

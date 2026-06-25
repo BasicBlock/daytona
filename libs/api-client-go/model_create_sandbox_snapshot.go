@@ -22,9 +22,7 @@ var _ MappedNullable = &CreateSandboxSnapshot{}
 // CreateSandboxSnapshot struct for CreateSandboxSnapshot
 type CreateSandboxSnapshot struct {
 	// Name for the new snapshot
-	Name string `json:"name"`
-	// Include the VM's memory in the snapshot. VM sandboxes only. When true the sandbox must be STARTED; when false (default) VM sandboxes must be STOPPED. Container sandboxes do not support memory snapshots.
-	IncludeMemory *bool `json:"includeMemory,omitempty"`
+	Name                 string `json:"name"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -37,8 +35,6 @@ type _CreateSandboxSnapshot CreateSandboxSnapshot
 func NewCreateSandboxSnapshot(name string) *CreateSandboxSnapshot {
 	this := CreateSandboxSnapshot{}
 	this.Name = name
-	var includeMemory bool = false
-	this.IncludeMemory = &includeMemory
 	return &this
 }
 
@@ -47,8 +43,6 @@ func NewCreateSandboxSnapshot(name string) *CreateSandboxSnapshot {
 // but it doesn't guarantee that properties required by API are set
 func NewCreateSandboxSnapshotWithDefaults() *CreateSandboxSnapshot {
 	this := CreateSandboxSnapshot{}
-	var includeMemory bool = false
-	this.IncludeMemory = &includeMemory
 	return &this
 }
 
@@ -76,40 +70,8 @@ func (o *CreateSandboxSnapshot) SetName(v string) {
 	o.Name = v
 }
 
-// GetIncludeMemory returns the IncludeMemory field value if set, zero value otherwise.
-func (o *CreateSandboxSnapshot) GetIncludeMemory() bool {
-	if o == nil || IsNil(o.IncludeMemory) {
-		var ret bool
-		return ret
-	}
-	return *o.IncludeMemory
-}
-
-// GetIncludeMemoryOk returns a tuple with the IncludeMemory field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CreateSandboxSnapshot) GetIncludeMemoryOk() (*bool, bool) {
-	if o == nil || IsNil(o.IncludeMemory) {
-		return nil, false
-	}
-	return o.IncludeMemory, true
-}
-
-// HasIncludeMemory returns a boolean if a field has been set.
-func (o *CreateSandboxSnapshot) HasIncludeMemory() bool {
-	if o != nil && !IsNil(o.IncludeMemory) {
-		return true
-	}
-
-	return false
-}
-
-// SetIncludeMemory gets a reference to the given bool and assigns it to the IncludeMemory field.
-func (o *CreateSandboxSnapshot) SetIncludeMemory(v bool) {
-	o.IncludeMemory = &v
-}
-
 func (o CreateSandboxSnapshot) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -119,9 +81,6 @@ func (o CreateSandboxSnapshot) MarshalJSON() ([]byte, error) {
 func (o CreateSandboxSnapshot) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["name"] = o.Name
-	if !IsNil(o.IncludeMemory) {
-		toSerialize["includeMemory"] = o.IncludeMemory
-	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -143,10 +102,10 @@ func (o *CreateSandboxSnapshot) UnmarshalJSON(data []byte) (err error) {
 	err = json.Unmarshal(data, &allProperties)
 
 	if err != nil {
-		return err;
+		return err
 	}
 
-	for _, requiredProperty := range(requiredProperties) {
+	for _, requiredProperty := range requiredProperties {
 		if _, exists := allProperties[requiredProperty]; !exists {
 			return fmt.Errorf("no value given for required property %v", requiredProperty)
 		}
@@ -166,7 +125,6 @@ func (o *CreateSandboxSnapshot) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "name")
-		delete(additionalProperties, "includeMemory")
 		o.AdditionalProperties = additionalProperties
 	}
 
@@ -208,5 +166,3 @@ func (v *NullableCreateSandboxSnapshot) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -19,10 +19,13 @@ import (
 
 var runnerID string
 
+const supportedSandboxClass = "linux-vm"
+
 type runnerIdentity struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Target string `json:"target"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Target       string `json:"target"`
+	SandboxClass string `json:"sandboxClass"`
 }
 
 type createRunnerResponse struct {
@@ -92,7 +95,11 @@ func lookupRunnerID(ctx context.Context, cfg *config.Config) (string, error) {
 	}
 
 	for _, runner := range runners {
-		if runner.Name == cfg.RunnerName && (runner.Target == "" || runner.Target == cfg.RunnerTarget) {
+		runnerSandboxClass := runner.SandboxClass
+		if runnerSandboxClass == "" {
+			runnerSandboxClass = "linux-vm"
+		}
+		if runner.Name == cfg.RunnerName && (runner.Target == "" || runner.Target == cfg.RunnerTarget) && runnerSandboxClass == supportedSandboxClass {
 			return runner.ID, nil
 		}
 	}
@@ -102,8 +109,9 @@ func lookupRunnerID(ctx context.Context, cfg *config.Config) (string, error) {
 
 func createRunner(ctx context.Context, cfg *config.Config) (string, error) {
 	payload, err := json.Marshal(map[string]any{
-		"target": cfg.RunnerTarget,
-		"name":   cfg.RunnerName,
+		"target":       cfg.RunnerTarget,
+		"name":         cfg.RunnerName,
+		"sandboxClass": supportedSandboxClass,
 	})
 	if err != nil {
 		return "", err

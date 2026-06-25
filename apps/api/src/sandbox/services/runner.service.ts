@@ -93,7 +93,7 @@ export class RunnerService {
       apiVersion: '2',
       appVersion: createRunnerDto.appVersion,
       tags: createRunnerDto.tags,
-      sandboxClass: createRunnerDto.sandboxClass,
+      sandboxClass: SandboxClass.LINUX_VM,
     })
 
     try {
@@ -306,11 +306,6 @@ export class RunnerService {
   /**
    * Returns true if at least one runner is registered for the given (target, sandboxClass)
    * and is currently schedulable.
-   *
-   * Callers must apply `getRunnerSandboxClass(snapshot.sandboxClass)` before calling, matching the
-   * convention used by `findAvailableRunners` / `getRandomAvailableRunner`. Otherwise classes
-   * that re-target to a different runner pool (currently `ANDROID → CONTAINER`) will be
-   * falsely reported as having no schedulable runners.
    *
    * Intentionally ignores transient signals like `state` (e.g. UNRESPONSIVE) and
    * `availabilityScore`, so this returns true even if every matching runner is temporarily
@@ -839,17 +834,17 @@ export class RunnerService {
    *
    * Every GPU sandbox in any state other than DESTROYED / ARCHIVED /
    * BUILD_FAILED counts toward capacity - including STOPPED, ERROR, RESIZING,
-   * SNAPSHOTTING, etc. - because the GPU index is pinned into the container's
-   * HostConfig.DeviceRequests at create time and survives any subsequent
+   * SNAPSHOTTING, etc. - because the GPU allocation is pinned at create time
+   * and survives any subsequent
    * restart, so the physical card stays reserved for that sandbox until it
    * is fully destroyed.
    *
    * ARCHIVED is excluded together with DESTROYED: GPU sandboxes are forced
    * ephemeral (see SandboxService) so they cannot legitimately reach the
    * archived state, but if one ever does (legacy data, manual bypass) the
-   * container is no longer on the runner and the card is effectively free.
+   * sandbox is no longer on the runner and the card is effectively free.
    *
-   * BUILD_FAILED is excluded because the build failed before a GPU container
+   * BUILD_FAILED is excluded because the build failed before a GPU sandbox
    * was created on the runner, so no physical card is reserved.
    */
   async getRunnersAtGpuCapacity(): Promise<string[]> {

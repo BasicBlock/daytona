@@ -328,7 +328,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 			parsed.Scheme = "wss"
 		}
 		hdr := http.Header{}
-		setToolboxAuthorization(hdr, cfg)
+		setToolboxAuthorizationForURL(hdr, cfg, parsed)
 		dialer := *websocket.DefaultDialer
 		dialer.HandshakeTimeout = 15 * time.Second
 		conn, resp, err := dialer.Dial(parsed.String(), hdr)

@@ -28,7 +28,7 @@ import { InjectRedis } from '@nestjs-modules/ioredis'
 import Redis from 'ioredis'
 import { WithSpan } from '../../../common/decorators/otel.decorator'
 import { SandboxActivityService } from '../../services/sandbox-activity.service'
-import { getRunnerSandboxClass, isRegistryBasedSandboxClass } from '../../utils/sandbox-class.util'
+import { getRunnerSandboxClass, isRegistrySnapshotRef } from '../../utils/sandbox-class.util'
 
 @Injectable()
 export class SandboxStartAction extends SandboxAction {
@@ -358,7 +358,7 @@ export class SandboxStartAction extends SandboxAction {
 
   async pullSnapshotToRunner(snapshot: Snapshot, runner: Runner) {
     let internalRegistry: DockerRegistry | undefined
-    if (isRegistryBasedSandboxClass(snapshot.sandboxClass)) {
+    if (isRegistrySnapshotRef(snapshot.sandboxClass, snapshot.ref)) {
       const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshot.ref, runner.target)
       internalRegistry = found ?? undefined
     }
@@ -366,14 +366,7 @@ export class SandboxStartAction extends SandboxAction {
     const runnerAdapter = await this.runnerAdapterFactory.create(runner)
 
     // Fire the pull request (runner returns 202 immediately)
-    await runnerAdapter.pullSnapshot(
-      snapshot.ref,
-      internalRegistry,
-      undefined,
-      undefined,
-      undefined,
-      snapshot.sandboxClass,
-    )
+    await runnerAdapter.pullSnapshot(snapshot.ref, internalRegistry)
 
     const pollTimeoutMs = 60 * 60 * 1_000 // 1 hour
     const pollIntervalMs = 5 * 1_000 // 5 seconds
@@ -456,7 +449,7 @@ export class SandboxStartAction extends SandboxAction {
       const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot)
       snapshotRef = snapshot.ref
 
-      if (isRegistryBasedSandboxClass(snapshot.sandboxClass)) {
+      if (isRegistrySnapshotRef(snapshot.sandboxClass, snapshotRef)) {
         const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshotRef, runner.target)
         internalRegistry = found ?? undefined
       }

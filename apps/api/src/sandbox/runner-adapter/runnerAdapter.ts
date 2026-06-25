@@ -10,7 +10,6 @@ import { RunnerAdapterV2 } from './runnerAdapter.v2'
 import { DockerRegistry } from '../../docker-registry/entities/docker-registry.entity'
 import { Sandbox } from '../entities/sandbox.entity'
 import { SandboxState } from '../enums/sandbox-state.enum'
-import { SandboxClass } from '../enums/sandbox-class.enum'
 import { BackupState } from '../enums/backup-state.enum'
 import { RunnerServiceInfo } from '../common/runner-service-info'
 import { BuildInfo } from '../entities/build-info.entity'
@@ -109,7 +108,6 @@ export interface RunnerAdapter {
     destinationRegistry?: DockerRegistry,
     destinationRef?: string,
     newTag?: string,
-    sandboxClass?: SandboxClass,
   ): Promise<void>
   snapshotExists(snapshotRef: string): Promise<boolean>
   getSnapshotInfo(snapshotName: string): Promise<RunnerSnapshotInfo>
@@ -123,7 +121,7 @@ export interface RunnerAdapter {
     domainAllowList?: string,
   ): Promise<void>
 
-  forkSandbox(sourceSandboxId: string, newSandboxId: string): Promise<void>
+  forkSandbox(sourceSandboxId: string, newSandboxId: string, targetAuthToken: string): Promise<void>
 
   pauseSandbox(sandboxId: string): Promise<void>
 
@@ -131,8 +129,6 @@ export interface RunnerAdapter {
     sandboxId: string,
     snapshotName: string,
     snapshotSource: string,
-    registry?: DockerRegistry,
-    includeMemory?: boolean,
   ): Promise<CreateSandboxSnapshotResult | undefined>
 
   recoverSandbox(sandbox: Sandbox, registry?: DockerRegistry, skipStart?: boolean): Promise<void>

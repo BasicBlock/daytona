@@ -17,6 +17,7 @@ import (
 	"github.com/daytonaio/runner/pkg/api/dto"
 	"github.com/daytonaio/runner/pkg/common"
 	"github.com/daytonaio/runner/pkg/models/enums"
+	"github.com/daytonaio/runner/pkg/storage"
 	"github.com/distribution/distribution/v3/manifest/manifestlist"
 	"github.com/docker/docker/api/types/image"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -26,6 +27,10 @@ import (
 
 func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxDTO) (string, string, error) {
 	defer timer.Timer()()
+
+	if storage.IsSnapshotStoreRef(sandboxDto.Snapshot) {
+		return "", "", fmt.Errorf("gVisor memory snapshot restore requires the raw runsc sandbox lifecycle backend; Docker restore/checkpoint fallback is intentionally disabled")
+	}
 
 	startTime := time.Now()
 	defer func() {
@@ -84,16 +89,6 @@ func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxD
 		containerIP := GetContainerIpAddress(ctx, c)
 		if containerIP == "" {
 			return "", "", errors.New("sandbox IP not found? Is the sandbox started?")
-		}
-
-		// Android-device sandboxes do not run the daytona daemon; their readiness is
-		// signaled by the ADB port accepting TCP connections. Match Start's behavior
-		// by branching on the inspected container label rather than the DTO.
-		if isAndroidDeviceContainer(c) {
-			if err := d.waitForAdbRunning(ctx, containerIP); err != nil {
-				return "", "", err
-			}
-			return sandboxDto.Id, "", nil
 		}
 
 		daemonVersion, err := d.waitForDaemonRunning(ctx, c, sandboxDto.AuthToken)
@@ -158,6 +153,14 @@ func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxD
 		}
 	}
 
+	extraHosts := []string{}
+	if linkedOwnerId != "" {
+		extraHosts, err = d.linkedOwnerExtraHosts(ctx, linkedOwnerId)
+		if err != nil {
+			return "", "", err
+		}
+	}
+
 	// Pin GPU sandboxes to a single physical card. The allocator mutex must
 	// be held across ContainerCreate so concurrent creators see the new
 	// daytona.gpu_index label on their next scan and skip this index, but it
@@ -184,15 +187,12 @@ func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxD
 		gpuIndex = &idx
 	}
 
-	containerConfig, hostConfig, networkingConfig, err := d.getContainerConfigs(sandboxDto, image, volumeMountPathBinds, gpuIndex)
+	containerConfig, hostConfig, networkingConfig, err := d.getContainerConfigs(sandboxDto, image, volumeMountPathBinds, gpuIndex, extraHosts)
 	if err != nil {
 		return "", "", err
 	}
 
-	c, err := d.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, &v1.Platform{
-		Architecture: "amd64",
-		OS:           "linux",
-	}, sandboxDto.Id)
+	c, err := d.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, sandboxPlatform(), sandboxDto.Id)
 	if err != nil {
 		// Container already exists and is being created by another process
 		if errdefs.IsConflict(err) {
@@ -211,19 +211,9 @@ func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxD
 
 	// Attach the follower to the owner's link network before it starts so DNS
 	// resolution between the two sandboxes works from the very first boot.
-	// Android-device followers are already created directly on the link network
-	// (see getContainerNetworkingConfig) so that the link network becomes eth0
-	// and docker-android's eth0-bound socat forwarders reach their ADB port; for
-	// those we skip the post-create connect — but we still need to clear the
-	// bridge port isolation Docker stamps on the freshly-created veth, since
-	// connectFollowerToLinkNetwork is what does that for non-android followers.
 	if linkedOwnerId != "" {
-		if !sandboxDto.IsAndroidSandbox() {
-			if err := d.connectFollowerToLinkNetwork(ctx, linkedOwnerId, sandboxDto.Id, sandboxDto.Name); err != nil {
-				return "", "", err
-			}
-		} else {
-			d.clearLinkNetworkIsolation(ctx, linkedOwnerId)
+		if err := d.connectFollowerToLinkNetwork(ctx, linkedOwnerId, sandboxDto.Id, sandboxDto.Name); err != nil {
+			return "", "", err
 		}
 	}
 
@@ -235,6 +225,11 @@ func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxD
 	runningContainer, daemonVersion, err := d.Start(ctx, sandboxDto.Id, sandboxDto.AuthToken, sandboxDto.Metadata)
 	if err != nil {
 		return "", "", err
+	}
+	if linkedOwnerId != "" {
+		d.clearLinkNetworkIsolation(ctx, linkedOwnerId)
+	} else {
+		d.clearLinkNetworkIsolation(ctx, sandboxDto.Id)
 	}
 
 	containerShortId := runningContainer.ID[:12]
@@ -280,15 +275,11 @@ func (p *DockerClient) validateImageArchitecture(image *image.InspectResponse) e
 		return nil
 	}
 
-	validArchs := []string{"amd64", "x86_64"}
-
-	for _, validArch := range validArchs {
-		if arch == validArch {
-			return nil
-		}
+	if isRuntimeCompatibleArchitecture(arch) {
+		return nil
 	}
 
-	return common_errors.NewConflictError(fmt.Errorf("image %s architecture (%s) is not x64 compatible", image.ID, image.Architecture))
+	return common_errors.NewConflictError(fmt.Errorf("image %s architecture (%s) is not compatible with runner architecture %s", image.ID, image.Architecture, sandboxArchitecture()))
 }
 
 func isMultiPlatformImageDescriptor(mediaType string) bool {

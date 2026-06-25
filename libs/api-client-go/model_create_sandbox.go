@@ -59,7 +59,7 @@ type CreateSandbox struct {
 	// Build information for the sandbox
 	BuildInfo *CreateBuildInfo `json:"buildInfo,omitempty"`
 	// ID or name of an existing sandbox to link the new sandbox to. The new sandbox will be scheduled on the same runner as the linked sandbox so a local network can be established between them. Linked sandboxes must be ephemeral (autoDeleteInterval=0) and cannot themselves be linked to another sandbox.
-	LinkedSandbox *string `json:"linkedSandbox,omitempty"`
+	LinkedSandbox        *string `json:"linkedSandbox,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -723,7 +723,7 @@ func (o *CreateSandbox) SetLinkedSandbox(v string) {
 }
 
 func (o CreateSandbox) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -875,5 +875,3 @@ func (v *NullableCreateSandbox) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

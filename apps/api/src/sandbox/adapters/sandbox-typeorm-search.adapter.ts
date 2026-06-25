@@ -49,9 +49,6 @@ export class SandboxTypeormSearchAdapter implements SandboxSearchAdapter {
     if (filters.snapshots?.length) {
       qb.andWhere('sandbox.snapshot IN (:...snapshots)', { snapshots: filters.snapshots })
     }
-    if (filters.sandboxClasses?.length) {
-      qb.andWhere('sandbox.sandboxClass IN (:...sandboxClasses)', { sandboxClasses: filters.sandboxClasses })
-    }
     if (filters.isRecoverable !== undefined) {
       qb.andWhere('sandbox.recoverable = :isRecoverable', { isRecoverable: filters.isRecoverable })
     }
