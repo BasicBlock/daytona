@@ -6,6 +6,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/coreos/go-iptables v0.8.0
 	github.com/daytonaio/daytona/libs/api-client-go v0.149.0
+	github.com/distribution/distribution/v3 v3.1.1
 	github.com/docker/cli v29.2.1+incompatible
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-units v0.5.0
