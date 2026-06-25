@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -18,7 +19,9 @@ import (
 
 type Config struct {
 	DaytonaApiUrl                      string        `envconfig:"DAYTONA_API_URL"`
-	ApiToken                           string        `envconfig:"DAYTONA_RUNNER_TOKEN"`
+	RunnerId                           string        `envconfig:"RUNNER_ID"`
+	RunnerTarget                       string        `envconfig:"RUNNER_TARGET"`
+	RunnerName                         string        `envconfig:"RUNNER_NAME"`
 	ApiPort                            int           `envconfig:"API_PORT"`
 	ApiLogRequests                     bool          `envconfig:"API_LOG_REQUESTS" default:"false"`
 	TLSCertFile                        string        `envconfig:"TLS_CERT_FILE"`
@@ -100,17 +103,22 @@ func GetConfig() (*Config, error) {
 		config.DaytonaApiUrl = serverUrl
 	}
 
-	if config.ApiToken == "" {
-		// For backward compatibility
-		apiToken := os.Getenv("API_TOKEN")
-		if apiToken == "" {
-			return nil, fmt.Errorf("DAYTONA_RUNNER_TOKEN or API_TOKEN is required")
-		}
-		config.ApiToken = apiToken
-	}
-
 	if config.ApiPort == 0 {
 		config.ApiPort = DEFAULT_API_PORT
+	}
+
+	if config.RunnerTarget == "" {
+		config.RunnerTarget = os.Getenv("DEFAULT_TARGET_ID")
+		if config.RunnerTarget == "" {
+			config.RunnerTarget = "us"
+		}
+	}
+
+	if config.RunnerName == "" {
+		config.RunnerName = os.Getenv("DEFAULT_RUNNER_NAME")
+		if config.RunnerName == "" {
+			config.RunnerName = "default"
+		}
 	}
 
 	if config.Domain == "" {
@@ -207,7 +215,7 @@ func GetBuildLogFilePath(snapshotRef string) (string, error) {
 
 // getOutboundIP returns the IP address of the default route's network interface
 func getOutboundIP() (net.IP, error) {
-	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
+	routes, err := netlink.RouteList(nil, syscall.AF_INET)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list routes: %w", err)
 	}
@@ -222,7 +230,7 @@ func getOutboundIP() (net.IP, error) {
 			}
 
 			// Get addresses for this interface
-			addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+			addrs, err := netlink.AddrList(link, syscall.AF_INET)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get addresses: %w", err)
 			}

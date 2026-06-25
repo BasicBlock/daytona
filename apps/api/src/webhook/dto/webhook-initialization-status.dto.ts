@@ -9,10 +9,10 @@ import { WebhookInitialization } from '../entities/webhook-initialization.entity
 @ApiSchema({ name: 'WebhookInitializationStatus' })
 export class WebhookInitializationStatusDto {
   @ApiProperty({
-    description: 'Organization ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    description: 'Webhook application ID',
+    example: 'default',
   })
-  organizationId: string
+  applicationId: string
 
   @ApiProperty({
     description: 'The ID of the Svix application',
@@ -48,7 +48,7 @@ export class WebhookInitializationStatusDto {
 
   static fromWebhookInitialization(webhookInitialization: WebhookInitialization): WebhookInitializationStatusDto {
     return {
-      organizationId: webhookInitialization.organizationId,
+      applicationId: webhookInitialization.applicationId,
       svixApplicationId: webhookInitialization.svixApplicationId,
       lastError: webhookInitialization.lastError,
       retryCount: webhookInitialization.retryCount,

@@ -6,7 +6,6 @@ package proxy
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	common_errors "github.com/daytonaio/common-go/pkg/errors"
@@ -16,21 +15,6 @@ import (
 
 func (p *Proxy) Authenticate(ctx *gin.Context, sandboxIdOrSignedToken string, port float32) (sandboxId string, didRedirect bool, err error) {
 	var authErrors []string
-
-	// Try Authorization header with Bearer token
-	bearerToken := p.getBearerToken(ctx)
-	if bearerToken != "" {
-		isValid, err := p.getSandboxBearerTokenValid(ctx, sandboxIdOrSignedToken, bearerToken)
-		if err != nil {
-			authErrors = append(authErrors, fmt.Sprintf("Bearer token validation error: %v", err))
-		} else if isValid != nil && *isValid {
-			// If authentication successful, remove the Authorization header to prevent it from being forwarded to the sandbox
-			ctx.Request.Header.Del("Authorization")
-			return sandboxIdOrSignedToken, false, nil
-		} else {
-			authErrors = append(authErrors, "Bearer token is invalid")
-		}
-	}
 
 	// Try auth key from header
 	authKey := ctx.Request.Header.Get(SANDBOX_AUTH_KEY_HEADER)
@@ -83,14 +67,6 @@ func (p *Proxy) Authenticate(ctx *gin.Context, sandboxIdOrSignedToken string, po
 		} else {
 			authErrors = append(authErrors, err.Error())
 		}
-
-		// All authentication methods failed, redirect to auth URL
-		authUrl, err := p.getAuthUrl(ctx, sandboxIdOrSignedToken)
-		if err != nil {
-			return sandboxIdOrSignedToken, false, fmt.Errorf("failed to get auth URL: %w", err)
-		}
-
-		ctx.Redirect(http.StatusTemporaryRedirect, authUrl)
 	}
 
 	// Return error with details about what failed
@@ -98,18 +74,10 @@ func (p *Proxy) Authenticate(ctx *gin.Context, sandboxIdOrSignedToken string, po
 	if len(authErrors) > 0 {
 		errorMsg = fmt.Sprintf("authentication failed: %s", strings.Join(authErrors, ","))
 	} else {
-		errorMsg = "missing authentication: provide a preview access token (via header, query parameter, or cookie) or use an API key or JWT"
+		errorMsg = "missing authentication: provide a preview access token via header, query parameter, cookie, or signed preview URL"
 	}
 
 	return sandboxIdOrSignedToken, !ctx.GetBool(IS_TOOLBOX_REQUEST_KEY), common_errors.NewUnauthorizedError(errors.New(errorMsg))
-}
-
-func (p *Proxy) getBearerToken(ctx *gin.Context) string {
-	authHeader := ctx.Request.Header.Get("Authorization")
-	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
-		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
-	}
-	return ""
 }
 
 func (p *Proxy) getSandboxIdFromSignedPreviewUrlToken(ctx *gin.Context, sandboxIdOrSignedToken string, port float32, cookieDomain string) (string, error) {

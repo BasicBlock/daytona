@@ -15,7 +15,7 @@ import (
 	"encoding/json"
 )
 
-// GpuType the model 'GpuType'
+// GpuType The GPU type assigned to the sandbox
 type GpuType string
 
 // List of GpuType

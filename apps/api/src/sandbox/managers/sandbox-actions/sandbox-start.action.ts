@@ -21,10 +21,8 @@ import { RunnerService } from '../../services/runner.service'
 import { RunnerAdapterFactory } from '../../runner-adapter/runnerAdapter'
 import { SnapshotStateError } from '../../errors/snapshot-state-error'
 import { Snapshot } from '../../entities/snapshot.entity'
-import { OrganizationService } from '../../../organization/services/organization.service'
 import { TypedConfigService } from '../../../config/typed-config.service'
 import { Runner } from '../../entities/runner.entity'
-import { Organization } from '../../../organization/entities/organization.entity'
 import { LockCode, RedisLockProvider } from '../../common/redis-lock.provider'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import Redis from 'ioredis'
@@ -41,7 +39,6 @@ export class SandboxStartAction extends SandboxAction {
     protected sandboxRepository: SandboxRepository,
     protected readonly snapshotService: SnapshotService,
     protected readonly dockerRegistryService: DockerRegistryService,
-    protected readonly organizationService: OrganizationService,
     protected readonly configService: TypedConfigService,
     protected readonly redisLockProvider: RedisLockProvider,
     @InjectRedis() private readonly redis: Redis,
@@ -67,7 +64,7 @@ export class SandboxStartAction extends SandboxAction {
           // Using the PULLING_SNAPSHOT state for the case where the runner isn't assigned yet as well
           return this.handleUnassignedRunnerSandbox(sandbox, lockCode)
         } else {
-          return this.handleRunnerSandboxStartedStateCheck(sandbox, lockCode)
+          return this.handleRunnerSandboxPullingSnapshotStateOnDesiredStateStart(sandbox, lockCode)
         }
       }
       case SandboxState.PENDING_BUILD: {
@@ -165,6 +162,44 @@ export class SandboxStartAction extends SandboxAction {
     return DONT_SYNC_AGAIN
   }
 
+  private async handleRunnerSandboxPullingSnapshotStateOnDesiredStateStart(
+    sandbox: Sandbox,
+    lockCode: LockCode,
+  ): Promise<SyncState> {
+    if (!sandbox.runnerId) {
+      return SYNC_AGAIN
+    }
+
+    const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot)
+    const snapshotRunner = await this.runnerService.getSnapshotRunner(sandbox.runnerId, snapshot.ref)
+
+    if (snapshotRunner) {
+      switch (snapshotRunner.state) {
+        case SnapshotRunnerState.READY: {
+          await this.updateSandboxState(sandbox, SandboxState.UNKNOWN, lockCode)
+          return SYNC_AGAIN
+        }
+        case SnapshotRunnerState.ERROR: {
+          await this.updateSandboxState(
+            sandbox,
+            SandboxState.ERROR,
+            lockCode,
+            undefined,
+            snapshotRunner.errorReason || 'Failed to pull snapshot',
+          )
+          return DONT_SYNC_AGAIN
+        }
+      }
+    }
+
+    if (await this.checkTimeoutError(sandbox, 30, 'Timeout while pulling snapshot')) {
+      return DONT_SYNC_AGAIN
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    return SYNC_AGAIN
+  }
+
   private async handleUnassignedRunnerSandbox(
     sandbox: Sandbox,
     lockCode: LockCode,
@@ -176,7 +211,7 @@ export class SandboxStartAction extends SandboxAction {
     if (isBuild) {
       snapshotRef = sandbox.buildInfo.snapshotRef
     } else {
-      const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot, sandbox.organizationId)
+      const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot)
       snapshotRef = snapshot.ref
     }
 
@@ -189,7 +224,7 @@ export class SandboxStartAction extends SandboxAction {
     // Try to assign an available runner with the snapshot already available
     try {
       const runner = await this.runnerService.getRandomAvailableRunner({
-        regions: [sandbox.region],
+        targets: [sandbox.target],
         sandboxClass: sandbox.sandboxClass,
         snapshotRef: snapshotRef,
         gpu: sandbox.gpu,
@@ -274,7 +309,7 @@ export class SandboxStartAction extends SandboxAction {
 
     try {
       runner = await this.runnerService.getRandomAvailableRunner({
-        regions: [sandbox.region],
+        targets: [sandbox.target],
         sandboxClass: sandbox.sandboxClass,
         gpu: sandbox.gpu,
         gpuType: sandbox.gpuType ?? null,
@@ -296,20 +331,15 @@ export class SandboxStartAction extends SandboxAction {
 
       const sourceRegistries = await this.dockerRegistryService.getSourceRegistriesForDockerfile(
         sandbox.buildInfo.dockerfileContent,
-        sandbox.organizationId,
       )
 
       // Fire build request - resolves immediately
-      await runnerAdapter.buildSnapshot(
-        sandbox.buildInfo,
-        sandbox.organizationId,
-        sourceRegistries.length > 0 ? sourceRegistries : undefined,
-      )
+      await runnerAdapter.buildSnapshot(sandbox.buildInfo, sourceRegistries.length > 0 ? sourceRegistries : undefined)
 
       this.pollBuildStatus(sandbox.buildInfo, runner).catch(this.logger.error)
       await this.updateSandboxState(sandbox, SandboxState.BUILDING_SNAPSHOT, lockCode, runner.id)
     } else {
-      const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot, sandbox.organizationId)
+      const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot)
       await this.runnerService.createSnapshotRunnerEntry(runner.id, snapshot.ref, SnapshotRunnerState.PULLING_SNAPSHOT)
       this.pullSnapshotToRunner(snapshot, runner)
       await this.updateSandboxState(sandbox, SandboxState.PULLING_SNAPSHOT, lockCode, runner.id)
@@ -329,11 +359,8 @@ export class SandboxStartAction extends SandboxAction {
   async pullSnapshotToRunner(snapshot: Snapshot, runner: Runner) {
     let internalRegistry: DockerRegistry | undefined
     if (isRegistryBasedSandboxClass(snapshot.sandboxClass)) {
-      const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshot.ref, runner.region)
-      if (!found) {
-        throw new Error('No internal registry found for sandbox snapshot')
-      }
-      internalRegistry = found
+      const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshot.ref, runner.target)
+      internalRegistry = found ?? undefined
     }
 
     const runnerAdapter = await this.runnerAdapterFactory.create(runner)
@@ -419,8 +446,6 @@ export class SandboxStartAction extends SandboxAction {
       return DONT_SYNC_AGAIN
     }
 
-    const organization = await this.organizationService.findOne(sandbox.organizationId)
-
     const runnerAdapter = await this.runnerAdapterFactory.create(runner)
 
     let internalRegistry: DockerRegistry | undefined
@@ -428,15 +453,12 @@ export class SandboxStartAction extends SandboxAction {
     let snapshotRef: string
     if (!sandbox.buildInfo) {
       //  get internal snapshot name
-      const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot, sandbox.organizationId)
+      const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot)
       snapshotRef = snapshot.ref
 
       if (isRegistryBasedSandboxClass(snapshot.sandboxClass)) {
-        const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshotRef, runner.region)
-        if (!found) {
-          throw new Error('No registry found for snapshot')
-        }
-        internalRegistry = found
+        const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshotRef, runner.target)
+        internalRegistry = found ?? undefined
       }
 
       entrypoint = snapshot.entrypoint
@@ -446,7 +468,6 @@ export class SandboxStartAction extends SandboxAction {
     }
 
     const metadata = {
-      ...organization?.sandboxMetadata,
       sandboxName: sandbox.name,
     }
 
@@ -468,8 +489,6 @@ export class SandboxStartAction extends SandboxAction {
     sandbox: Sandbox,
     lockCode: LockCode,
   ): Promise<SyncState> {
-    const organization = await this.organizationService.findOne(sandbox.organizationId)
-
     //  check if sandbox is assigned to a runner and if that runner is unschedulable
     //  if it is, move sandbox to prevRunnerId, and set runnerId to null
     //  this will assign a new runner to the sandbox and restore the sandbox from the latest backup
@@ -494,7 +513,7 @@ export class SandboxStartAction extends SandboxAction {
       if (sandbox.backupState === BackupState.COMPLETED) {
         if (runner.availabilityScore < this.configService.getOrThrow('runnerScore.thresholds.availability')) {
           const availableRunners = await this.runnerService.findAvailableRunners({
-            regions: [sandbox.region],
+            targets: [sandbox.target],
             sandboxClass: sandbox.sandboxClass,
             gpu: sandbox.gpu,
             gpuType: sandbox.gpuType ?? null,
@@ -536,7 +555,7 @@ export class SandboxStartAction extends SandboxAction {
         return DONT_SYNC_AGAIN
       }
 
-      const syncCheck = await this.restoreSandboxOnNewRunner(sandbox, lockCode, organization, sandbox.prevRunnerId)
+      const syncCheck = await this.restoreSandboxOnNewRunner(sandbox, lockCode, sandbox.prevRunnerId)
       if (syncCheck !== null) {
         return syncCheck
       }
@@ -550,7 +569,7 @@ export class SandboxStartAction extends SandboxAction {
 
       const runnerAdapter = await this.runnerAdapterFactory.create(runner)
 
-      const metadata: { [key: string]: string } = { ...organization?.sandboxMetadata }
+      const metadata: { [key: string]: string } = { sandboxName: sandbox.name }
       if (sandbox.volumes?.length) {
         metadata['volumes'] = JSON.stringify(
           sandbox.volumes.map((v) => ({ volumeId: v.volumeId, mountPath: v.mountPath, subpath: v.subpath })),
@@ -570,7 +589,7 @@ export class SandboxStartAction extends SandboxAction {
           )
           if (matchesRecovery) {
             try {
-              await this.restoreSandboxOnNewRunner(sandbox, lockCode, organization, sandbox.runnerId, true)
+              await this.restoreSandboxOnNewRunner(sandbox, lockCode, sandbox.runnerId, true)
               this.logger.warn(`Sandbox ${sandbox.id} transferred to a new runner`)
               return SYNC_AGAIN
             } catch (restoreError) {
@@ -735,7 +754,6 @@ export class SandboxStartAction extends SandboxAction {
   private async restoreSandboxOnNewRunner(
     sandbox: Sandbox,
     lockCode: LockCode,
-    organization: Organization,
     excludedRunnerId: string,
     isRecovery?: boolean,
   ): Promise<SyncState | null> {
@@ -764,7 +782,7 @@ export class SandboxStartAction extends SandboxAction {
     let baseSnapshot: Snapshot | null = null
     if (sandbox.snapshot) {
       try {
-        baseSnapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot, sandbox.organizationId)
+        baseSnapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot)
       } catch (e) {
         if (e instanceof NotFoundException) {
           //  if the base snapshot is not found, we'll use any available runner later
@@ -786,7 +804,7 @@ export class SandboxStartAction extends SandboxAction {
 
     const runnersWithBaseSnapshot: Runner[] = snapshotRef
       ? await this.runnerService.findAvailableRunners({
-          regions: [sandbox.region],
+          targets: [sandbox.target],
           sandboxClass: sandbox.sandboxClass,
           snapshotRef,
           excludedRunnerIds,
@@ -799,7 +817,7 @@ export class SandboxStartAction extends SandboxAction {
     } else {
       //  if no runner has the base snapshot, get all available runners
       availableRunners = await this.runnerService.findAvailableRunners({
-        regions: [sandbox.region],
+        targets: [sandbox.target],
         sandboxClass: sandbox.sandboxClass,
         excludedRunnerIds,
         gpu: sandbox.gpu,
@@ -907,7 +925,6 @@ export class SandboxStartAction extends SandboxAction {
     )
 
     const metadata = {
-      ...organization?.sandboxMetadata,
       sandboxName: sandbox.name,
     }
 

@@ -24,8 +24,6 @@ import { ResizeSandboxDto } from '../dto/resize-sandbox.dto'
 import { SandboxState } from '../enums/sandbox-state.enum'
 import { SandboxClass } from '../enums/sandbox-class.enum'
 import { isRegistryBasedSandboxClass } from '../utils/sandbox-class.util'
-import { OpenFeature } from '@openfeature/server-sdk'
-import { FeatureFlags } from '../../common/constants/feature-flags'
 import { SandboxDesiredState } from '../enums/sandbox-desired-state.enum'
 import { resolveGpuTypePreferences } from '../utils/gpu-type-preferences.util'
 import { RunnerService } from './runner.service'
@@ -36,13 +34,11 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { BackupState } from '../enums/backup-state.enum'
 import { Snapshot } from '../entities/snapshot.entity'
 import { SnapshotState } from '../enums/snapshot-state.enum'
-import { SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION } from '../constants/sandbox.constants'
 import { SandboxWarmPoolService } from './sandbox-warm-pool.service'
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter'
 import { WarmPoolEvents } from '../constants/warmpool-events.constants'
 import { WarmPoolTopUpRequested } from '../events/warmpool-topup-requested.event'
 import { Runner } from '../entities/runner.entity'
-import { Organization } from '../../organization/entities/organization.entity'
 import { SandboxEvents } from '../constants/sandbox-events.constants'
 import { isApiRecoverableError } from '../constants/errors-for-recovery'
 import { SandboxStateUpdatedEvent } from '../events/sandbox-state-updated.event'
@@ -53,16 +49,12 @@ import { SandboxDestroyedEvent } from '../events/sandbox-destroyed.event'
 import { SandboxStartedEvent } from '../events/sandbox-started.event'
 import { SandboxStoppedEvent } from '../events/sandbox-stopped.event'
 import { SandboxArchivedEvent } from '../events/sandbox-archived.event'
-import { OrganizationService } from '../../organization/services/organization.service'
-import { OrganizationEvents } from '../../organization/constants/organization-events.constant'
-import { OrganizationSuspendedSandboxStoppedEvent } from '../../organization/events/organization-suspended-sandbox-stopped.event'
 import { TypedConfigService } from '../../config/typed-config.service'
 import { WarmPool } from '../entities/warm-pool.entity'
 import { SandboxDto, SandboxVolume } from '../dto/sandbox.dto'
 import { isValidUuid } from '../../common/utils/uuid'
-import { RunnerAdapter, RunnerAdapterFactory } from '../runner-adapter/runnerAdapter'
+import { RunnerAdapterFactory } from '../runner-adapter/runnerAdapter'
 import { validateDomainAllowList, validateNetworkAllowList } from '../utils/network-validation.util'
-import { OrganizationUsageService } from '../../organization/services/organization-usage.service'
 import { SshAccess } from '../entities/ssh-access.entity'
 import { SshAccessDto, SshAccessValidationDto } from '../dto/ssh-access.dto'
 import { VolumeService } from './volume.service'
@@ -75,11 +67,6 @@ import {
 } from '../dto/list-sandboxes-query.deprecated.dto'
 import { createRangeFilter } from '../../common/utils/range-filter'
 import { LogExecution } from '../../common/decorators/log-execution.decorator'
-import {
-  UPGRADE_TIER_MESSAGE,
-  ARCHIVE_SANDBOXES_MESSAGE,
-  PER_SANDBOX_LIMIT_MESSAGE,
-} from '../../common/constants/error-messages'
 import { RedisLockProvider } from '../common/redis-lock.provider'
 import { getStateChangeLockKey } from '../utils/lock-key.util'
 import { customAlphabet as customNanoid, nanoid, urlAlphabet } from 'nanoid'
@@ -89,29 +76,20 @@ import { isEphemeral } from '../utils/ephemeral.util'
 import { SandboxRepository } from '../repositories/sandbox.repository'
 import { SnapshotRepository } from '../repositories/snapshot.repository'
 import { PortPreviewUrlDto, SignedPortPreviewUrlDto } from '../dto/port-preview-url.dto'
-import { RegionService } from '../../region/services/region.service'
-import { DefaultRegionRequiredException } from '../../organization/exceptions/DefaultRegionRequiredException'
 import { SnapshotService } from './snapshot.service'
 import { DockerRegistryService } from '../../docker-registry/services/docker-registry.service'
 import { DockerRegistry } from '../../docker-registry/entities/docker-registry.entity'
-import { RegionType } from '../../region/enums/region-type.enum'
-import { getEffectivePerSandboxLimits } from '../../organization/utils/sandbox-limits.util'
-import { RegionQuotaDto } from '../../organization/dto/region-quota.dto'
 import { SandboxCreatedEvent } from '../events/sandbox-create.event'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import { Redis } from 'ioredis'
 import {
   SANDBOX_LOOKUP_CACHE_TTL_MS,
-  SANDBOX_ORG_ID_CACHE_TTL_MS,
   TOOLBOX_PROXY_URL_CACHE_TTL_S,
   sandboxLookupCacheKeyById,
   sandboxLookupCacheKeyByName,
-  sandboxOrgIdCacheKeyById,
-  sandboxOrgIdCacheKeyByName,
   toolboxProxyUrlCacheKey,
 } from '../utils/sandbox-lookup-cache.util'
 import { SandboxLookupCacheInvalidationService } from './sandbox-lookup-cache-invalidation.service'
-import { Region } from '../../region/entities/region.entity'
 import { SandboxActivityService } from './sandbox-activity.service'
 import { ListSandboxesResponseDto } from '../dto/list-sandboxes-response.dto'
 import { ListSandboxesQueryDto } from '../dto/list-sandboxes-query.dto'
@@ -122,6 +100,8 @@ const DEFAULT_CPU = 1
 const DEFAULT_MEMORY = 1
 const DEFAULT_DISK = 3
 const DEFAULT_GPU = 0
+const RUNNER_SNAPSHOT_SOURCE = 'open'
+type SandboxTarget = { id: string }
 
 @Injectable()
 export class SandboxService {
@@ -141,12 +121,9 @@ export class SandboxService {
     private readonly configService: TypedConfigService,
     private readonly warmPoolService: SandboxWarmPoolService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly organizationService: OrganizationService,
     private readonly runnerAdapterFactory: RunnerAdapterFactory,
-    private readonly organizationUsageService: OrganizationUsageService,
     private readonly redisLockProvider: RedisLockProvider,
     @InjectRedis() private readonly redis: Redis,
-    private readonly regionService: RegionService,
     private readonly snapshotService: SnapshotService,
     private readonly sandboxLookupCacheInvalidationService: SandboxLookupCacheInvalidationService,
     private readonly sandboxActivityService: SandboxActivityService,
@@ -167,9 +144,8 @@ export class SandboxService {
     }
   }
 
-  private async validateOrganizationQuotas(
-    organization: Organization,
-    region: Region,
+  private async validateSandboxResources(
+    target: SandboxTarget,
     sandboxClass: SandboxClass,
     cpu: number,
     memory: number,
@@ -177,7 +153,7 @@ export class SandboxService {
     gpu: number,
     ephemeral: boolean,
     excludeSandboxId?: string,
-    regionQuota?: RegionQuotaDto | null,
+    allowedGpuTypes?: string[] | null,
     // Controls which per-sandbox limits table is used (GPU-specific vs non-GPU).
     // Defaults to `gpu > 0`, which is correct for create/start/fork/archive paths where
     // `gpu` is the absolute sandbox GPU allocation. Resize passes `gpu = 0` (no GPU delta)
@@ -189,144 +165,27 @@ export class SandboxService {
     pendingDiskIncremented: boolean
     pendingGpuIncremented: boolean
   }> {
-    if (region.enforceQuotas) {
-      if (!regionQuota) {
-        regionQuota = await this.organizationService.getRegionQuota(organization.id, region.id, sandboxClass)
-      }
-
-      if (!regionQuota) {
-        if (region.regionType === RegionType.SHARED) {
-          // region is public, but the organization does not have a quota for it
-          throw new ForbiddenException(
-            `Region ${region.id} is not available to the organization for class ${sandboxClass}`,
-          )
-        } else {
-          // region is not public, respond as if the region was not found
-          throw new NotFoundException('Region not found')
-        }
-      }
+    void target
+    void sandboxClass
+    void excludeSandboxId
+    void allowedGpuTypes
+    void gpuEnabled
+    if (cpu < 0 || memory < 0 || disk < 0 || gpu < 0) {
+      throw new BadRequestError('Sandbox resources must be non-negative')
     }
-
-    // validate per-sandbox quotas
-    const { maxCpuPerSandbox, maxMemoryPerSandbox, maxDiskPerSandbox, maxDiskPerNonEphemeralSandbox } =
-      getEffectivePerSandboxLimits(organization, regionQuota, gpuEnabled)
-
-    if (cpu > maxCpuPerSandbox) {
-      throw new BadRequestError(
-        `CPU request ${cpu} exceeds maximum allowed per sandbox (${maxCpuPerSandbox}).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-      )
+    if (gpu > 0 && !ephemeral) {
+      throw new BadRequestError('GPU sandboxes must be ephemeral - set autoDeleteInterval to 0')
     }
-    if (memory > maxMemoryPerSandbox) {
-      throw new BadRequestError(
-        `Memory request ${memory}GB exceeds maximum allowed per sandbox (${maxMemoryPerSandbox}GB).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-      )
-    }
-    if (disk > maxDiskPerSandbox) {
-      throw new BadRequestError(
-        `Disk request ${disk}GB exceeds maximum allowed per sandbox (${maxDiskPerSandbox}GB).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-      )
-    }
-
-    if (!ephemeral && maxDiskPerNonEphemeralSandbox !== null) {
-      if (maxDiskPerNonEphemeralSandbox === 0) {
-        throw new BadRequestError('Only ephemeral sandboxes are permitted in this region')
-      }
-      if (disk > maxDiskPerNonEphemeralSandbox) {
-        throw new BadRequestError(
-          `Disk request ${disk}GB exceeds maximum allowed per non-ephemeral sandbox (${maxDiskPerNonEphemeralSandbox}GB).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-        )
-      }
-    }
-
-    // e.g. region belonging to an organization
-    if (!region.enforceQuotas) {
-      return {
-        pendingCpuIncremented: false,
-        pendingMemoryIncremented: false,
-        pendingDiskIncremented: false,
-        pendingGpuIncremented: false,
-      }
-    }
-
-    // Fail fast: requesting GPU in a region with no GPU quota at all.
-    if (gpu > 0 && regionQuota.totalGpuQuota === 0) {
-      throw new BadRequestError(`Total GPU limit exceeded. Maximum allowed: ${regionQuota.totalGpuQuota}.`)
-    }
-
-    // validate usage quotas
-    const {
-      cpuIncremented: pendingCpuIncremented,
-      memoryIncremented: pendingMemoryIncremented,
-      diskIncremented: pendingDiskIncremented,
-      gpuIncremented: pendingGpuIncremented,
-    } = await this.organizationUsageService.incrementPendingSandboxUsage(
-      organization.id,
-      region.id,
-      sandboxClass,
-      cpu,
-      memory,
-      disk,
-      gpu,
-      excludeSandboxId,
-    )
-
-    const usageOverview = await this.organizationUsageService.getSandboxUsageOverview(
-      organization.id,
-      region.id,
-      sandboxClass,
-      excludeSandboxId,
-    )
-
-    try {
-      const upgradeTierMessage = UPGRADE_TIER_MESSAGE(this.configService.getOrThrow('dashboardUrl'))
-
-      if (usageOverview.currentCpuUsage + usageOverview.pendingCpuUsage > regionQuota.totalCpuQuota) {
-        throw new BadRequestError(
-          `Total CPU limit exceeded. Maximum allowed: ${regionQuota.totalCpuQuota}.\n${upgradeTierMessage}`,
-        )
-      }
-
-      if (usageOverview.currentMemoryUsage + usageOverview.pendingMemoryUsage > regionQuota.totalMemoryQuota) {
-        throw new BadRequestError(
-          `Total memory limit exceeded. Maximum allowed: ${regionQuota.totalMemoryQuota}GiB.\n${upgradeTierMessage}`,
-        )
-      }
-
-      if (usageOverview.currentDiskUsage + usageOverview.pendingDiskUsage > regionQuota.totalDiskQuota) {
-        throw new BadRequestError(
-          `Total disk limit exceeded. Maximum allowed: ${regionQuota.totalDiskQuota}GiB.\n${ARCHIVE_SANDBOXES_MESSAGE}\n${upgradeTierMessage}`,
-        )
-      }
-
-      if (usageOverview.currentGpuUsage + usageOverview.pendingGpuUsage > regionQuota.totalGpuQuota) {
-        throw new BadRequestError(
-          `Total GPU limit exceeded. Maximum allowed: ${regionQuota.totalGpuQuota}.\n${upgradeTierMessage}`,
-        )
-      }
-    } catch (error) {
-      await this.rollbackPendingUsage(
-        organization.id,
-        region.id,
-        sandboxClass,
-        pendingCpuIncremented ? cpu : undefined,
-        pendingMemoryIncremented ? memory : undefined,
-        pendingDiskIncremented ? disk : undefined,
-        pendingGpuIncremented ? gpu : undefined,
-      )
-      throw error
-    }
-
     return {
-      pendingCpuIncremented,
-      pendingMemoryIncremented,
-      pendingDiskIncremented,
-      pendingGpuIncremented,
+      pendingCpuIncremented: false,
+      pendingMemoryIncremented: false,
+      pendingDiskIncremented: false,
+      pendingGpuIncremented: false,
     }
   }
 
   async rollbackPendingUsage(
-    organizationId: string,
-    regionId: string,
+    target: string,
     sandboxClass: SandboxClass,
     pendingCpuIncrement?: number,
     pendingMemoryIncrement?: number,
@@ -337,23 +196,12 @@ export class SandboxService {
       return
     }
 
-    try {
-      await this.organizationUsageService.decrementPendingSandboxUsage(
-        organizationId,
-        regionId,
-        sandboxClass,
-        pendingCpuIncrement,
-        pendingMemoryIncrement,
-        pendingDiskIncrement,
-        pendingGpuIncrement,
-      )
-    } catch (error) {
-      this.logger.error(`Error rolling back pending sandbox usage: ${error}`)
-    }
+    void target
+    void sandboxClass
   }
 
-  async archive(sandboxIdOrName: string, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async archive(sandboxIdOrName: string): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     this.assertSandboxNotErrored(sandbox)
 
@@ -388,12 +236,10 @@ export class SandboxService {
   }
 
   async createForWarmPool(warmPoolItem: WarmPool): Promise<Sandbox> {
-    const sandbox = new Sandbox({ region: warmPoolItem.target })
-
-    sandbox.organizationId = SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION
+    const sandbox = new Sandbox({ target: warmPoolItem.target })
 
     sandbox.snapshot = warmPoolItem.snapshot
-    //  TODO: default user should be configurable
+    //  TODO: default OS user should be configurable
     sandbox.osUser = 'daytona'
     sandbox.env = warmPoolItem.env || {}
 
@@ -403,10 +249,7 @@ export class SandboxService {
     sandbox.disk = warmPoolItem.disk
 
     const snapshot = await this.snapshotRepository.findOne({
-      where: [
-        { organizationId: sandbox.organizationId, name: sandbox.snapshot, state: SnapshotState.ACTIVE },
-        { general: true, name: sandbox.snapshot, state: SnapshotState.ACTIVE },
-      ],
+      where: { name: sandbox.snapshot, state: SnapshotState.ACTIVE },
     })
     if (!snapshot) {
       throw new BadRequestError(`Snapshot ${sandbox.snapshot} not found while creating warm pool sandbox`)
@@ -419,15 +262,15 @@ export class SandboxService {
     sandbox.sandboxClass = snapshot.sandboxClass
 
     try {
-      // Same per-region GPU runner assignment serialization as createFromSnapshot.
+      // Same per-target GPU runner assignment serialization as createFromSnapshot.
       if (sandbox.gpu > 0) {
-        const key = `gpu-runner-assignment:${sandbox.region}`
+        const key = `gpu-runner-assignment:${sandbox.target}`
         await this.redisLockProvider.waitForLock(key, 60, 30000)
         gpuRunnerAssignmentLockKey = key
       }
 
       const runner = await this.runnerService.getRandomAvailableRunner({
-        regions: [sandbox.region],
+        targets: [sandbox.target],
         sandboxClass: sandbox.sandboxClass,
         snapshotRef: snapshot.ref,
         gpu: sandbox.gpu,
@@ -457,7 +300,7 @@ export class SandboxService {
     }
   }
 
-  async createFromSnapshot(createSandboxDto: CreateSandboxDto, organization: Organization): Promise<SandboxDto> {
+  async createFromSnapshot(createSandboxDto: CreateSandboxDto): Promise<SandboxDto> {
     let pendingCpuIncrement: number | undefined
     let pendingMemoryIncrement: number | undefined
     let pendingDiskIncrement: number | undefined
@@ -465,7 +308,7 @@ export class SandboxService {
     let gpuRunnerAssignmentLockKey: string | undefined
     let sandboxClass: SandboxClass | undefined
 
-    const region = await this.getValidatedOrDefaultRegion(organization, createSandboxDto.target)
+    const target = await this.getValidatedOrDefaultTarget(createSandboxDto.target)
 
     try {
       let snapshotIdOrName = createSandboxDto.snapshot
@@ -474,16 +317,10 @@ export class SandboxService {
         snapshotIdOrName = this.configService.getOrThrow('defaultSnapshot')
       }
 
-      const snapshotFilter: FindOptionsWhere<Snapshot>[] = [
-        { organizationId: organization.id, name: snapshotIdOrName },
-        { general: true, name: snapshotIdOrName },
-      ]
+      const snapshotFilter: FindOptionsWhere<Snapshot>[] = [{ name: snapshotIdOrName }]
 
       if (isValidUuid(snapshotIdOrName)) {
-        snapshotFilter.push(
-          { organizationId: organization.id, id: snapshotIdOrName },
-          { general: true, id: snapshotIdOrName },
-        )
+        snapshotFilter.push({ id: snapshotIdOrName })
       }
 
       const snapshots = await this.snapshotRepository.find({
@@ -500,10 +337,6 @@ export class SandboxService {
 
       if (!snapshot) {
         snapshot = snapshots[0]
-      }
-
-      if (!(await this.snapshotService.isAvailableInRegion(snapshot.id, region.id))) {
-        throw new BadRequestError(`Snapshot ${snapshotIdOrName} is not available in region ${region.id}`)
       }
 
       if (snapshot.state !== SnapshotState.ACTIVE) {
@@ -531,20 +364,13 @@ export class SandboxService {
 
       // Resolve and validate an optional linked sandbox. When set, the new sandbox is pinned
       // to the same runner as the linked sandbox so a local network can be established.
-      // Constraints:
-      //   - linked sandbox must exist in the same org, be STARTED or STOPPED, and have a runnerId
-      //   - linked sandbox cannot itself be linked to another sandbox (no chains)
-      //   - new sandbox must be ephemeral (autoDeleteInterval === 0)
-      const linkedSandbox = await this.resolveLinkedSandbox(createSandboxDto, organization.id)
-
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
+      const linkedSandbox = await this.resolveLinkedSandbox(createSandboxDto)
 
       sandboxClass = snapshot.sandboxClass
 
       const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented, pendingGpuIncremented } =
-        await this.validateOrganizationQuotas(
-          organization,
-          region,
+        await this.validateSandboxResources(
+          target,
           snapshot.sandboxClass,
           cpu,
           mem,
@@ -567,7 +393,7 @@ export class SandboxService {
       }
 
       // Resolve volume names to UUIDs before runner assignment, so invalid references fail fast
-      const resolvedVolumes = await this.resolveVolumes(organization.id, createSandboxDto.volumes)
+      const resolvedVolumes = await this.resolveVolumes(createSandboxDto.volumes)
 
       // GPU sandboxes are always ephemeral: they get exclusive ownership of a
       // runner for their lifetime and are auto-deleted on first stop. Skip the
@@ -578,65 +404,70 @@ export class SandboxService {
 
         if (!skipWarmPool) {
           const warmPoolSandbox = await this.warmPoolService.fetchWarmPoolSandbox({
-            organizationId: organization.id,
             snapshot,
-            target: region.id,
+            target: target.id,
             cpu: cpu,
             mem: mem,
             disk: disk,
             gpu: gpu,
-            osUser: createSandboxDto.user,
+            osUser: createSandboxDto.osUser,
             env: createSandboxDto.env,
             state: SandboxState.STARTED,
           })
 
           if (warmPoolSandbox) {
-            return await this.assignWarmPoolSandbox(warmPoolSandbox, createSandboxDto, organization)
+            return await this.assignWarmPoolSandbox(warmPoolSandbox, createSandboxDto)
           }
         }
       }
 
-      // Serialize GPU runner assignment per region: getRunnersAtGpuCapacity reads
+      // Serialize GPU runner assignment per target: getRunnersAtGpuCapacity reads
       // the DB to find runners at capacity, but the just-assigned runnerId on a
       // concurrent request is not yet persisted, so two concurrent creates can
       // pick the same already-full runner. Hold the lock until the runnerId is
       // written to the DB. Only mark the key as held after acquisition succeeds —
       // otherwise a timed-out waiter would unlock the actual holder in finally.
       if (gpu > 0) {
-        const key = `gpu-runner-assignment:${region.id}`
+        const key = `gpu-runner-assignment:${target.id}`
         await this.redisLockProvider.waitForLock(key, 60, 30000)
         gpuRunnerAssignmentLockKey = key
       }
 
-      let runner: Runner
+      let runner: Runner | undefined
+      let prepareSnapshotOnRunner = false
       if (linkedSandbox && linkedSandbox.runnerId) {
         runner = await this.runnerService.findOneOrFail(linkedSandbox.runnerId)
 
-        if (runner.region !== region.id) {
+        if (runner.target !== target.id) {
           throw new BadRequestError(
-            `Runner hosting linked sandbox is in region ${runner.region}, which does not match requested region ${region.id}`,
+            `Runner hosting linked sandbox is in target ${runner.target}, which does not match requested target ${target.id}`,
           )
         }
 
         this.runnerService.assertRunnerCanHost(runner)
       } else {
-        runner = await this.runnerService.getRandomAvailableRunner({
-          regions: [region.id],
-          sandboxClass: snapshot.sandboxClass,
-          snapshotRef: snapshot.ref,
-          gpu,
-          gpuType,
-        })
+        try {
+          runner = await this.runnerService.getRandomAvailableRunner({
+            targets: [target.id],
+            sandboxClass: snapshot.sandboxClass,
+            snapshotRef: snapshot.ref,
+            gpu,
+            gpuType,
+          })
+        } catch (error) {
+          if (!(error instanceof BadRequestError) || !error.message.startsWith('No available runners')) {
+            throw error
+          }
+          prepareSnapshotOnRunner = true
+        }
       }
 
-      const sandbox = new Sandbox({ region: region.id, name: createSandboxDto.name })
-
-      sandbox.organizationId = organization.id
+      const sandbox = new Sandbox({ target: target.id, name: createSandboxDto.name })
 
       sandbox.sandboxClass = snapshot.sandboxClass
       sandbox.snapshot = snapshot.name
-      //  TODO: default user should be configurable
-      sandbox.osUser = createSandboxDto.user || 'daytona'
+      //  TODO: default OS user should be configurable
+      sandbox.osUser = createSandboxDto.osUser || 'daytona'
       sandbox.env = createSandboxDto.env || {}
       sandbox.labels = createSandboxDto.labels || {}
 
@@ -645,8 +476,6 @@ export class SandboxService {
       sandbox.gpuType = gpuType
       sandbox.mem = mem
       sandbox.disk = disk
-
-      sandbox.public = createSandboxDto.public || false
 
       if (createSandboxDto.networkBlockAll !== undefined) {
         sandbox.networkBlockAll = createSandboxDto.networkBlockAll
@@ -676,7 +505,14 @@ export class SandboxService {
         sandbox.volumes = resolvedVolumes
       }
 
-      sandbox.runnerId = runner.id
+      if (runner) {
+        sandbox.runnerId = runner.id
+      } else if (prepareSnapshotOnRunner && snapshot.buildInfo) {
+        sandbox.buildInfo = snapshot.buildInfo
+        sandbox.state = SandboxState.PENDING_BUILD
+      } else if (prepareSnapshotOnRunner) {
+        sandbox.state = SandboxState.PULLING_SNAPSHOT
+      }
       sandbox.linkedSandboxId = linkedSandbox?.id ?? null
       sandbox.pending = true
 
@@ -698,8 +534,7 @@ export class SandboxService {
     } catch (error) {
       if (sandboxClass) {
         await this.rollbackPendingUsage(
-          organization.id,
-          region.id,
+          target.id,
           sandboxClass,
           pendingCpuIncrement,
           pendingMemoryIncrement,
@@ -728,12 +563,8 @@ export class SandboxService {
    * Returns the linked Sandbox entity when linking is requested, otherwise undefined.
    *
    * @throws {BadRequestError} If any link precondition is not met.
-   * @throws {NotFoundException} If the linked sandbox does not exist for the organization.
    */
-  private async resolveLinkedSandbox(
-    createSandboxDto: CreateSandboxDto,
-    organizationId: string,
-  ): Promise<Sandbox | undefined> {
+  private async resolveLinkedSandbox(createSandboxDto: CreateSandboxDto): Promise<Sandbox | undefined> {
     if (!createSandboxDto.linkedSandbox) {
       return undefined
     }
@@ -742,7 +573,7 @@ export class SandboxService {
       throw new BadRequestError('Linked sandboxes must be ephemeral (set autoDeleteInterval to 0)')
     }
 
-    const linkedSandbox = await this.findOneByIdOrName(createSandboxDto.linkedSandbox, organizationId)
+    const linkedSandbox = await this.findOneByIdOrName(createSandboxDto.linkedSandbox)
 
     if (linkedSandbox.linkedSandboxId) {
       throw new BadRequestError(
@@ -762,13 +593,10 @@ export class SandboxService {
   private async assignWarmPoolSandbox(
     warmPoolSandbox: Sandbox,
     createSandboxDto: CreateSandboxDto,
-    organization: Organization,
   ): Promise<SandboxDto> {
     const now = new Date()
     const updateData: Partial<Sandbox> = {
-      public: createSandboxDto.public || false,
       labels: createSandboxDto.labels || {},
-      organizationId: organization.id,
       createdAt: now,
     }
 
@@ -812,8 +640,7 @@ export class SandboxService {
     if (
       createSandboxDto.networkBlockAll !== undefined ||
       createSandboxDto.networkAllowList !== undefined ||
-      createSandboxDto.domainAllowList !== undefined ||
-      organization.sandboxLimitedNetworkEgress
+      createSandboxDto.domainAllowList !== undefined
     ) {
       const runner = await this.runnerService.findOneOrFail(warmPoolSandbox.runnerId)
       const runnerAdapter = await this.runnerAdapterFactory.create(runner)
@@ -821,7 +648,7 @@ export class SandboxService {
         warmPoolSandbox.id,
         createSandboxDto.networkBlockAll,
         createSandboxDto.networkAllowList,
-        organization.sandboxLimitedNetworkEgress,
+        undefined,
         updateData.domainAllowList ?? undefined,
       )
     }
@@ -829,14 +656,6 @@ export class SandboxService {
     const updatedSandbox = await this.sandboxRepository.update(warmPoolSandbox.id, {
       updateData,
       entity: warmPoolSandbox,
-    })
-
-    // Defensive invalidation of orgId cache since the sandbox moved from unassigned to a real organization
-    this.sandboxLookupCacheInvalidationService.invalidateOrgId({
-      sandboxId: warmPoolSandbox.id,
-      organizationId: organization.id,
-      name: warmPoolSandbox.name,
-      previousOrganizationId: SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION,
     })
 
     // Treat this as a newly started sandbox
@@ -847,14 +666,14 @@ export class SandboxService {
     return this.toSandboxDto(updatedSandbox)
   }
 
-  async createFromBuildInfo(createSandboxDto: CreateSandboxDto, organization: Organization): Promise<SandboxDto> {
+  async createFromBuildInfo(createSandboxDto: CreateSandboxDto): Promise<SandboxDto> {
     let pendingCpuIncrement: number | undefined
     let pendingMemoryIncrement: number | undefined
     let pendingDiskIncrement: number | undefined
     let pendingGpuIncrement: number | undefined
     let gpuRunnerAssignmentLockKey: string | undefined
 
-    const region = await this.getValidatedOrDefaultRegion(organization, createSandboxDto.target)
+    const target = await this.getValidatedOrDefaultTarget(createSandboxDto.target)
 
     try {
       const cpu = createSandboxDto.cpu || DEFAULT_CPU
@@ -867,17 +686,11 @@ export class SandboxService {
         throw new BadRequestError('GPU sandboxes must be ephemeral - set autoDeleteInterval to 0')
       }
 
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
-
-      const regionQuota = region.enforceQuotas
-        ? await this.organizationService.getRegionQuota(organization.id, region.id, SandboxClass.CONTAINER)
-        : null
-      const gpuTypePreferences = resolveGpuTypePreferences(gpu, createSandboxDto.gpuType, regionQuota?.allowedGpuTypes)
+      const gpuTypePreferences = resolveGpuTypePreferences(gpu, createSandboxDto.gpuType, undefined)
 
       const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented, pendingGpuIncremented } =
-        await this.validateOrganizationQuotas(
-          organization,
-          region,
+        await this.validateSandboxResources(
+          target,
           SandboxClass.CONTAINER,
           cpu,
           mem,
@@ -885,7 +698,7 @@ export class SandboxService {
           gpu,
           isEphemeral(createSandboxDto),
           undefined,
-          regionQuota,
+          undefined,
         )
 
       if (pendingCpuIncremented) {
@@ -902,14 +715,12 @@ export class SandboxService {
       }
 
       // Resolve volume names to UUIDs, failing fast on invalid references
-      const resolvedVolumes = await this.resolveVolumes(organization.id, createSandboxDto.volumes)
+      const resolvedVolumes = await this.resolveVolumes(createSandboxDto.volumes)
 
-      const sandbox = new Sandbox({ region: region.id, name: createSandboxDto.name })
-
-      sandbox.organizationId = organization.id
+      const sandbox = new Sandbox({ target: target.id, name: createSandboxDto.name })
 
       sandbox.sandboxClass = SandboxClass.CONTAINER
-      sandbox.osUser = createSandboxDto.user || 'daytona'
+      sandbox.osUser = createSandboxDto.osUser || 'daytona'
       sandbox.env = createSandboxDto.env || {}
       sandbox.labels = createSandboxDto.labels || {}
 
@@ -917,7 +728,6 @@ export class SandboxService {
       sandbox.gpu = gpu
       sandbox.mem = mem
       sandbox.disk = disk
-      sandbox.public = createSandboxDto.public || false
 
       if (createSandboxDto.networkBlockAll !== undefined) {
         sandbox.networkBlockAll = createSandboxDto.networkBlockAll
@@ -958,14 +768,14 @@ export class SandboxService {
 
       let runner: Runner
 
-      // Serialize GPU runner assignment per region: getRunnersAtGpuCapacity reads
+      // Serialize GPU runner assignment per target: getRunnersAtGpuCapacity reads
       // the DB to find runners at capacity, but the just-assigned runnerId on a
       // concurrent request is not yet persisted, so two concurrent creates can
       // pick the same already-full runner. Hold the lock until the runnerId is
       // written to the DB. Only mark the key as held after acquisition succeeds —
       // otherwise a timed-out waiter would unlock the actual holder in finally.
       if (sandbox.gpu > 0) {
-        const key = `gpu-runner-assignment:${region.id}`
+        const key = `gpu-runner-assignment:${target.id}`
         await this.redisLockProvider.waitForLock(key, 60, 30000)
         gpuRunnerAssignmentLockKey = key
       }
@@ -982,7 +792,7 @@ export class SandboxService {
               )
             : []
         runner = await this.runnerService.getRandomAvailableRunner({
-          regions: [sandbox.region],
+          targets: [sandbox.target],
           sandboxClass: sandbox.sandboxClass,
           snapshotRef: buildInfoSnapshotRef,
           gpu: sandbox.gpu,
@@ -1043,8 +853,7 @@ export class SandboxService {
       return this.toSandboxDto(insertedSandbox)
     } catch (error) {
       await this.rollbackPendingUsage(
-        organization.id,
-        region.id,
+        target.id,
         SandboxClass.CONTAINER,
         pendingCpuIncrement,
         pendingMemoryIncrement,
@@ -1066,8 +875,8 @@ export class SandboxService {
     }
   }
 
-  async createBackup(sandboxIdOrName: string, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async createBackup(sandboxIdOrName: string): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (isEphemeral(sandbox)) {
       throw new SandboxError('Ephemeral sandboxes cannot be backed up')
@@ -1082,22 +891,19 @@ export class SandboxService {
     return sandbox
   }
 
-  async forkSandbox(sandboxIdOrName: string, organization: Organization, dto: ForkSandboxDto): Promise<Sandbox> {
+  async forkSandbox(sandboxIdOrName: string, dto: ForkSandboxDto): Promise<Sandbox> {
     let pendingCpuIncrement: number | undefined
     let pendingMemoryIncrement: number | undefined
     let pendingDiskIncrement: number | undefined
     let pendingGpuIncrement: number | undefined
 
-    const sourceSandbox = await this.findOneByIdOrName(sandboxIdOrName, organization.id)
+    const sourceSandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (![SandboxClass.LINUX_VM, SandboxClass.WINDOWS].includes(sourceSandbox.sandboxClass)) {
       throw new HttpException('Forking is not supported for this sandbox', HttpStatus.UNPROCESSABLE_ENTITY)
     }
 
-    const region = await this.regionService.findOne(sourceSandbox.region)
-    if (!region) {
-      throw new NotFoundException(`Region with ID ${sourceSandbox.region} not found`)
-    }
+    const target = { id: sourceSandbox.target }
 
     try {
       if (sourceSandbox.state !== SandboxState.STARTED) {
@@ -1119,8 +925,7 @@ export class SandboxService {
       const runner = await this.runnerService.findOneOrFail(sourceSandbox.runnerId)
 
       // Copy all properties from source sandbox to forked sandbox
-      const forkedSandbox = new Sandbox({ region: sourceSandbox.region, name: dto.name })
-      forkedSandbox.organizationId = organization.id
+      const forkedSandbox = new Sandbox({ target: sourceSandbox.target, name: dto.name })
       forkedSandbox.sandboxClass = sourceSandbox.sandboxClass
       forkedSandbox.snapshot = sourceSandbox.snapshot
       forkedSandbox.osUser = sourceSandbox.osUser
@@ -1131,7 +936,6 @@ export class SandboxService {
       forkedSandbox.disk = sourceSandbox.disk
       forkedSandbox.gpu = sourceSandbox.gpu
       forkedSandbox.gpuType = sourceSandbox.gpuType ?? null
-      forkedSandbox.public = sourceSandbox.public
       forkedSandbox.autoStopInterval = sourceSandbox.autoStopInterval
       forkedSandbox.autoArchiveInterval = sourceSandbox.autoArchiveInterval
       forkedSandbox.autoDeleteInterval = sourceSandbox.autoDeleteInterval
@@ -1142,13 +946,9 @@ export class SandboxService {
       forkedSandbox.pending = true
       forkedSandbox.state = SandboxState.CREATING
 
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
-
-      // Validate organization usage quotas are not exceeded due to new sandbox created by forking
       const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented, pendingGpuIncremented } =
-        await this.validateOrganizationQuotas(
-          organization,
-          region,
+        await this.validateSandboxResources(
+          target,
           forkedSandbox.sandboxClass,
           forkedSandbox.cpu,
           forkedSandbox.mem,
@@ -1223,8 +1023,7 @@ export class SandboxService {
       return insertedForkedSandbox
     } catch (error) {
       await this.rollbackPendingUsage(
-        organization.id,
-        region.id,
+        target.id,
         sourceSandbox.sandboxClass,
         pendingCpuIncrement,
         pendingMemoryIncrement,
@@ -1240,17 +1039,12 @@ export class SandboxService {
     }
   }
 
-  async getForkChildren(
-    organizationId: string,
-    sandboxIdOrName: string,
-    includeDestroyed?: boolean,
-  ): Promise<Sandbox[]> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async getForkChildren(sandboxIdOrName: string, includeDestroyed?: boolean): Promise<Sandbox[]> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
     const forks = await this.sandboxForkRepository.find({
       where: {
         parentId: sandbox.id,
         child: {
-          organizationId,
           ...(!includeDestroyed && { state: Not(SandboxState.DESTROYED) }),
         },
       },
@@ -1260,20 +1054,20 @@ export class SandboxService {
     return forks.map((f) => f.child)
   }
 
-  async getForkParent(organizationId: string, sandboxIdOrName: string): Promise<Sandbox | null> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async getForkParent(sandboxIdOrName: string): Promise<Sandbox | null> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
     const fork = await this.sandboxForkRepository.findOne({
       where: { childId: sandbox.id },
       relations: ['parent'],
     })
-    if (!fork || fork.parent.organizationId !== organizationId) {
+    if (!fork) {
       return null
     }
     return fork.parent
   }
 
-  async getForkAncestors(organizationId: string, sandboxIdOrName: string): Promise<Sandbox[]> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async getForkAncestors(sandboxIdOrName: string): Promise<Sandbox[]> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
     const ancestors: Sandbox[] = []
     const visitedIds = new Set<string>()
     let currentId = sandbox.id
@@ -1283,7 +1077,7 @@ export class SandboxService {
         where: { childId: currentId },
         relations: ['parent'],
       })
-      if (!fork || visitedIds.has(fork.parentId) || fork.parent.organizationId !== organizationId) {
+      if (!fork || visitedIds.has(fork.parentId)) {
         break
       }
       visitedIds.add(fork.parentId)
@@ -1294,14 +1088,10 @@ export class SandboxService {
     return ancestors.reverse()
   }
 
-  async createSnapshotFromSandbox(
-    sandboxIdOrName: string,
-    organization: Organization,
-    dto: CreateSandboxSnapshotDto,
-  ): Promise<Sandbox> {
+  async createSnapshotFromSandbox(sandboxIdOrName: string, dto: CreateSandboxSnapshotDto): Promise<Sandbox> {
     let pendingSnapshotCountIncrement: number | undefined
 
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organization.id)
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     const includeMemory = dto.includeMemory ?? false
 
@@ -1331,37 +1121,19 @@ export class SandboxService {
         throw new BadRequestError('includeMemory is only supported for Windows sandboxes')
       }
 
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
-
-      const region = await this.regionService.findOne(sandbox.region)
-      if (!region) {
-        throw new NotFoundException(`Region with ID ${sandbox.region} not found`)
-      }
+      const target = { id: sandbox.target }
 
       let registry: DockerRegistry | undefined
       if (isRegistryBasedSandboxClass(sandbox.sandboxClass)) {
-        registry = (await this.dockerRegistryService.getAvailableInternalRegistry(sandbox.region)) ?? undefined
+        registry = (await this.dockerRegistryService.getAvailableInternalRegistry(sandbox.target)) ?? undefined
         if (sandbox.sandboxClass === SandboxClass.CONTAINER && !registry) {
           throw new BadRequestError(
-            'No internal registry is available for this sandbox region; cannot snapshot a container sandbox',
+            'No internal registry is available for this sandbox target; cannot snapshot a container sandbox',
           )
         }
       }
 
-      const { pendingSnapshotCountIncremented } = await this.snapshotService.validateOrganizationQuotas(
-        organization,
-        region,
-        sandbox.sandboxClass,
-        1,
-        sandbox.cpu,
-        sandbox.mem,
-        sandbox.disk,
-        sandbox.gpu,
-      )
-
-      if (pendingSnapshotCountIncremented) {
-        pendingSnapshotCountIncrement = 1
-      }
+      void target
 
       const updatedSandbox = await this.sandboxRepository.updateWhere(sandbox.id, {
         updateData: {
@@ -1376,133 +1148,34 @@ export class SandboxService {
 
       const runnerAdapter = await this.runnerAdapterFactory.create(runner)
 
-      // v2 runners enqueue a SNAPSHOT_SANDBOX job and resolve immediately
-      // with `undefined`; the job state handler will persist the resulting
-      // Snapshot on completion.
-      //
-      // v0 runners (Docker, container class) don't have jobs - the adapter
-      // performs a synchronous HTTP call to the runner's commit+push
-      // endpoint, which can take several minutes. We don't want to block
-      // the API request that long, so for v0 we kick the call off in the
-      // background and immediately return the SNAPSHOTTING sandbox to the
-      // caller. The background promise persists the snapshot or reverts
-      // sandbox state on failure.
-      if (runner.apiVersion === '0') {
-        // Hand off pending-quota ownership to the background driver - it must
-        // roll back on failure since the outer try/catch returns successfully
-        // here.
-        const inheritedPendingIncrement = pendingSnapshotCountIncrement
-        pendingSnapshotCountIncrement = undefined
-
-        void this.runV0SnapshotFromSandbox({
-          sandbox,
-          previousState: sandbox.state,
-          snapshotName: dto.name,
-          organizationId: organization.id,
+      try {
+        await runnerAdapter.createSnapshotFromSandbox(
+          sandbox.id,
+          dto.name,
+          RUNNER_SNAPSHOT_SOURCE,
           registry,
-          runner,
-          runnerAdapter,
-          pendingSnapshotCountIncrement: inheritedPendingIncrement,
+          includeMemory,
+        )
+      } catch (error) {
+        await this.sandboxRepository.updateWhere(sandbox.id, {
+          updateData: {
+            state: sandbox.state,
+            pending: false,
+          },
+          whereCondition: { state: SandboxState.SNAPSHOTTING },
         })
-      } else {
-        try {
-          await runnerAdapter.createSnapshotFromSandbox(sandbox.id, dto.name, organization.id, registry, includeMemory)
-        } catch (error) {
-          await this.sandboxRepository.updateWhere(sandbox.id, {
-            updateData: {
-              state: sandbox.state,
-              pending: false,
-            },
-            whereCondition: { state: SandboxState.SNAPSHOTTING },
-          })
 
-          throw error
-        }
+        throw error
       }
 
       return updatedSandbox
     } catch (error) {
-      await this.snapshotService.rollbackPendingUsage(organization.id, pendingSnapshotCountIncrement)
+      await this.snapshotService.rollbackPendingUsage(pendingSnapshotCountIncrement)
       throw error
     }
   }
 
-  /**
-   * Background driver for v0 (Docker) sandbox snapshotting.
-   *
-   * v0 runners expose a synchronous HTTP endpoint for "commit + push" that
-   * may take several minutes. We run it in a background promise so the
-   * user-facing API request can return immediately with state=SNAPSHOTTING,
-   * mirroring the v2 (job-driven) UX.
-   *
-   * Errors are intentionally swallowed - sandbox state is the source of
-   * truth. On any failure we restore state and refund the pending quota.
-   */
-  private async runV0SnapshotFromSandbox(params: {
-    sandbox: Sandbox
-    previousState: SandboxState
-    snapshotName: string
-    organizationId: string
-    registry?: DockerRegistry
-    runner: Runner
-    runnerAdapter: RunnerAdapter
-    pendingSnapshotCountIncrement?: number
-  }): Promise<void> {
-    const {
-      sandbox,
-      previousState,
-      snapshotName,
-      organizationId,
-      registry,
-      runner,
-      runnerAdapter,
-      pendingSnapshotCountIncrement,
-    } = params
-
-    let succeeded = false
-    try {
-      const result = await runnerAdapter.createSnapshotFromSandbox(sandbox.id, snapshotName, organizationId, registry)
-      if (!result) {
-        throw new Error('runner returned no snapshot result')
-      }
-
-      await this.snapshotService.persistSnapshotFromSandbox({
-        organizationId,
-        name: snapshotName,
-        ref: result.ref,
-        runnerId: runner.id,
-        regionId: sandbox.region,
-        sandboxClass: sandbox.sandboxClass,
-        cpu: sandbox.cpu,
-        gpu: sandbox.gpu,
-        gpuType: sandbox.gpuType ?? null,
-        mem: sandbox.mem,
-        disk: sandbox.disk,
-        sizeGB: result.sizeGB,
-      })
-      succeeded = true
-    } catch (error) {
-      this.logger.error(`v0 snapshotFromSandbox failed for sandbox ${sandbox.id}:`, error)
-    }
-
-    // Always clear SNAPSHOTTING - whether the snapshot was persisted or not,
-    // the sandbox itself should return to its previous state.
-    await this.sandboxRepository
-      .updateWhere(sandbox.id, {
-        updateData: { state: previousState, pending: false },
-        whereCondition: { state: SandboxState.SNAPSHOTTING },
-      })
-      .catch((err) => this.logger.error(`Failed to clear SNAPSHOTTING state for sandbox ${sandbox.id}:`, err))
-
-    if (!succeeded) {
-      await this.snapshotService
-        .rollbackPendingUsage(organizationId, pendingSnapshotCountIncrement)
-        .catch((err) => this.logger.error(`Failed to roll back pending snapshot quota for org ${organizationId}:`, err))
-    }
-  }
-
   async findAllPaginatedDeprecated(
-    organizationId: string,
     page = 1,
     limit = 10,
     filters?: {
@@ -1512,7 +1185,7 @@ export class SandboxService {
       includeErroredDestroyed?: boolean
       states?: SandboxState[]
       snapshots?: string[]
-      regionIds?: string[]
+      targets?: string[]
       minCpu?: number
       maxCpu?: number
       minMemoryGiB?: number
@@ -1537,7 +1210,7 @@ export class SandboxService {
       includeErroredDestroyed,
       states,
       snapshots,
-      regionIds,
+      targets,
       minCpu,
       maxCpu,
       minMemoryGiB,
@@ -1554,12 +1227,11 @@ export class SandboxService {
     } = sort || {}
 
     const baseFindOptions: FindOptionsWhere<Sandbox> = {
-      organizationId,
       ...(id ? { id: ILike(`${id}%`) } : {}),
       ...(name ? { name: ILike(`${name}%`) } : {}),
       ...(labels ? { labels: JsonContains(labels) } : {}),
       ...(snapshots ? { snapshot: In(snapshots) } : {}),
-      ...(regionIds ? { region: In(regionIds) } : {}),
+      ...(targets ? { target: In(targets) } : {}),
     }
 
     baseFindOptions.cpu = createRangeFilter(minCpu, maxCpu)
@@ -1622,12 +1294,11 @@ export class SandboxService {
 
   /**
    * Search sandboxes
-   * @param organizationId - The ID of the organization
    * @param query - The query parameters
    * @returns The paginated list of sandboxes. If cursor is omitted from the query, newest sandboxes will be returned.
    * @throws BadRequestError if the cursor is invalid
    */
-  async search(organizationId: string, query: ListSandboxesQueryDto): Promise<ListSandboxesResponseDto> {
+  async search(query: ListSandboxesQueryDto): Promise<ListSandboxesResponseDto> {
     let parsedLabels: { [key: string]: string } | undefined
     if (query.labels) {
       try {
@@ -1639,14 +1310,12 @@ export class SandboxService {
 
     const result = await this.sandboxSearchAdapter.search({
       filters: {
-        organizationId,
         idPrefix: query.id,
         namePrefix: query.name,
         labels: parsedLabels,
         includeErroredDeleted: query.includeErroredDeleted,
         states: query.states,
         snapshots: query.snapshots,
-        regionIds: query.regionIds,
         sandboxClasses: query.sandboxClasses,
         minCpu: query.minCpu,
         maxCpu: query.maxCpu,
@@ -1654,7 +1323,6 @@ export class SandboxService {
         maxMemoryGiB: query.maxMemoryGiB,
         minDiskGiB: query.minDiskGiB,
         maxDiskGiB: query.maxDiskGiB,
-        isPublic: query.isPublic,
         isRecoverable: query.isRecoverable,
         createdAtAfter: query.createdAtAfter,
         createdAtBefore: query.createdAtBefore,
@@ -1678,7 +1346,7 @@ export class SandboxService {
       items: result.items.map((item) => {
         const url = toolboxProxyUrlMap.get(item.target)
         if (!url) {
-          throw new NotFoundException(`Toolbox proxy URL not resolved for region ${item.target}`)
+          throw new NotFoundException(`Toolbox proxy URL not resolved for target ${item.target}`)
         }
         item.toolboxProxyUrl = url
         return item
@@ -1736,11 +1404,7 @@ export class SandboxService {
     return sandboxes
   }
 
-  async findOneByIdOrName(
-    sandboxIdOrName: string,
-    organizationId: string,
-    returnDestroyed?: boolean,
-  ): Promise<Sandbox> {
+  async findOneByIdOrName(sandboxIdOrName: string, returnDestroyed?: boolean): Promise<Sandbox> {
     const stateFilter = returnDestroyed ? {} : { state: Not(SandboxState.DESTROYED) }
     const relations = ['buildInfo', 'lastActivityAt']
 
@@ -1748,12 +1412,11 @@ export class SandboxService {
     let sandbox = await this.sandboxRepository.findOne({
       where: {
         id: sandboxIdOrName,
-        organizationId,
         ...stateFilter,
       },
       relations,
       cache: {
-        id: sandboxLookupCacheKeyById({ organizationId, returnDestroyed, sandboxId: sandboxIdOrName }),
+        id: sandboxLookupCacheKeyById({ returnDestroyed, sandboxId: sandboxIdOrName }),
         milliseconds: SANDBOX_LOOKUP_CACHE_TTL_MS,
       },
     })
@@ -1763,12 +1426,11 @@ export class SandboxService {
       sandbox = await this.sandboxRepository.findOne({
         where: {
           name: sandboxIdOrName,
-          organizationId,
           ...stateFilter,
         },
         relations,
         cache: {
-          id: sandboxLookupCacheKeyByName({ organizationId, returnDestroyed, sandboxName: sandboxIdOrName }),
+          id: sandboxLookupCacheKeyByName({ returnDestroyed, sandboxName: sandboxIdOrName }),
           milliseconds: SANDBOX_LOOKUP_CACHE_TTL_MS,
         },
       })
@@ -1807,40 +1469,6 @@ export class SandboxService {
     return sandbox
   }
 
-  async getOrganizationId(sandboxIdOrName: string, organizationId?: string): Promise<string> {
-    let sandbox = await this.sandboxRepository.findOne({
-      where: {
-        id: sandboxIdOrName,
-        ...(organizationId ? { organizationId: organizationId } : {}),
-      },
-      select: ['organizationId'],
-      cache: {
-        id: sandboxOrgIdCacheKeyById({ organizationId, sandboxId: sandboxIdOrName }),
-        milliseconds: SANDBOX_ORG_ID_CACHE_TTL_MS,
-      },
-    })
-
-    if (!sandbox && organizationId) {
-      sandbox = await this.sandboxRepository.findOne({
-        where: {
-          name: sandboxIdOrName,
-          organizationId: organizationId,
-        },
-        select: ['organizationId'],
-        cache: {
-          id: sandboxOrgIdCacheKeyByName({ organizationId, sandboxName: sandboxIdOrName }),
-          milliseconds: SANDBOX_ORG_ID_CACHE_TTL_MS,
-        },
-      })
-    }
-
-    if (!sandbox || !sandbox.organizationId) {
-      throw new NotFoundException(`Sandbox with ID or name ${sandboxIdOrName} not found`)
-    }
-
-    return sandbox.organizationId
-  }
-
   async getRunnerId(sandboxId: string): Promise<string | null> {
     const sandbox = await this.sandboxRepository.findOne({
       where: {
@@ -1857,12 +1485,12 @@ export class SandboxService {
     return sandbox.runnerId || null
   }
 
-  async getRegionId(sandboxId: string): Promise<string> {
+  async getTargetId(sandboxId: string): Promise<string> {
     const sandbox = await this.sandboxRepository.findOne({
       where: {
         id: sandboxId,
       },
-      select: ['region'],
+      select: ['target'],
       loadEagerRelations: false,
     })
 
@@ -1870,10 +1498,10 @@ export class SandboxService {
       throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
     }
 
-    return sandbox.region
+    return sandbox.target
   }
 
-  async getPortPreviewUrl(sandboxIdOrName: string, organizationId: string, port: number): Promise<PortPreviewUrlDto> {
+  async getPortPreviewUrl(sandboxIdOrName: string, port: number): Promise<PortPreviewUrlDto> {
     if (port < 1 || port > 65535) {
       throw new BadRequestError('Invalid port')
     }
@@ -1882,7 +1510,6 @@ export class SandboxService {
     const proxyProtocol = this.configService.getOrThrow('proxy.protocol')
 
     const where: FindOptionsWhere<Sandbox> = {
-      organizationId: organizationId,
       state: Not(SandboxState.DESTROYED),
     }
 
@@ -1898,7 +1525,7 @@ export class SandboxService {
         },
       ],
       cache: {
-        id: `sandbox:${sandboxIdOrName}:organization:${organizationId}`,
+        id: `sandbox:${sandboxIdOrName}:preview-url`,
         milliseconds: 1000,
       },
     })
@@ -1907,13 +1534,7 @@ export class SandboxService {
       throw new NotFoundException(`Sandbox with ID or name ${sandboxIdOrName} not found`)
     }
 
-    let url = `${proxyProtocol}://${port}-${sandbox.id}.${proxyDomain}`
-
-    const region = await this.regionService.findOne(sandbox.region, true)
-    if (region && region.proxyUrl) {
-      // Insert port and sandbox.id into the custom proxy URL
-      url = region.proxyUrl.replace(/(https?:\/)(\/)/, `$1/${port}-${sandbox.id}.`)
-    }
+    const url = `${proxyProtocol}://${port}-${sandbox.id}.${proxyDomain}`
 
     return {
       sandboxId: sandbox.id,
@@ -1924,7 +1545,6 @@ export class SandboxService {
 
   async getSignedPortPreviewUrl(
     sandboxIdOrName: string,
-    organizationId: string,
     port: number,
     expiresInSeconds = 60,
   ): Promise<SignedPortPreviewUrlDto> {
@@ -1940,7 +1560,6 @@ export class SandboxService {
     const proxyProtocol = this.configService.getOrThrow('proxy.protocol')
 
     const where: FindOptionsWhere<Sandbox> = {
-      organizationId: organizationId,
       state: Not(SandboxState.DESTROYED),
     }
 
@@ -1956,7 +1575,7 @@ export class SandboxService {
         },
       ],
       cache: {
-        id: `sandbox:${sandboxIdOrName}:organization:${organizationId}`,
+        id: `sandbox:${sandboxIdOrName}:signed-preview-url`,
         milliseconds: 1000,
       },
     })
@@ -1970,13 +1589,7 @@ export class SandboxService {
     const lockKey = `sandbox:signed-preview-url-token:${port}:${token}`
     await this.redis.setex(lockKey, expiresInSeconds, sandbox.id)
 
-    let url = `${proxyProtocol}://${port}-${token}.${proxyDomain}`
-
-    const region = await this.regionService.findOne(sandbox.region, true)
-    if (region && region.proxyUrl) {
-      // Insert port and sandbox.id into the custom proxy URL
-      url = region.proxyUrl.replace(/(https?:\/)(\/)/, `$1/${port}-${token}.`)
-    }
+    const url = `${proxyProtocol}://${port}-${token}.${proxyDomain}`
 
     return {
       sandboxId: sandbox.id,
@@ -1995,13 +1608,8 @@ export class SandboxService {
     return sandboxId
   }
 
-  async expireSignedPreviewUrlToken(
-    sandboxIdOrName: string,
-    organizationId: string,
-    token: string,
-    port: number,
-  ): Promise<void> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async expireSignedPreviewUrlToken(sandboxIdOrName: string, token: string, port: number): Promise<void> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
     if (!sandbox) {
       throw new NotFoundException(`Sandbox with ID or name ${sandboxIdOrName} not found`)
     }
@@ -2010,8 +1618,8 @@ export class SandboxService {
     await this.redis.del(lockKey)
   }
 
-  async destroy(sandboxIdOrName: string, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async destroy(sandboxIdOrName: string): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (sandbox.pending && sandbox.state !== SandboxState.PENDING_BUILD) {
       throw new StateChangeInProgressError()
@@ -2039,18 +1647,15 @@ export class SandboxService {
     return updatedSandbox
   }
 
-  async start(sandboxIdOrName: string, organization: Organization): Promise<Sandbox> {
+  async start(sandboxIdOrName: string): Promise<Sandbox> {
     let pendingCpuIncrement: number | undefined
     let pendingMemoryIncrement: number | undefined
     let pendingDiskIncrement: number | undefined
     let pendingGpuIncrement: number | undefined
 
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organization.id)
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
-    const region = await this.regionService.findOne(sandbox.region)
-    if (!region) {
-      throw new NotFoundException(`Region with ID ${sandbox.region} not found`)
-    }
+    const target = { id: sandbox.target }
 
     try {
       if (sandbox.state === SandboxState.STARTED && sandbox.desiredState === SandboxDesiredState.STARTED) {
@@ -2087,12 +1692,9 @@ export class SandboxService {
         throw new HttpException('Resuming is not supported for this sandbox', HttpStatus.UNPROCESSABLE_ENTITY)
       }
 
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
-
       const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented, pendingGpuIncremented } =
-        await this.validateOrganizationQuotas(
-          organization,
-          region,
+        await this.validateSandboxResources(
+          target,
           sandbox.sandboxClass,
           sandbox.cpu,
           sandbox.mem,
@@ -2136,8 +1738,7 @@ export class SandboxService {
       return updatedSandbox
     } catch (error) {
       await this.rollbackPendingUsage(
-        organization.id,
-        sandbox.region,
+        sandbox.target,
         sandbox.sandboxClass,
         pendingCpuIncrement,
         pendingMemoryIncrement,
@@ -2148,8 +1749,8 @@ export class SandboxService {
     }
   }
 
-  async stop(sandboxIdOrName: string, organizationId?: string, force?: boolean): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async stop(sandboxIdOrName: string, force?: boolean): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     this.assertSandboxNotErrored(sandbox)
 
@@ -2187,8 +1788,8 @@ export class SandboxService {
     return updatedSandbox
   }
 
-  async pause(sandboxIdOrName: string, organization: Organization): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organization.id)
+  async pause(sandboxIdOrName: string): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (sandbox.state !== SandboxState.STARTED) {
       throw new BadRequestError('Sandbox must be in started state to pause')
@@ -2236,20 +1837,17 @@ export class SandboxService {
       throw error
     }
 
-    return this.findOneByIdOrName(sandbox.id, organization.id)
+    return this.findOneByIdOrName(sandbox.id)
   }
 
-  async recover(sandboxIdOrName: string, organization: Organization, skipStart = false): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organization.id)
+  async recover(sandboxIdOrName: string, skipStart = false): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (!sandbox.recoverable) {
       throw new BadRequestError('Sandbox is not in a recoverable state')
     }
 
-    const region = await this.regionService.findOne(sandbox.region)
-    if (!region) {
-      throw new NotFoundException(`Region with ID ${sandbox.region} not found`)
-    }
+    const target = { id: sandbox.target }
 
     // Serialize against concurrent recover calls and the draining-runner manager (which takes
     // the same lock). The pending flag can't be used here: enforceInvariants forces pending=false
@@ -2264,8 +1862,6 @@ export class SandboxService {
         throw new BadRequestError('Sandbox must be in error state to recover')
       }
 
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
-
       // API-level recoverable errors (e.g. timeouts) bypass the runner and restore
       // from backup on a new runner, provided a completed backup exists.
       if (
@@ -2274,17 +1870,17 @@ export class SandboxService {
         sandbox.backupSnapshot &&
         sandbox.backupRegistryId
       ) {
-        return await this.recoverFromBackup(sandbox, organization, region)
+        return await this.recoverFromBackup(sandbox, target)
       }
 
       // Everything else goes to the runner for in-place recovery (e.g. disk expansion).
-      return await this.recoverInPlace(sandbox, organization, region, skipStart)
+      return await this.recoverInPlace(sandbox, target, skipStart)
     } finally {
       await this.redisLockProvider.unlock(lockKey)
     }
   }
 
-  private async recoverFromBackup(sandbox: Sandbox, organization: Organization, region: Region): Promise<Sandbox> {
+  private async recoverFromBackup(sandbox: Sandbox, target: SandboxTarget): Promise<Sandbox> {
     const cooldownKey = `sandbox:recover-from-backup:${sandbox.id}`
     const existing = await this.redis.get(cooldownKey)
     if (existing) {
@@ -2293,9 +1889,8 @@ export class SandboxService {
 
     // The sandbox will be fully recreated from backup on a new runner, so reserve all resources.
     const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented, pendingGpuIncremented } =
-      await this.validateOrganizationQuotas(
-        organization,
-        region,
+      await this.validateSandboxResources(
+        target,
         sandbox.sandboxClass,
         sandbox.cpu,
         sandbox.mem,
@@ -2330,8 +1925,7 @@ export class SandboxService {
       return updatedSandbox
     } catch (error) {
       await this.rollbackPendingUsage(
-        organization.id,
-        sandbox.region,
+        sandbox.target,
         sandbox.sandboxClass,
         pendingCpuIncremented ? sandbox.cpu : undefined,
         pendingMemoryIncremented ? sandbox.mem : undefined,
@@ -2342,12 +1936,7 @@ export class SandboxService {
     }
   }
 
-  private async recoverInPlace(
-    sandbox: Sandbox,
-    organization: Organization,
-    region: Region,
-    skipStart: boolean,
-  ): Promise<Sandbox> {
+  private async recoverInPlace(sandbox: Sandbox, target: SandboxTarget, skipStart: boolean): Promise<Sandbox> {
     if (!sandbox.runnerId) {
       throw new NotFoundException(`Sandbox with ID ${sandbox.id} does not have a runner`)
     }
@@ -2357,9 +1946,8 @@ export class SandboxService {
     // ERROR → STOPPED activates disk usage; v2 + !skipStart additionally activates cpu/mem/gpu
     // because there is no trailing start() call to validate them.
     const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented, pendingGpuIncremented } =
-      await this.validateOrganizationQuotas(
-        organization,
-        region,
+      await this.validateSandboxResources(
+        target,
         sandbox.sandboxClass,
         willStartOnV2 ? sandbox.cpu : 0,
         willStartOnV2 ? sandbox.mem : 0,
@@ -2434,11 +2022,10 @@ export class SandboxService {
       }
 
       // start() validates cpu/mem with self-excluded so disk doesn't double-count.
-      return await this.start(sandbox.id, organization)
+      return await this.start(sandbox.id)
     } catch (error) {
       await this.rollbackPendingUsage(
-        organization.id,
-        sandbox.region,
+        sandbox.target,
         sandbox.sandboxClass,
         pendingCpuIncremented ? sandbox.cpu : undefined,
         pendingMemoryIncremented ? sandbox.mem : undefined,
@@ -2449,18 +2036,15 @@ export class SandboxService {
     }
   }
 
-  async resize(sandboxIdOrName: string, resizeDto: ResizeSandboxDto, organization: Organization): Promise<Sandbox> {
+  async resize(sandboxIdOrName: string, resizeDto: ResizeSandboxDto): Promise<Sandbox> {
     let pendingCpuIncrement: number | undefined
     let pendingMemoryIncrement: number | undefined
     let pendingDiskIncrement: number | undefined
     let pendingGpuIncrement: number | undefined
 
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organization.id)
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
-    const region = await this.regionService.findOne(sandbox.region)
-    if (!region) {
-      throw new NotFoundException(`Region with ID ${sandbox.region} not found`)
-    }
+    const target = { id: sandbox.target }
 
     try {
       // Validate sandbox is in a valid state for resize
@@ -2511,43 +2095,6 @@ export class SandboxService {
         throw new BadRequestError('No resource changes specified - sandbox is already at the desired configuration')
       }
 
-      // Validate organization quotas for the new resource values
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
-
-      const regionQuota = region.enforceQuotas
-        ? await this.organizationService.getRegionQuota(organization.id, region.id, sandbox.sandboxClass)
-        : null
-
-      const { maxCpuPerSandbox, maxMemoryPerSandbox, maxDiskPerSandbox, maxDiskPerNonEphemeralSandbox } =
-        getEffectivePerSandboxLimits(organization, regionQuota, sandbox.gpu > 0)
-
-      if (newCpu > maxCpuPerSandbox) {
-        throw new BadRequestError(
-          `CPU request ${newCpu} exceeds maximum allowed per sandbox (${maxCpuPerSandbox}).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-        )
-      }
-      if (newMem > maxMemoryPerSandbox) {
-        throw new BadRequestError(
-          `Memory request ${newMem}GB exceeds maximum allowed per sandbox (${maxMemoryPerSandbox}GB).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-        )
-      }
-      if (newDisk > maxDiskPerSandbox) {
-        throw new BadRequestError(
-          `Disk request ${newDisk}GB exceeds maximum allowed per sandbox (${maxDiskPerSandbox}GB).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-        )
-      }
-
-      if (!isEphemeral(sandbox) && maxDiskPerNonEphemeralSandbox !== null) {
-        if (maxDiskPerNonEphemeralSandbox === 0) {
-          throw new BadRequestError('Non-ephemeral sandboxes are not permitted in this region')
-        }
-        if (newDisk > maxDiskPerNonEphemeralSandbox) {
-          throw new BadRequestError(
-            `Disk request ${newDisk}GB exceeds maximum allowed per non-ephemeral sandbox (${maxDiskPerNonEphemeralSandbox}GB).\n${PER_SANDBOX_LIMIT_MESSAGE}`,
-          )
-        }
-      }
-
       // For cold resize, cpu/memory don't affect quota until sandbox is STARTED.
       // For hot resize, track all deltas (positive reserves quota, negative frees quota for others).
       const cpuDeltaForQuota = isHotResize ? newCpu - sandbox.cpu : 0
@@ -2559,9 +2106,8 @@ export class SandboxService {
       // `gpuEnabled = sandbox.gpu > 0` so per-sandbox limit checks use the GPU-specific table.
       if (cpuDeltaForQuota !== 0 || memDeltaForQuota !== 0 || diskDeltaForQuota !== 0) {
         const { pendingCpuIncremented, pendingMemoryIncremented, pendingDiskIncremented } =
-          await this.validateOrganizationQuotas(
-            organization,
-            region,
+          await this.validateSandboxResources(
+            target,
             sandbox.sandboxClass,
             cpuDeltaForQuota,
             memDeltaForQuota,
@@ -2569,7 +2115,7 @@ export class SandboxService {
             0,
             isEphemeral(sandbox),
             undefined,
-            regionQuota,
+            undefined,
             sandbox.gpu > 0,
           )
 
@@ -2628,36 +2174,8 @@ export class SandboxService {
 
         await runnerAdapter.resizeSandbox(sandbox.id, resizeDto.cpu, resizeDto.memory, resizeDto.disk, backupRegistry)
 
-        // For V0 runners, update resources immediately (subscriber emits STATE_UPDATED)
-        // For V2 runners, job handler will update resources on completion
-        if (runner.apiVersion === '0') {
-          const updateData: Partial<Sandbox> = {
-            cpu: newCpu,
-            mem: newMem,
-            disk: newDisk,
-            state: previousState,
-          }
-
-          await this.sandboxRepository.updateWhere(sandbox.id, {
-            updateData,
-            whereCondition: { state: SandboxState.RESIZING },
-          })
-
-          // Apply the usage change (increments current, decrements pending)
-          // Only apply deltas for quotas that were validated/pending-incremented.
-          // Resize never changes GPU allocation — always pass 0.
-          await this.organizationUsageService.applyResizeUsageChange(
-            organization.id,
-            sandbox.region,
-            sandbox.sandboxClass,
-            cpuDeltaForQuota,
-            memDeltaForQuota,
-            diskDeltaForQuota,
-            0,
-          )
-        }
-
-        return await this.findOneByIdOrName(sandbox.id, organization.id)
+        // The v2 job handler updates resources and restores the prior state on completion.
+        return await this.findOneByIdOrName(sandbox.id)
       } catch (error) {
         // Return to previous state on error
         const updateData: Partial<Sandbox> = {
@@ -2673,8 +2191,7 @@ export class SandboxService {
       }
     } catch (error) {
       await this.rollbackPendingUsage(
-        organization.id,
-        sandbox.region,
+        sandbox.target,
         sandbox.sandboxClass,
         pendingCpuIncrement,
         pendingMemoryIncrement,
@@ -2685,64 +2202,48 @@ export class SandboxService {
     }
   }
 
-  async updatePublicStatus(sandboxIdOrName: string, isPublic: boolean, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
-
-    const updateData: Partial<Sandbox> = {
-      public: isPublic,
-    }
-
-    return await this.sandboxRepository.update(sandbox.id, {
-      updateData,
-      entity: sandbox,
-    })
-  }
-
   async updateLastActivityAt(sandboxId: string, lastActivityAt: Date): Promise<void> {
     await this.sandboxActivityService.updateLastActivityAt(sandboxId, lastActivityAt)
   }
 
   async getToolboxProxyUrl(sandboxId: string): Promise<string> {
     const sandbox = await this.findOne(sandboxId)
-    return this.resolveToolboxProxyUrl(sandbox.region)
+    return this.resolveToolboxProxyUrl(sandbox.target)
   }
 
   async toSandboxDto(sandbox: Sandbox): Promise<SandboxDto> {
-    const toolboxProxyUrl = await this.resolveToolboxProxyUrl(sandbox.region)
+    const toolboxProxyUrl = await this.resolveToolboxProxyUrl(sandbox.target)
     return SandboxDto.fromSandbox(sandbox, toolboxProxyUrl)
   }
 
   async toSandboxDtos(sandboxes: Sandbox[]): Promise<SandboxDto[]> {
-    const urlMap = await this.resolveToolboxProxyUrls(sandboxes.map((s) => s.region))
+    const urlMap = await this.resolveToolboxProxyUrls(sandboxes.map((s) => s.target))
     return sandboxes.map((s) => {
-      const url = urlMap.get(s.region)
+      const url = urlMap.get(s.target)
       if (!url) {
-        throw new NotFoundException(`Toolbox proxy URL not resolved for region ${s.region}`)
+        throw new NotFoundException(`Toolbox proxy URL not resolved for target ${s.target}`)
       }
       return SandboxDto.fromSandbox(s, url)
     })
   }
 
-  async resolveToolboxProxyUrl(regionId: string): Promise<string> {
-    const cacheKey = toolboxProxyUrlCacheKey(regionId)
+  async resolveToolboxProxyUrl(target: string): Promise<string> {
+    const cacheKey = toolboxProxyUrlCacheKey(target)
     const cached = await this.redis.get(cacheKey)
     if (cached) {
       return cached
     }
 
-    const region = await this.regionService.findOne(regionId)
-    const url = region?.toolboxProxyUrl
-      ? region.toolboxProxyUrl.replace(/\/+$/, '') + '/toolbox'
-      : this.configService.getOrThrow('proxy.toolboxUrl')
+    const url = this.configService.getOrThrow('proxy.toolboxUrl')
 
     this.redis.setex(cacheKey, TOOLBOX_PROXY_URL_CACHE_TTL_S, url).catch((err) => {
-      this.logger.warn(`Failed to cache toolbox proxy URL for region ${regionId}: ${err.message}`)
+      this.logger.warn(`Failed to cache toolbox proxy URL for target ${target}: ${err.message}`)
     })
     return url
   }
 
-  async resolveToolboxProxyUrls(regionIds: string[]): Promise<Map<string, string>> {
-    const unique = [...new Set(regionIds)]
+  async resolveToolboxProxyUrls(targets: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(targets)]
     const result = new Map<string, string>()
 
     const pipeline = this.redis.pipeline()
@@ -2755,7 +2256,7 @@ export class SandboxService {
     for (let i = 0; i < unique.length; i++) {
       const err = cached?.[i]?.[0]
       if (err) {
-        this.logger.warn(`Failed to get cached toolbox proxy URL for region ${unique[i]}: ${err.message}`)
+        this.logger.warn(`Failed to get cached toolbox proxy URL for target ${unique[i]}: ${err.message}`)
       }
       const val = cached?.[i]?.[1] as string | null
       if (val) {
@@ -2766,20 +2267,16 @@ export class SandboxService {
     }
 
     if (uncached.length > 0) {
-      const regions = await this.regionService.findByIds(uncached)
-      const regionMap = new Map(regions.map((r) => [r.id, r]))
       const fallback = this.configService.getOrThrow('proxy.toolboxUrl')
       const setPipeline = this.redis.pipeline()
       for (const id of uncached) {
-        const region = regionMap.get(id)
-        const url = region?.toolboxProxyUrl ? region.toolboxProxyUrl.replace(/\/+$/, '') + '/toolbox' : fallback
-        result.set(id, url)
-        setPipeline.setex(toolboxProxyUrlCacheKey(id), TOOLBOX_PROXY_URL_CACHE_TTL_S, url)
+        result.set(id, fallback)
+        setPipeline.setex(toolboxProxyUrlCacheKey(id), TOOLBOX_PROXY_URL_CACHE_TTL_S, fallback)
       }
       const setResults = await setPipeline.exec()
       setResults?.forEach(([err], i) => {
         if (err) {
-          this.logger.warn(`Failed to cache toolbox proxy URL for region ${uncached[i]}: ${err.message}`)
+          this.logger.warn(`Failed to cache toolbox proxy URL for target ${uncached[i]}: ${err.message}`)
         }
       })
     }
@@ -2787,59 +2284,22 @@ export class SandboxService {
     return result
   }
 
-  async getBuildLogsUrl(sandboxIdOrName: string, organizationId: string): Promise<string> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async getBuildLogsUrl(sandboxIdOrName: string): Promise<string> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (!sandbox.buildInfo?.snapshotRef) {
       throw new NotFoundException(`Sandbox ${sandboxIdOrName} has no build info`)
     }
 
-    const region = await this.regionService.findOne(sandbox.region, true)
-
-    if (!region) {
-      throw new NotFoundException(`Region for runner for sandbox ${sandboxIdOrName} not found`)
-    }
-
-    if (!region.proxyUrl) {
-      return `${this.configService.getOrThrow('proxy.protocol')}://${this.configService.getOrThrow('proxy.domain')}/sandboxes/${sandbox.id}/build-logs`
-    }
-
-    return region.proxyUrl + '/sandboxes/' + sandbox.id + '/build-logs'
+    return `${this.configService.getOrThrow('proxy.protocol')}://${this.configService.getOrThrow('proxy.domain')}/sandboxes/${sandbox.id}/build-logs`
   }
 
-  private async getValidatedOrDefaultRegion(organization: Organization, regionIdOrName?: string): Promise<Region> {
-    if (!organization.defaultRegionId) {
-      throw new DefaultRegionRequiredException()
-    }
-
-    regionIdOrName = regionIdOrName?.trim()
-
-    if (!regionIdOrName) {
-      const region = await this.regionService.findOne(organization.defaultRegionId)
-      if (!region) {
-        throw new NotFoundException('Default region not found')
-      }
-      return region
-    }
-
-    const region =
-      (await this.regionService.findOneByName(regionIdOrName, organization.id)) ??
-      (await this.regionService.findOneByName(regionIdOrName, null)) ??
-      (await this.regionService.findOne(regionIdOrName))
-
-    if (!region) {
-      throw new NotFoundException('Region not found')
-    }
-
-    return region
+  private async getValidatedOrDefaultTarget(target?: string): Promise<SandboxTarget> {
+    return { id: target?.trim() || this.configService.getOrThrow('defaultTarget.id') }
   }
 
-  async replaceLabels(
-    sandboxIdOrName: string,
-    labels: { [key: string]: string },
-    organizationId?: string,
-  ): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async replaceLabels(sandboxIdOrName: string, labels: { [key: string]: string }): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     // Replace all labels
     const updateData: Partial<Sandbox> = {
@@ -2960,78 +2420,8 @@ export class SandboxService {
     }
   }
 
-  @Cron(CronExpression.EVERY_MINUTE, { name: 'recover-stale-snapshotting-sandboxes' })
-  @LogExecution('recover-stale-snapshotting-sandboxes')
-  @WithInstrumentation()
-  async recoverStaleSnapshottingSandboxes() {
-    const lockKey = 'sandbox:recover-stale-snapshotting-sandboxes'
-    const acquired = await this.redisLockProvider.lock(lockKey, 300)
-    if (!acquired) {
-      return
-    }
-
-    try {
-      const timeoutMinutes = this.configService.getOrThrow('sandboxSnapshottingTimeoutMin')
-      const cutoff = new Date()
-      cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes)
-
-      const staleSandboxes = await this.sandboxRepository.find({
-        where: {
-          state: SandboxState.SNAPSHOTTING,
-          pending: true,
-          updatedAt: LessThan(cutoff),
-        },
-        take: 100,
-      })
-
-      if (staleSandboxes.length === 0) {
-        return
-      }
-
-      for (const sandbox of staleSandboxes) {
-        if (!sandbox.runnerId) {
-          continue
-        }
-
-        try {
-          const runner = await this.runnerService.findOneOrFail(sandbox.runnerId)
-
-          // v2 runners are recovered by the job system — skip them
-          if (runner.apiVersion !== '0') {
-            continue
-          }
-
-          const restoredState =
-            sandbox.desiredState === SandboxDesiredState.STARTED ? SandboxState.STARTED : SandboxState.STOPPED
-
-          await this.sandboxRepository.updateWhere(sandbox.id, {
-            updateData: { state: restoredState, pending: false },
-            whereCondition: { state: SandboxState.SNAPSHOTTING, desiredState: sandbox.desiredState },
-          })
-
-          await this.snapshotService
-            .rollbackPendingUsage(sandbox.organizationId, 1)
-            .catch((err) =>
-              this.logger.error(
-                `Failed to roll back pending snapshot quota for org ${sandbox.organizationId} during stale recovery:`,
-                err,
-              ),
-            )
-
-          this.logger.warn(
-            `Recovered stale SNAPSHOTTING sandbox ${sandbox.id} (v0 runner ${sandbox.runnerId}), restored to ${restoredState}`,
-          )
-        } catch (error) {
-          this.logger.error(`Error recovering stale SNAPSHOTTING sandbox ${sandbox.id}:`, error)
-        }
-      }
-    } finally {
-      await this.redisLockProvider.unlock(lockKey)
-    }
-  }
-
-  async setAutostopInterval(sandboxIdOrName: string, interval: number, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async setAutostopInterval(sandboxIdOrName: string, interval: number): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     const updateData: Partial<Sandbox> = {
       autoStopInterval: this.resolveAutoStopInterval(interval),
@@ -3040,8 +2430,8 @@ export class SandboxService {
     return await this.sandboxRepository.update(sandbox.id, { updateData, entity: sandbox })
   }
 
-  async setAutoArchiveInterval(sandboxIdOrName: string, interval: number, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async setAutoArchiveInterval(sandboxIdOrName: string, interval: number): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     const updateData: Partial<Sandbox> = {
       autoArchiveInterval: this.resolveAutoArchiveInterval(interval),
@@ -3050,8 +2440,8 @@ export class SandboxService {
     return await this.sandboxRepository.update(sandbox.id, { updateData, entity: sandbox })
   }
 
-  async setAutoDeleteInterval(sandboxIdOrName: string, interval: number, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async setAutoDeleteInterval(sandboxIdOrName: string, interval: number): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (sandbox.gpu > 0) {
       throw new BadRequestError('GPU sandboxes must remain ephemeral')
@@ -3069,9 +2459,8 @@ export class SandboxService {
     networkBlockAll?: boolean,
     networkAllowList?: string,
     domainAllowList?: string,
-    organizationId?: string,
   ): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     const updateData: Partial<Sandbox> = {}
     let effectiveNetworkBlockAll = sandbox.networkBlockAll
@@ -3210,11 +2599,10 @@ export class SandboxService {
       return
     }
 
-    //  find all sandboxes that are using the unschedulable runners and have organizationId = '00000000-0000-0000-0000-000000000000'
+    //  find all started sandboxes that are using unschedulable runners
     const sandboxes = await this.sandboxRepository.find({
       where: {
         runnerId: In(runners.map((runner) => runner.id)),
-        organizationId: '00000000-0000-0000-0000-000000000000',
         state: SandboxState.STARTED,
         desiredState: Not(SandboxDesiredState.DESTROYED),
       },
@@ -3232,26 +2620,6 @@ export class SandboxService {
       if (result.status === 'rejected') {
         this.logger.error(`Failed to destroy sandbox ${sandboxes[index].id}: ${result.reason}`)
       }
-    })
-  }
-
-  async isSandboxPublic(sandboxId: string): Promise<boolean> {
-    const sandbox = await this.sandboxRepository.findOne({
-      where: { id: sandboxId },
-    })
-
-    if (!sandbox) {
-      throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
-    }
-
-    return sandbox.public
-  }
-
-  @OnEvent(OrganizationEvents.SUSPENDED_SANDBOX_STOPPED)
-  async handleSuspendedSandboxStopped(event: OrganizationSuspendedSandboxStoppedEvent) {
-    await this.stop(event.sandboxId).catch((error) => {
-      //  log the error for now, but don't throw it as it will be retried
-      this.logger.error(`Error stopping sandbox from suspended organization. SandboxId: ${event.sandboxId}: `, error)
     })
   }
 
@@ -3276,7 +2644,7 @@ export class SandboxService {
 
     for (const follower of followers) {
       try {
-        await this.destroy(follower.id, follower.organizationId)
+        await this.destroy(follower.id)
       } catch (err) {
         this.logger.warn(
           `Failed to cascade-destroy linked follower ${follower.id} after owner ${event.sandbox.id} was destroyed: ${
@@ -3331,16 +2699,13 @@ export class SandboxService {
 
   // Resolves each volumeId (which may be a volume name) to the volume's UUID — the
   // runner builds a host mount path from this value, so only UUIDs may be stored.
-  private async resolveVolumes(
-    organizationId: string,
-    volumes?: SandboxVolume[],
-  ): Promise<SandboxVolume[] | undefined> {
+  private async resolveVolumes(volumes?: SandboxVolume[]): Promise<SandboxVolume[] | undefined> {
     if (volumes === undefined || volumes.length === 0) {
       return volumes
     }
 
     const volumeIdOrNames = volumes.map((volume) => volume.volumeId)
-    const foundVolumes = await this.volumeService.getVolumesByIdOrName(organizationId, volumeIdOrNames)
+    const foundVolumes = await this.volumeService.getVolumesByIdOrName(volumeIdOrNames)
 
     const resolved = volumes.map((volume) => {
       const matchedVolume = foundVolumes.get(volume.volumeId)
@@ -3365,13 +2730,9 @@ export class SandboxService {
     return resolved
   }
 
-  async createSshAccess(
-    sandboxIdOrName: string,
-    expiresInMinutes = 60,
-    organizationId?: string,
-  ): Promise<SshAccessDto> {
+  async createSshAccess(sandboxIdOrName: string, expiresInMinutes = 60): Promise<SshAccessDto> {
     //  check if sandbox exists
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     // Revoke any existing SSH access for this sandbox
     await this.revokeSshAccess(sandbox.id)
@@ -3384,16 +2745,11 @@ export class SandboxService {
 
     await this.sshAccessRepository.save(sshAccess)
 
-    const region = await this.regionService.findOne(sandbox.region, true)
-    if (region && region.sshGatewayUrl) {
-      return SshAccessDto.fromSshAccess(sshAccess, region.sshGatewayUrl)
-    }
-
     return SshAccessDto.fromSshAccess(sshAccess, this.configService.getOrThrow('sshGateway.url'))
   }
 
-  async revokeSshAccess(sandboxIdOrName: string, token?: string, organizationId?: string): Promise<Sandbox> {
-    const sandbox = await this.findOneByIdOrName(sandboxIdOrName, organizationId)
+  async revokeSshAccess(sandboxIdOrName: string, token?: string): Promise<Sandbox> {
+    const sandbox = await this.findOneByIdOrName(sandboxIdOrName)
 
     if (token) {
       // Revoke specific SSH access by token

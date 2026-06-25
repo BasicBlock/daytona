@@ -4,7 +4,6 @@
  */
 
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { useMutation } from '@tanstack/react-query'
 
 interface CreateSshAccessVariables {
@@ -14,11 +13,10 @@ interface CreateSshAccessVariables {
 
 export const useCreateSshAccessMutation = () => {
   const { sandboxApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useMutation({
     mutationFn: async ({ sandboxId, expiresInMinutes }: CreateSshAccessVariables) => {
-      const response = await sandboxApi.createSshAccess(sandboxId, selectedOrganization?.id, expiresInMinutes)
+      const response = await sandboxApi.createSshAccess(sandboxId, expiresInMinutes)
       return response.data
     },
   })

@@ -21,7 +21,7 @@ var _ MappedNullable = &CreateRunner{}
 
 // CreateRunner struct for CreateRunner
 type CreateRunner struct {
-	RegionId string `json:"regionId"`
+	Target string `json:"target"`
 	Name string `json:"name"`
 	// Tags to associate with the runner
 	Tags []string `json:"tags,omitempty"`
@@ -34,9 +34,9 @@ type _CreateRunner CreateRunner
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCreateRunner(regionId string, name string) *CreateRunner {
+func NewCreateRunner(target string, name string) *CreateRunner {
 	this := CreateRunner{}
-	this.RegionId = regionId
+	this.Target = target
 	this.Name = name
 	return &this
 }
@@ -49,28 +49,28 @@ func NewCreateRunnerWithDefaults() *CreateRunner {
 	return &this
 }
 
-// GetRegionId returns the RegionId field value
-func (o *CreateRunner) GetRegionId() string {
+// GetTarget returns the Target field value
+func (o *CreateRunner) GetTarget() string {
 	if o == nil {
 		var ret string
 		return ret
 	}
 
-	return o.RegionId
+	return o.Target
 }
 
-// GetRegionIdOk returns a tuple with the RegionId field value
+// GetTargetOk returns a tuple with the Target field value
 // and a boolean to check if the value has been set.
-func (o *CreateRunner) GetRegionIdOk() (*string, bool) {
+func (o *CreateRunner) GetTargetOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.RegionId, true
+	return &o.Target, true
 }
 
-// SetRegionId sets field value
-func (o *CreateRunner) SetRegionId(v string) {
-	o.RegionId = v
+// SetTarget sets field value
+func (o *CreateRunner) SetTarget(v string) {
+	o.Target = v
 }
 
 // GetName returns the Name field value
@@ -139,7 +139,7 @@ func (o CreateRunner) MarshalJSON() ([]byte, error) {
 
 func (o CreateRunner) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["regionId"] = o.RegionId
+	toSerialize["target"] = o.Target
 	toSerialize["name"] = o.Name
 	if !IsNil(o.Tags) {
 		toSerialize["tags"] = o.Tags
@@ -157,7 +157,7 @@ func (o *CreateRunner) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"regionId",
+		"target",
 		"name",
 	}
 
@@ -188,7 +188,7 @@ func (o *CreateRunner) UnmarshalJSON(data []byte) (err error) {
 	additionalProperties := make(map[string]interface{})
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "regionId")
+		delete(additionalProperties, "target")
 		delete(additionalProperties, "name")
 		delete(additionalProperties, "tags")
 		o.AdditionalProperties = additionalProperties

@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
 import { useCreateVolumeMutation } from '@/hooks/mutations/useCreateVolumeMutation'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { handleApiError } from '@/lib/error-handling'
 import { useForm } from '@tanstack/react-form'
 import { Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
@@ -47,7 +46,6 @@ export const CreateVolumeSheet = ({
 }) => {
   const [open, setOpen] = useState(false)
 
-  const { selectedOrganization } = useSelectedOrganization()
   const { reset: resetCreateVolumeMutation, ...createVolumeMutation } = useCreateVolumeMutation()
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -70,11 +68,6 @@ export const CreateVolumeSheet = ({
       }
     },
     onSubmit: async ({ value }) => {
-      if (!selectedOrganization?.id) {
-        toast.error('Select an organization to create a volume.')
-        return
-      }
-
       try {
         const volumeName = value.name.trim()
 
@@ -82,7 +75,6 @@ export const CreateVolumeSheet = ({
           volume: {
             name: volumeName,
           },
-          organizationId: selectedOrganization.id,
         })
 
         setOpen(false)
@@ -165,7 +157,7 @@ export const CreateVolumeSheet = ({
                 size="sm"
                 form="create-volume-form"
                 variant="default"
-                disabled={!canSubmit || isSubmitting || !selectedOrganization?.id}
+                disabled={!canSubmit || isSubmitting}
               >
                 {isSubmitting && <Spinner />}
                 Create

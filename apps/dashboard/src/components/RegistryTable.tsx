@@ -4,10 +4,9 @@
  */
 
 import { DEFAULT_PAGE_SIZE } from '@/constants/Pagination'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { cn } from '@/lib/utils'
 import { DEFAULT_TABLE_COLUMN, getColumnSizeStyles, getTableSizeStyles } from '@/lib/utils/table'
-import { DockerRegistry, OrganizationRolePermissionsEnum } from '@daytona/api-client'
+import { DockerRegistry } from '@daytona/api-client'
 import {
   ColumnDef,
   flexRender,
@@ -21,7 +20,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { MoreHorizontal, PackageOpen } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { PageFooterPortal } from './PageLayout'
 import { Pagination } from './Pagination'
 import { SearchInput } from './SearchInput'
@@ -71,17 +70,8 @@ interface DataTableProps {
 }
 
 export function RegistryTable({ data, loading, onDelete, onEdit }: DataTableProps) {
-  const { authenticatedUserHasPermission } = useSelectedOrganization()
-
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_REGISTRIES),
-    [authenticatedUserHasPermission],
-  )
-
-  const deletePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_REGISTRIES),
-    [authenticatedUserHasPermission],
-  )
+  const writePermitted = true
+  const deletePermitted = true
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')

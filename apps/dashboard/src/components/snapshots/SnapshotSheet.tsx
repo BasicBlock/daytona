@@ -32,7 +32,7 @@ export interface SnapshotSheetProps {
   ref?: Ref<SnapshotSheetRef>
   snapshotId?: string | null
   onOpenChange: (open: boolean) => void
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   onNavigate: (direction: 'prev' | 'next') => void
   hasPrev: boolean
   hasNext: boolean
@@ -136,7 +136,7 @@ function SnapshotStateBadge({ snapshot }: { snapshot: SnapshotDto }) {
   return <Badge variant={getStateBadgeVariant(snapshot.state)}>{getStateLabel(snapshot.state)}</Badge>
 }
 
-function TimestampRow({ label, value }: { label: string; value: Date | null | undefined }) {
+function TimestampRow({ label, value }: { label: string; value: Date | string | null | undefined }) {
   if (!value) {
     return (
       <InfoRow label={label}>
@@ -145,11 +145,12 @@ function TimestampRow({ label, value }: { label: string; value: Date | null | un
     )
   }
 
-  const timestamp = getRelativeTimeString(value)
+  const timestampValue = typeof value === 'string' ? new Date(value) : value
+  const timestamp = getRelativeTimeString(timestampValue)
 
   return (
     <InfoRow label={label}>
-      <TimestampTooltip timestamp={value.toString()}>{timestamp.relativeTimeString}</TimestampTooltip>
+      <TimestampTooltip timestamp={timestampValue.toString()}>{timestamp.relativeTimeString}</TimestampTooltip>
     </InfoRow>
   )
 }
@@ -175,7 +176,7 @@ function SnapshotSheetSkeleton() {
           <Skeleton className="h-7 w-16" />
         </div>
       </InfoSection>
-      <InfoSection title="Regions">
+      <InfoSection title="Targets">
         <div className="flex flex-wrap gap-2">
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-6 w-20" />
@@ -222,7 +223,7 @@ export function SnapshotSheet({
   ref,
   snapshotId,
   onOpenChange,
-  getRegionName,
+  getTargetName,
   onNavigate,
   hasPrev,
   hasNext,
@@ -258,7 +259,7 @@ export function SnapshotSheet({
   const activeSnapshot = fetchedSnapshot
   const loadingSnapshot = !activeSnapshot && (snapshotIsLoading || snapshotIsFetching)
   const snapshotNotFound = snapshotIsError && getSnapshotQueryErrorStatus(snapshotError) === 404
-  const regionNames = activeSnapshot?.regionIds?.map((id) => getRegionName(id) ?? id) ?? []
+  const targetNames = activeSnapshot?.targets?.map((id) => getTargetName(id) ?? id) ?? []
   const showActions = !!activeSnapshot && !activeSnapshot.general && (writePermitted || deletePermitted)
   const showActivate = !!activeSnapshot && writePermitted && activeSnapshot.state === SnapshotState.INACTIVE
   const showDeactivate = !!activeSnapshot && writePermitted && activeSnapshot.state === SnapshotState.ACTIVE
@@ -413,12 +414,12 @@ export function SnapshotSheet({
                 </div>
               </InfoSection>
 
-              <InfoSection title="Regions">
-                {regionNames.length ? (
+              <InfoSection title="Targets">
+                {targetNames.length ? (
                   <div className="flex flex-wrap gap-2">
-                    {regionNames.map((regionName) => (
-                      <Badge key={regionName} variant="secondary">
-                        {regionName}
+                    {targetNames.map((targetName) => (
+                      <Badge key={targetName} variant="secondary">
+                        {targetName}
                       </Badge>
                     ))}
                   </div>

@@ -57,18 +57,15 @@ func (p *Proxy) getSandboxBuildTarget(ctx *gin.Context) (*url.URL, map[string]st
 	target.RawQuery = queryParams.Encode()
 
 	return target, map[string]string{
-		"X-Daytona-Authorization": fmt.Sprintf("Bearer %s", runnerInfo.ApiKey),
-		"X-Forwarded-Host":        ctx.Request.Host,
+		"X-Forwarded-Host": ctx.Request.Host,
 	}, nil
 }
 
 func (p *Proxy) getSandbox(ctx *gin.Context, sandboxId string) (*apiclient.Sandbox, error) {
 	var sandbox *apiclient.Sandbox
-	bearerToken := p.getBearerToken(ctx)
-	apiClient := p.getUserApiClient(ctx, bearerToken)
 
 	err := utils.RetryWithExponentialBackoff(ctx, "getSandbox", proxyMaxRetries, proxyBaseDelay, proxyMaxDelay, func() error {
-		s, _, e := apiClient.SandboxAPI.GetSandbox(ctx, sandboxId).Execute()
+		s, _, e := p.apiclient.SandboxAPI.GetSandbox(ctx, sandboxId).Execute()
 		sandbox = s
 		openapiErr := common_errors.ConvertOpenAPIError(e)
 

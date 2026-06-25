@@ -20,28 +20,14 @@ import { SnapshotState } from '../enums/snapshot-state.enum'
 import { SandboxClass } from '../enums/sandbox-class.enum'
 import { GpuType } from '../enums/gpu-type.enum'
 import { BuildInfo } from './build-info.entity'
-import { SnapshotRegion } from './snapshot-region.entity'
 
 @Entity()
-@Unique(['organizationId', 'name'])
+@Unique(['name'])
 @Index('snapshot_name_idx', ['name'])
 @Index('snapshot_state_idx', ['state'])
 export class Snapshot {
   @PrimaryGeneratedColumn('uuid')
   id: string
-
-  @Column({
-    nullable: true,
-    type: 'uuid',
-  })
-  organizationId?: string
-
-  //  general snapshot is available to all organizations
-  @Column({
-    type: 'boolean',
-    default: false,
-  })
-  general = false
 
   @Column()
   name: string
@@ -121,10 +107,4 @@ export class Snapshot {
 
   @Column({ nullable: true })
   initialRunnerId?: string
-
-  @OneToMany(() => SnapshotRegion, (snapshotRegion) => snapshotRegion.snapshot, {
-    cascade: true,
-    onDelete: 'CASCADE',
-  })
-  snapshotRegions: SnapshotRegion[]
 }

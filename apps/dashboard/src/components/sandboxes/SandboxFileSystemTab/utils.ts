@@ -142,8 +142,15 @@ export function toNode(parentPath: string, file: FileInfo): SandboxFileSystemNod
 
   return {
     ...file,
+    group: file.group ?? '',
     id: path,
+    isDir: file.isDir ?? file.isDirectory ?? false,
+    modTime: file.modTime ?? '',
+    mode: file.mode ?? '',
+    owner: file.owner ?? '',
     path,
+    permissions: file.permissions ?? '',
+    size: file.size ?? 0,
   }
 }
 

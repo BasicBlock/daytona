@@ -11,7 +11,7 @@ import { IsSafeDisplayString } from '../../common/validators'
 export class CreateRunnerDto {
   @IsString()
   @ApiProperty()
-  regionId: string
+  target: string
 
   @IsString()
   @IsSafeDisplayString()

@@ -6,23 +6,16 @@
 import { DockerRegistry } from '@daytona/api-client'
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../useApi'
-import { useSelectedOrganization } from '../useSelectedOrganization'
 import { queryKeys } from './queryKeys'
 
 export function useRegistriesQuery() {
   const { dockerRegistryApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<DockerRegistry[]>({
-    queryKey: queryKeys.registries.list(selectedOrganization?.id ?? ''),
+    queryKey: queryKeys.registries.list(),
     queryFn: async () => {
-      if (!selectedOrganization) {
-        throw new Error('No organization selected')
-      }
-
-      const response = await dockerRegistryApi.listRegistries(selectedOrganization.id)
+      const response = await dockerRegistryApi.listRegistries()
       return response.data
     },
-    enabled: !!selectedOrganization,
   })
 }

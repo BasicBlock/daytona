@@ -62,15 +62,15 @@ export class EcrCredentialsService {
     if (!match) {
       throw new Error(`Not an ECR URL: ${url}`)
     }
-    const region = match[1]
+    const awsRegion = match[1]
     const normalizedArn = roleArn.trim()
 
     const apiArn = await this.getApiArn()
     const useApiIdentity = apiArn !== '' && apiArn === normalizedArn
 
     const cacheKey = useApiIdentity
-      ? `ecr:token:default:${region}`
-      : `ecr:token:${externalId}:${normalizedArn}:${region}`
+      ? `ecr:token:default:${awsRegion}`
+      : `ecr:token:${externalId}:${normalizedArn}:${awsRegion}`
     const cached = await this.redis.get(cacheKey)
     if (cached) {
       try {
@@ -99,7 +99,7 @@ export class EcrCredentialsService {
         : undefined
 
       const ecr = new ECRClient({
-        region,
+        region: awsRegion,
         credentials: useApiIdentity
           ? baseCredentials
           : fromTemporaryCredentials({
@@ -136,14 +136,14 @@ export class EcrCredentialsService {
       }
 
       this.logger.log(
-        `Resolved ECR credentials for region=${region} role=${useApiIdentity ? '(API identity)' : normalizedArn}${this.brokerRoleArn ? ' via broker' : ''}`,
+        `Resolved ECR credentials for awsRegion=${awsRegion} role=${useApiIdentity ? '(API identity)' : normalizedArn}${this.brokerRoleArn ? ' via broker' : ''}`,
       )
       return auth
     } catch (err) {
       // Only negative-cache the per-role key, which is scoped to a single
       // (misconfigured) registry. The API-identity key is shared across all
-      // tenants in the region, so caching a transient failure there would
-      // wrongly fail-fast everyone for the TTL window.
+      // registries in the AWS account, so caching a transient failure there would
+      // wrongly fail-fast every ECR registry for the TTL window.
       if (!useApiIdentity) {
         const message = err instanceof Error ? err.message : String(err)
         // Cache the failure briefly so subsequent builds don't each pay the full

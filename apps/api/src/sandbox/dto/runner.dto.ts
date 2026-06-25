@@ -139,10 +139,10 @@ export class RunnerDto {
   availabilityScore: number
 
   @ApiProperty({
-    description: 'The region of the runner',
+    description: 'The target of the runner',
     example: 'us',
   })
-  region: string
+  target: string
 
   @ApiProperty({
     description: 'The name of the runner',
@@ -247,7 +247,7 @@ export class RunnerDto {
       currentSnapshotCount: runner.currentSnapshotCount,
       currentStartedSandboxes: runner.currentStartedSandboxes,
       availabilityScore: runner.availabilityScore,
-      region: runner.region,
+      target: runner.target,
       name: runner.name,
       state: runner.state,
       lastChecked: runner.lastChecked?.toISOString(),

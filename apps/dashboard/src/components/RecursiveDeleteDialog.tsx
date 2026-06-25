@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { buttonVariants } from '@/components/ui/button'
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { Sandbox } from '@daytona/api-client'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -30,14 +29,13 @@ interface RecursiveDeleteDialogProps {
 
 export function RecursiveDeleteDialog({ sandboxId, open, onClose, onDeleted }: RecursiveDeleteDialogProps) {
   const { sandboxApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
   const [sandboxesToDelete, setSandboxesToDelete] = useState<Sandbox[]>([])
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteProgress, setDeleteProgress] = useState(0)
 
   useEffect(() => {
-    if (!open || !sandboxId || !selectedOrganization?.id) return
+    if (!open || !sandboxId) return
 
     const fetchAll = async () => {
       setLoading(true)
@@ -47,7 +45,7 @@ export function RecursiveDeleteDialog({ sandboxId, open, onClose, onDeleted }: R
         const collected: Sandbox[] = []
 
         const collectChildren = async (id: string) => {
-          const res = await sandboxApi.getSandboxForks(id, selectedOrganization.id)
+          const res = await sandboxApi.getSandboxForks(id)
           for (const fork of res.data) {
             await collectChildren(fork.id)
             collected.push(fork)
@@ -56,7 +54,7 @@ export function RecursiveDeleteDialog({ sandboxId, open, onClose, onDeleted }: R
 
         await collectChildren(sandboxId)
 
-        const currentRes = await sandboxApi.getSandbox(sandboxId, selectedOrganization.id)
+        const currentRes = await sandboxApi.getSandbox(sandboxId)
         collected.push(currentRes.data)
 
         setSandboxesToDelete(collected)
@@ -68,17 +66,16 @@ export function RecursiveDeleteDialog({ sandboxId, open, onClose, onDeleted }: R
     }
 
     fetchAll()
-  }, [open, sandboxId, selectedOrganization?.id, sandboxApi])
+  }, [open, sandboxId, sandboxApi])
 
   const handleDelete = async () => {
-    if (!selectedOrganization?.id) return
     setDeleting(true)
     setDeleteProgress(0)
 
     let deleted = 0
     for (const sandbox of sandboxesToDelete) {
       try {
-        await sandboxApi.deleteSandbox(sandbox.id, selectedOrganization.id)
+        await sandboxApi.deleteSandbox(sandbox.id)
         deleted++
         setDeleteProgress(deleted)
       } catch {

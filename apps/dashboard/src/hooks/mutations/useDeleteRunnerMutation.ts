@@ -11,7 +11,6 @@ import { mutationKeys } from './mutationKeys'
 
 export interface DeleteRunnerMutationVariables {
   runnerId: string
-  organizationId?: string
 }
 
 interface UseDeleteRunnerMutationOptions {
@@ -24,19 +23,11 @@ export const useDeleteRunnerMutation = ({ invalidateOnSuccess = true }: UseDelet
 
   return useMutation<void, unknown, DeleteRunnerMutationVariables>({
     mutationKey: mutationKeys.runners.remove(),
-    mutationFn: async ({ runnerId, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-
-      await runnersApi.deleteRunner(runnerId, organizationId)
+    mutationFn: async ({ runnerId }) => {
+      await runnersApi.deleteRunner(runnerId)
     },
-    onSuccess: async (_data, { runnerId, organizationId }) => {
-      if (!organizationId) {
-        return
-      }
-
-      const queryKey = queryKeys.runners.list(organizationId)
+    onSuccess: async (_data, { runnerId }) => {
+      const queryKey = queryKeys.runners.list()
       queryClient.setQueriesData<Runner[]>({ queryKey }, (previousRunners) => {
         if (!previousRunners) return previousRunners
 

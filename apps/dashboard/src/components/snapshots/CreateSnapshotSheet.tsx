@@ -21,15 +21,13 @@ import {
 } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
 import { useCreateSnapshotMutation } from '@/hooks/mutations/useCreateSnapshotMutation'
-import { useOrganizationUsageOverviewQuery } from '@/hooks/queries/useOrganizationUsageOverviewQuery'
-import { useAvailableRegionsQuery } from '@/hooks/queries/useRegionsQuery'
+import { useAvailableTargetsQuery } from '@/hooks/queries/useTargetsQuery'
 import { useAvailableSandboxClasses } from '@/hooks/useAvailableSandboxClasses'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { handleApiError } from '@/lib/error-handling'
 import { GPU_TYPE_LABELS } from '@/lib/gpu-types'
-import { EMPTY_REGIONS } from '@/lib/regions'
+import { EMPTY_TARGETS } from '@/lib/targets'
 import { imageNameSchema } from '@/lib/schema'
-import { cn, getRegionFullDisplayName } from '@/lib/utils'
+import { cn, getTargetFullDisplayName } from '@/lib/utils'
 import type { SnapshotDto } from '@daytona/api-client'
 import { GpuType, SandboxClass } from '@daytona/api-client'
 import { useForm, useStore } from '@tanstack/react-form'
@@ -53,9 +51,9 @@ const SANDBOX_CLASS_OPTIONS: { value: SandboxClass; label: string }[] = [
 
 const SELECTABLE_GPU_TYPES = (Object.values(GpuType) as GpuType[]).filter((t) => t !== GpuType.UNKNOWN_DEFAULT_OPEN_API)
 
-const resolveAllowedGpuTypes = (regionAllowed: GpuType[] | null | undefined): GpuType[] => {
-  const filteredRegion = (regionAllowed ?? []).filter((t) => t !== GpuType.UNKNOWN_DEFAULT_OPEN_API)
-  return filteredRegion.length > 0 ? filteredRegion : SELECTABLE_GPU_TYPES
+const resolveAllowedGpuTypes = (targetAllowed: GpuType[] | null | undefined): GpuType[] => {
+  const filteredTarget = (targetAllowed ?? []).filter((t) => t !== GpuType.UNKNOWN_DEFAULT_OPEN_API)
+  return filteredTarget.length > 0 ? filteredTarget : SELECTABLE_GPU_TYPES
 }
 
 const formSchema = z.object({
@@ -67,7 +65,7 @@ const formSchema = z.object({
   disk: z.number().min(1).optional(),
   gpu: z.boolean().optional(),
   gpuType: z.nativeEnum(GpuType).optional(),
-  regionId: z.string().optional(),
+  target: z.string().optional(),
   sandboxClass: z.nativeEnum(SandboxClass).optional(),
 })
 
@@ -82,7 +80,7 @@ const defaultValues: FormValues = {
   disk: undefined,
   gpu: false,
   gpuType: undefined,
-  regionId: undefined,
+  target: undefined,
   sandboxClass: SandboxClass.CONTAINER,
 }
 
@@ -97,21 +95,15 @@ export const CreateSnapshotSheet = ({
 }) => {
   const [open, setOpen] = useState(false)
 
-  const { selectedOrganization } = useSelectedOrganization()
-  const { data: regions = EMPTY_REGIONS, isLoading: loadingRegions } = useAvailableRegionsQuery(
-    selectedOrganization?.id,
-  )
+  const { data: targets = EMPTY_TARGETS, isLoading: loadingTargets } = useAvailableTargetsQuery()
   const { reset: resetCreateSnapshotMutation, ...createSnapshotMutation } = useCreateSnapshotMutation()
   const formRef = useRef<HTMLFormElement>(null)
-  const { data: usageOverview } = useOrganizationUsageOverviewQuery({
-    organizationId: selectedOrganization?.id || '',
-  })
   const formDefaultValues = useMemo<FormValues>(
     () => ({
       ...defaultValues,
-      regionId: selectedOrganization?.defaultRegionId,
+      target: undefined,
     }),
-    [selectedOrganization?.defaultRegionId],
+    [],
   )
 
   useImperativeHandle(ref, () => ({
@@ -133,11 +125,6 @@ export const CreateSnapshotSheet = ({
       }
     },
     onSubmit: async ({ value }) => {
-      if (!selectedOrganization?.id) {
-        toast.error('Select an organization to create a snapshot.')
-        return
-      }
-
       const trimmedEntrypoint = value.entrypoint?.trim()
 
       try {
@@ -151,10 +138,9 @@ export const CreateSnapshotSheet = ({
             disk: value.disk,
             gpu: value.gpu ? 1 : undefined,
             gpuType: value.gpu && value.gpuType ? [value.gpuType] : undefined,
-            regionId: value.regionId,
+            target: value.target,
             sandboxClass: value.sandboxClass,
           },
-          organizationId: selectedOrganization.id,
         })
 
         toast.success(`Creating snapshot ${value.name.trim()}`)
@@ -178,8 +164,8 @@ export const CreateSnapshotSheet = ({
     }
   }, [open, resetState])
 
-  const selectedRegionId = useStore(form.store, (state) => state.values.regionId)
-  const availableSandboxClasses = useAvailableSandboxClasses(selectedRegionId)
+  const selectedTarget = useStore(form.store, (state) => state.values.target)
+  const availableSandboxClasses = useAvailableSandboxClasses(selectedTarget)
 
   useEffect(() => {
     if (availableSandboxClasses.length === 0) return
@@ -200,7 +186,7 @@ export const CreateSnapshotSheet = ({
         <SheetHeader className="border-b border-border p-4 px-5 items-center flex text-left flex-row">
           <SheetTitle>Create Snapshot</SheetTitle>
           <SheetDescription className="sr-only">
-            Register a new snapshot to be used for spinning up sandboxes in your organization.
+            Register a new snapshot to be used for spinning up sandboxes in your workspace.
           </SheetDescription>
         </SheetHeader>
         <ScrollArea fade="mask" className="flex-1 min-h-0">
@@ -266,23 +252,23 @@ export const CreateSnapshotSheet = ({
               }}
             </form.Field>
 
-            <form.Field name="regionId">
+            <form.Field name="target">
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor={field.name}>Region</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>Target</FieldLabel>
                   <Select value={field.state.value} onValueChange={field.handleChange}>
-                    <SelectTrigger className="h-8" id={field.name} disabled={loadingRegions} loading={loadingRegions}>
-                      <SelectValue placeholder={loadingRegions ? 'Loading regions...' : 'Select a region'} />
+                    <SelectTrigger className="h-8" id={field.name} disabled={loadingTargets} loading={loadingTargets}>
+                      <SelectValue placeholder={loadingTargets ? 'Loading targets...' : 'Select a target'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {regions.map((region) => (
-                        <SelectItem key={region.id} value={region.id}>
-                          {getRegionFullDisplayName(region)}
+                      {targets.map((target) => (
+                        <SelectItem key={target.id} value={target.id}>
+                          {getTargetFullDisplayName(target)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <FieldDescription>The region where the snapshot will be available.</FieldDescription>
+                  <FieldDescription>The target where the snapshot will be available.</FieldDescription>
                 </Field>
               )}
             </form.Field>
@@ -295,7 +281,7 @@ export const CreateSnapshotSheet = ({
                     <Select
                       value={field.state.value ?? SandboxClass.CONTAINER}
                       onValueChange={(value) => field.handleChange(value as SandboxClass)}
-                      disabled={!selectedRegionId}
+                      disabled={!selectedTarget}
                     >
                       <SelectTrigger className="h-8" id={field.name}>
                         <SelectValue />
@@ -375,11 +361,10 @@ export const CreateSnapshotSheet = ({
                     </div>
                   )}
                 </form.Field>
-                <form.Subscribe selector={(state) => state.values.regionId}>
-                  {(regionId) => {
-                    const region = usageOverview?.regionUsage.find((r) => r.regionId === regionId)
-                    if ((region?.totalGpuQuota ?? 0) <= 0) return null
-                    const allowedGpuTypes = resolveAllowedGpuTypes(region?.allowedGpuTypes)
+                <form.Subscribe selector={(state) => state.values.target}>
+                  {(target) => {
+                    if (!target) return null
+                    const allowedGpuTypes = resolveAllowedGpuTypes(undefined)
                     return (
                       <div className="flex flex-col gap-3">
                         <form.Field name="gpu">
@@ -479,12 +464,7 @@ export const CreateSnapshotSheet = ({
           <form.Subscribe
             selector={(state) => [state.canSubmit, state.isSubmitting]}
             children={([canSubmit, isSubmitting]) => (
-              <Button
-                type="submit"
-                form="create-snapshot-form"
-                variant="default"
-                disabled={!canSubmit || isSubmitting || !selectedOrganization?.id}
-              >
+              <Button type="submit" form="create-snapshot-form" variant="default" disabled={!canSubmit || isSubmitting}>
                 {isSubmitting && <Spinner />}
                 Create
               </Button>

@@ -3,11 +3,29 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import type { Daytona } from '@daytona/sdk'
+import type { FileInfo } from '@daytona/toolbox-api-client'
+import type { Buffer } from 'buffer'
 
 export type PreviewKind = 'binary' | 'image' | 'text'
 
-export type SandboxInstance = Awaited<ReturnType<Daytona['get']>>
+export type FileUpload = {
+  source: Buffer | ArrayBuffer | Uint8Array | Blob
+  destination: string
+}
+
+export type SandboxInstance = {
+  fs: {
+    createFolder: (path: string, mode: string) => Promise<void>
+    deleteFile: (path: string, recursive?: boolean) => Promise<void>
+    downloadFile: (path: string) => Promise<ArrayBuffer>
+    getFileDetails: (path: string) => Promise<FileInfo>
+    listFiles: (path: string) => Promise<FileInfo[]>
+    moveFiles: (source: string, destination: string) => Promise<void>
+    searchFiles: (path: string, pattern: string) => Promise<{ files: string[] }>
+    uploadFiles: (files: FileUpload[]) => Promise<void>
+  }
+  id: string
+}
 
 export type SandboxFileSystemNode = {
   group: string

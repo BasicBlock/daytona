@@ -28,9 +28,8 @@ type InspectSnapshotInRegistryRequestDTO struct {
 // the supplied internal registry under the canonical
 // `daytona-{hash}:daytona` tag, and return the resulting image metadata.
 type CreateSnapshotFromSandboxRequestDTO struct {
-	Name           string       `json:"name" validate:"required" example:"my-snapshot:latest"`
-	OrganizationId string       `json:"organizationId,omitempty"`
-	Registry       *RegistryDTO `json:"registry" validate:"required"`
+	Name     string       `json:"name" validate:"required" example:"my-snapshot:latest"`
+	Registry *RegistryDTO `json:"registry" validate:"required"`
 } //	@name	CreateSnapshotFromSandboxRequest
 
 func HashWithoutPrefix(hash string) string {

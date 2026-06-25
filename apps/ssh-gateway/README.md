@@ -45,14 +45,12 @@ Where:
 | ------------------ | ------------------------------------- | ----------------------- | -------- |
 | `SSH_GATEWAY_PORT` | Port for the SSH gateway to listen on | `2222`                  | No       |
 | `API_URL`          | Daytona API base URL                  | `http://localhost:3000` | No       |
-| `API_KEY`          | Daytona API authentication key        | -                       | **Yes**  |
 
 ### Example Environment
 
 ```bash
 export SSH_GATEWAY_PORT=2222
 export API_URL=https://api.daytona.example.com
-export API_KEY=your-api-key-here
 ```
 
 ## Building
@@ -83,7 +81,6 @@ docker build -t ssh-gateway .
 ```bash
 docker run -p 2222:2222 \
   -e API_URL=https://api.daytona.example.com \
-  -e API_KEY=your-api-key-here \
   ssh-gateway
 ```
 

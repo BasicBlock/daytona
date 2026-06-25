@@ -4,7 +4,7 @@
   "projectType": "application",
   "sourceRoot": "apps/daytona-e2e",
   "tags": [],
-  "implicitDependencies": ["api", "runner", "proxy", "dashboard"],
+  "implicitDependencies": ["api", "runner", "proxy"],
   "targets": {
     "e2e": {
       "executor": "nx:run-commands",
@@ -17,8 +17,7 @@
         "default",
         "^goProduction",
         { "dependentTasksOutputFiles": "**/*", "transitive": true },
-        { "env": "DAYTONA_API_URL" },
-        { "env": "DAYTONA_API_KEY" }
+        { "env": "DAYTONA_API_URL" }
       ]
     },
     "e2e:cleanup": {

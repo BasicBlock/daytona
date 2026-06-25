@@ -7,8 +7,6 @@ definitions:
         type: array
       dockerfile:
         type: string
-      organizationId:
-        type: string
       pushToInternalRegistry:
         type: boolean
       registry:
@@ -20,9 +18,10 @@ definitions:
         items:
           $ref: '#/definitions/RegistryDTO'
         type: array
+      storagePrefix:
+        type: string
     required:
       - dockerfile
-      - organizationId
     type: object
   CreateBackupDTO:
     properties:
@@ -80,14 +79,9 @@ definitions:
         type: string
       networkBlockAll:
         type: boolean
-      organizationId:
-        description: Nullable for backward compatibility
-        type: string
       osUser:
         type: string
       otelEndpoint:
-        type: string
-      regionId:
         type: string
       registry:
         $ref: '#/definitions/RegistryDTO'
@@ -102,8 +96,6 @@ definitions:
       storageQuota:
         minimum: 1
         type: integer
-      userId:
-        type: string
       volumes:
         items:
           $ref: '#/definitions/dto.VolumeDTO'
@@ -112,14 +104,11 @@ definitions:
       - id
       - osUser
       - snapshot
-      - userId
     type: object
   CreateSnapshotFromSandboxRequest:
     properties:
       name:
         example: my-snapshot:latest
-        type: string
-      organizationId:
         type: string
       registry:
         $ref: '#/definitions/RegistryDTO'
@@ -229,15 +218,12 @@ definitions:
       storageQuota:
         minimum: 1
         type: integer
-      userId:
-        type: string
       volumes:
         items:
           $ref: '#/definitions/dto.VolumeDTO'
         type: array
     required:
       - osUser
-      - userId
     type: object
   RegistryDTO:
     properties:
@@ -1445,12 +1431,4 @@ paths:
       summary: Tag an image
       tags:
         - snapshots
-security:
-  - Bearer: []
-securityDefinitions:
-  Bearer:
-    description: Type "Bearer" followed by a space and an API token.
-    in: header
-    name: Authorization
-    type: apiKey
 swagger: '2.0'

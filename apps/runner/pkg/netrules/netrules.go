@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -27,27 +28,39 @@ type NetRulesManager struct {
 
 // NewNetRulesManager creates a new instance of NetRulesManager
 func NewNetRulesManager(logger *slog.Logger, persistent bool) (*NetRulesManager, error) {
-	ipt, err := iptables.NewWithProtocol(iptables.ProtocolIPv4)
-	if err != nil {
-		return nil, err
-	}
-
 	if logger == nil {
 		return nil, errors.New("logger can't be nil")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-
-	return &NetRulesManager{
+	manager := &NetRulesManager{
 		log:        logger.With(slog.String("component", "netrules_manager")),
-		ipt:        ipt,
 		persistent: persistent,
 		ctx:        ctx,
 		cancel:     cancel,
-	}, nil
+	}
+
+	ipt, err := iptables.NewWithProtocol(iptables.ProtocolIPv4)
+	if err != nil {
+		if runtime.GOOS != "linux" {
+			manager.log.Warn("iptables unavailable; network rules are disabled on this platform", "error", err)
+			return manager, nil
+		}
+
+		cancel()
+		return nil, err
+	}
+
+	manager.ipt = ipt
+
+	return manager, nil
 }
 
 func (manager *NetRulesManager) Start() error {
+	if manager.disabled() {
+		return nil
+	}
+
 	// Start periodic reconciliation
 	if manager.persistent {
 		go manager.persistRulesLoop()
@@ -65,6 +78,10 @@ func (manager *NetRulesManager) Stop() {
 
 // saveIptablesRules saves the current iptables rules to make them persistent
 func (manager *NetRulesManager) saveIptablesRules() error {
+	if manager.disabled() {
+		return nil
+	}
+
 	if manager.persistent {
 		cmd := exec.Command("sh", "-c", "iptables-save > /etc/iptables/rules.v4")
 		return cmd.Run()
@@ -74,6 +91,10 @@ func (manager *NetRulesManager) saveIptablesRules() error {
 
 // ListDaytonaRules returns all DOCKER-USER rules that jump to Daytona chains
 func (manager *NetRulesManager) ListDaytonaRules(table string, chain string) ([]string, error) {
+	if manager.disabled() {
+		return nil, nil
+	}
+
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 
@@ -94,6 +115,10 @@ func (manager *NetRulesManager) ListDaytonaRules(table string, chain string) ([]
 
 // DeleteChainRule deletes a specific rule from a specific chain
 func (manager *NetRulesManager) DeleteChainRule(table string, chain string, rule string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 
@@ -107,6 +132,10 @@ func (manager *NetRulesManager) DeleteChainRule(table string, chain string, rule
 
 // ListDaytonaChains returns all chains that start with DAYTONA-SB-
 func (manager *NetRulesManager) ListDaytonaChains(table string) ([]string, error) {
+	if manager.disabled() {
+		return nil, nil
+	}
+
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 
@@ -127,10 +156,18 @@ func (manager *NetRulesManager) ListDaytonaChains(table string) ([]string, error
 
 // ClearAndDeleteChain deletes a specific table chain
 func (manager *NetRulesManager) ClearAndDeleteChain(table string, name string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 
 	return manager.ipt.ClearAndDeleteChain(table, name)
+}
+
+func (manager *NetRulesManager) disabled() bool {
+	return manager == nil || manager.ipt == nil
 }
 
 // persistRulesLoop persists the iptables rules

@@ -185,10 +185,17 @@ func (a *JobsAPIService) GetJobExecute(r JobsAPIGetJobRequest) (*Job, *http.Resp
 type JobsAPIListJobsRequest struct {
 	ctx context.Context
 	ApiService JobsAPI
+	runnerId *string
 	page *float32
 	limit *float32
 	status *JobStatus
 	offset *float32
+}
+
+// Runner ID
+func (r JobsAPIListJobsRequest) RunnerId(runnerId string) JobsAPIListJobsRequest {
+	r.runnerId = &runnerId
+	return r
 }
 
 // Page number of the results
@@ -254,7 +261,11 @@ func (a *JobsAPIService) ListJobsExecute(r JobsAPIListJobsRequest) (*PaginatedJo
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
+	if r.runnerId == nil {
+		return localVarReturnValue, nil, reportError("runnerId is required and must be specified")
+	}
 
+	parameterAddToHeaderOrQuery(localVarQueryParams, "runnerId", r.runnerId, "form", "")
 	if r.page != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "page", r.page, "form", "")
 	} else {
@@ -332,8 +343,15 @@ func (a *JobsAPIService) ListJobsExecute(r JobsAPIListJobsRequest) (*PaginatedJo
 type JobsAPIPollJobsRequest struct {
 	ctx context.Context
 	ApiService JobsAPI
+	runnerId *string
 	timeout *float32
 	limit *float32
+}
+
+// Runner ID
+func (r JobsAPIPollJobsRequest) RunnerId(runnerId string) JobsAPIPollJobsRequest {
+	r.runnerId = &runnerId
+	return r
 }
 
 // Timeout in seconds for long polling (default: 30, max: 60)
@@ -387,7 +405,11 @@ func (a *JobsAPIService) PollJobsExecute(r JobsAPIPollJobsRequest) (*PollJobsRes
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
+	if r.runnerId == nil {
+		return localVarReturnValue, nil, reportError("runnerId is required and must be specified")
+	}
 
+	parameterAddToHeaderOrQuery(localVarQueryParams, "runnerId", r.runnerId, "form", "")
 	if r.timeout != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "timeout", r.timeout, "form", "")
 	}

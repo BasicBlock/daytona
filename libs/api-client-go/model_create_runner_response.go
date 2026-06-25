@@ -23,8 +23,6 @@ var _ MappedNullable = &CreateRunnerResponse{}
 type CreateRunnerResponse struct {
 	// The ID of the runner
 	Id string `json:"id"`
-	// The API key for the runner
-	ApiKey string `json:"apiKey"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -34,10 +32,9 @@ type _CreateRunnerResponse CreateRunnerResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCreateRunnerResponse(id string, apiKey string) *CreateRunnerResponse {
+func NewCreateRunnerResponse(id string) *CreateRunnerResponse {
 	this := CreateRunnerResponse{}
 	this.Id = id
-	this.ApiKey = apiKey
 	return &this
 }
 
@@ -73,30 +70,6 @@ func (o *CreateRunnerResponse) SetId(v string) {
 	o.Id = v
 }
 
-// GetApiKey returns the ApiKey field value
-func (o *CreateRunnerResponse) GetApiKey() string {
-	if o == nil {
-		var ret string
-		return ret
-	}
-
-	return o.ApiKey
-}
-
-// GetApiKeyOk returns a tuple with the ApiKey field value
-// and a boolean to check if the value has been set.
-func (o *CreateRunnerResponse) GetApiKeyOk() (*string, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.ApiKey, true
-}
-
-// SetApiKey sets field value
-func (o *CreateRunnerResponse) SetApiKey(v string) {
-	o.ApiKey = v
-}
-
 func (o CreateRunnerResponse) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -108,7 +81,6 @@ func (o CreateRunnerResponse) MarshalJSON() ([]byte, error) {
 func (o CreateRunnerResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["id"] = o.Id
-	toSerialize["apiKey"] = o.ApiKey
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -123,7 +95,6 @@ func (o *CreateRunnerResponse) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"id",
-		"apiKey",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -154,7 +125,6 @@ func (o *CreateRunnerResponse) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "id")
-		delete(additionalProperties, "apiKey")
 		o.AdditionalProperties = additionalProperties
 	}
 

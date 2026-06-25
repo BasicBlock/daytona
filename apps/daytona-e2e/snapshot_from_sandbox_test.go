@@ -188,7 +188,7 @@ func uploadFile(t *testing.T, httpCli *http.Client, cfg Config, baseURL, path, c
 
 	req, err := http.NewRequest(http.MethodPost, baseURL+"/files/upload?path="+path, &buf)
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	setToolboxAuthorizationHeader(req, cfg)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 
 	resp, err := httpCli.Do(req)
@@ -208,7 +208,7 @@ func downloadFile(t *testing.T, httpCli *http.Client, cfg Config, baseURL, path 
 
 	req, err := http.NewRequest(http.MethodGet, baseURL+"/files/download?path="+path, nil)
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	setToolboxAuthorizationHeader(req, cfg)
 
 	resp, err := httpCli.Do(req)
 	require.NoError(t, err, "files/download request failed")

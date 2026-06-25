@@ -55,7 +55,7 @@ export function InfoRow({
 
 interface SandboxInfoPanelProps {
   sandbox: SandboxListItem
-  getRegionName: (id: string) => string | undefined
+  getTargetName: (id: string) => string | undefined
   actionsDisabled?: boolean
   writePermitted?: boolean
   onCreateSshAccess?: () => void
@@ -65,7 +65,7 @@ interface SandboxInfoPanelProps {
 
 export function SandboxInfoPanel({
   sandbox,
-  getRegionName,
+  getTargetName,
   actionsDisabled = false,
   writePermitted = false,
   onCreateSshAccess,
@@ -90,9 +90,9 @@ export function SandboxInfoPanel({
       )}
 
       <InfoSection title={null}>
-        <InfoRow label="Region" className="-mr-2">
+        <InfoRow label="Target" className="-mr-2">
           <div className="flex items-center gap-1">
-            <span className="truncate">{getRegionName(sandbox.target) ?? sandbox.target}</span>
+            <span className="truncate">{getTargetName(sandbox.target) ?? sandbox.target}</span>
             <CopyButton value={sandbox.target} tooltipText="Copy" size="icon-xs" />
           </div>
         </InfoRow>

@@ -17,7 +17,6 @@ import { BackupState } from '../enums/backup-state.enum'
 import { SandboxDesiredState } from '../enums/sandbox-desired-state.enum'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import { Redis } from 'ioredis'
-import { SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION } from '../constants/sandbox.constants'
 import { BACKUP_RETRY_ERROR_SUBSTRINGS } from '../constants/errors-for-backup-retry'
 import { fromAxiosError } from '../../common/utils/from-axios-error'
 import { sanitizeSandboxError } from '../utils/sanitize-error.util'
@@ -149,7 +148,6 @@ export class BackupManager implements TrackableJobExecutions, OnApplicationShutd
           const sandboxes = await this.sandboxRepository.find({
             where: {
               runnerId: runner.id,
-              organizationId: Not(SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION),
               state: SandboxState.STARTED,
               desiredState: Not(SandboxDesiredState.DESTROYED),
               backupState: In([BackupState.NONE, BackupState.COMPLETED]),
@@ -621,7 +619,7 @@ export class BackupManager implements TrackableJobExecutions, OnApplicationShutd
     if (sandbox.backupRegistryId) {
       registry = await this.dockerRegistryService.findOne(sandbox.backupRegistryId)
     } else {
-      registry = await this.dockerRegistryService.getAvailableBackupRegistry(sandbox.region)
+      registry = await this.dockerRegistryService.getAvailableBackupRegistry(sandbox.target)
     }
 
     if (!registry) {
@@ -670,81 +668,7 @@ export class BackupManager implements TrackableJobExecutions, OnApplicationShutd
 
   private async checkBackupProgress(sandbox: Sandbox): Promise<void> {
     try {
-      const runner = await this.runnerService.findOneOrFail(sandbox.runnerId)
-
-      // v2+ runners don't expose live backup state via the runner API - completion is
-      // tracked through the CREATE_BACKUP job. Reconcile from the job instead of polling.
-      if (runner.apiVersion !== '0') {
-        await this.reconcileV2BackupFromJob(sandbox)
-        return
-      }
-
-      const runnerAdapter = await this.runnerAdapterFactory.create(runner)
-
-      // Get sandbox info from runner
-      const sandboxInfo = await runnerAdapter.sandboxInfo(sandbox.id)
-
-      switch (sandboxInfo.backupState) {
-        case BackupState.COMPLETED: {
-          // Only accept completion if the runner-reported snapshot matches the DB snapshot
-          if (sandboxInfo.backupSnapshot && sandboxInfo.backupSnapshot !== sandbox.backupSnapshot) {
-            this.logger.warn(
-              `Ignoring stale backup completion for sandbox ${sandbox.id}: runner snapshot ${sandboxInfo.backupSnapshot} does not match DB snapshot ${sandbox.backupSnapshot}`,
-            )
-            break
-          }
-          await this.sandboxService.updateSandboxBackupState(sandbox.id, BackupState.COMPLETED)
-          break
-        }
-        case BackupState.ERROR: {
-          // Only accept failure if the runner-reported snapshot matches the DB snapshot
-          if (sandboxInfo.backupSnapshot && sandboxInfo.backupSnapshot !== sandbox.backupSnapshot) {
-            this.logger.warn(
-              `Ignoring stale backup failure for sandbox ${sandbox.id}: runner snapshot ${sandboxInfo.backupSnapshot} does not match DB snapshot ${sandbox.backupSnapshot}`,
-            )
-            break
-          }
-          // Surface recoverable=true for archive flows or any backup error on a draining runner.
-          const isArchiveFlow = sandbox.desiredState === SandboxDesiredState.ARCHIVED
-          const isOnDrainingRunner = runner.draining === true
-          const recoverable = sandboxInfo.recoverable ?? false
-          await this.sandboxService.updateSandboxBackupState(
-            sandbox.id,
-            BackupState.ERROR,
-            undefined,
-            undefined,
-            sandboxInfo.backupErrorReason,
-            recoverable && (isArchiveFlow || isOnDrainingRunner),
-          )
-          await this.markErroredIfDraining(
-            sandbox,
-            sandboxInfo.backupErrorReason ?? null,
-            recoverable,
-            isOnDrainingRunner,
-          )
-          break
-        }
-        // If backup state is none, retry the backup process by setting the backup state to pending
-        // This can happen if the runner is restarted or the operation is cancelled.
-        // Bound the retries so a runner stuck reporting NONE doesn't loop forever.
-        case BackupState.NONE: {
-          const noneRetryKey = `sandbox-backup-${sandbox.id}-none-retry`
-          if (await this.shouldRetry(noneRetryKey)) {
-            await this.sandboxService.updateSandboxBackupState(sandbox.id, BackupState.PENDING)
-          } else {
-            this.logger.error(`Backup for sandbox ${sandbox.id} failed: runner repeatedly reports no backup state`)
-            await this.sandboxService.updateSandboxBackupState(
-              sandbox.id,
-              BackupState.ERROR,
-              undefined,
-              undefined,
-              'Backup failed: runner repeatedly reports no backup state',
-            )
-          }
-          break
-        }
-        // If still in progress or any other state, do nothing and wait for next sync
-      }
+      await this.reconcileV2BackupFromJob(sandbox)
     } catch (error) {
       const { recoverable, errorReason } = sanitizeSandboxError(error)
       const isArchiveFlow = sandbox.desiredState === SandboxDesiredState.ARCHIVED
@@ -763,7 +687,17 @@ export class BackupManager implements TrackableJobExecutions, OnApplicationShutd
   }
 
   private async deleteSandboxBackupRepositoryFromRegistry(sandbox: Sandbox): Promise<void> {
+    if (!sandbox.backupRegistryId) {
+      return
+    }
+
     const registry = await this.dockerRegistryService.findOne(sandbox.backupRegistryId)
+    if (!registry) {
+      this.logger.warn(
+        `Backup registry ${sandbox.backupRegistryId} not found for sandbox ${sandbox.id}; skipping repository deletion`,
+      )
+      return
+    }
 
     try {
       await this.dockerRegistryService.deleteSandboxRepository(sandbox.id, registry)

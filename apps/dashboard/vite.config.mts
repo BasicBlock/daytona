@@ -7,7 +7,6 @@ import path from 'path'
 import { defineConfig } from 'vite'
 import { analyzer } from 'vite-bundle-analyzer'
 import checker from 'vite-plugin-checker'
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 const outDir = '../../dist/apps/dashboard'
 
@@ -32,14 +31,6 @@ export default defineConfig((mode) => ({
   },
   plugins: [
     react(),
-    // Required for @daytona/sdk
-    nodePolyfills({
-      globals: { global: true, process: true, Buffer: true },
-      overrides: {
-        path: 'path-browserify-win32',
-      },
-      protocolImports: true,
-    }),
     nxViteTsPaths(),
     nxCopyAssetsPlugin(['*.md']),
     // enforce typechecking for build mode
@@ -72,11 +63,6 @@ export default defineConfig((mode) => ({
   ],
   resolve: {
     alias: [
-      // Resolve @daytona/sdk to the built ESM entry so browsers never receive raw SDK TypeScript decorators.
-      {
-        find: '@daytona/sdk',
-        replacement: path.resolve(__dirname, '../../dist/libs/sdk-typescript'),
-      },
       // Target @ but not @daytona,
       {
         // find: /^@(?!daytona)/,
@@ -99,7 +85,7 @@ export default defineConfig((mode) => ({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
-    // we'd ideally polyfill it but until https://github.com/davidmyersdev/vite-plugin-node-polyfills/issues/118 gets resolved we can just exclude it
+    // Keep tar external; it is not used by the browser runtime.
     rollupOptions: {
       external: ['tar'],
     },

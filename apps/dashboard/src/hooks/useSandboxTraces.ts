@@ -5,7 +5,6 @@
 
 import { useQuery, UseQueryOptions } from '@tanstack/react-query'
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { PaginatedTraces } from '@daytona/api-client'
 
@@ -22,20 +21,18 @@ export function useSandboxTraces(
   options?: Omit<UseQueryOptions<PaginatedTraces>, 'queryKey' | 'queryFn'>,
 ) {
   const api = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<PaginatedTraces>({
     queryKey: queryKeys.telemetry.traces(sandboxId ?? '', params),
     queryFn: async () => {
-      if (!selectedOrganization || !sandboxId || !api.analyticsTelemetryApi) {
+      if (!sandboxId || !api.analyticsTelemetryApi) {
         throw new Error('Missing required parameters')
       }
       const limit = params.limit ?? 50
       const page = params.page ?? 1
       const offset = (page - 1) * limit
 
-      const response = await api.analyticsTelemetryApi.organizationOrganizationIdSandboxSandboxIdTelemetryTracesGet(
-        selectedOrganization.id,
+      const response = await api.analyticsTelemetryApi.sandboxSandboxIdTelemetryTracesGet(
         sandboxId,
         params.from.toISOString(),
         params.to.toISOString(),
@@ -60,7 +57,7 @@ export function useSandboxTraces(
         totalPages: items.length < limit ? page : page + 1,
       }
     },
-    enabled: !!sandboxId && !!selectedOrganization && !!api.analyticsTelemetryApi && !!params.from && !!params.to,
+    enabled: !!sandboxId && !!api.analyticsTelemetryApi && !!params.from && !!params.to,
     staleTime: 10_000,
     ...options,
   })

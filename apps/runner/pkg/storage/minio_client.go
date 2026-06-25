@@ -65,8 +65,8 @@ func GetObjectStorageClient() (ObjectStorageClient, error) {
 	return instance, nil
 }
 
-func (m *minioClient) GetObject(ctx context.Context, organizationId, hash string) ([]byte, error) {
-	objectPath := fmt.Sprintf("%s/%s/%s", organizationId, hash, CONTEXT_TAR_FILE_NAME)
+func (m *minioClient) GetObject(ctx context.Context, storagePrefix, hash string) ([]byte, error) {
+	objectPath := fmt.Sprintf("%s/%s/%s", storagePrefix, hash, CONTEXT_TAR_FILE_NAME)
 	obj, err := m.client.GetObject(ctx, m.bucketName, objectPath, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object from storage: %w", err)

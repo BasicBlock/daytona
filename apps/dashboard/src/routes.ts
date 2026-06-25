@@ -32,25 +32,10 @@ function createRouteLazy<TComponent extends ComponentType<any>>(
 }
 
 export const lazyRoutes = {
-  AccountSettings: createRouteLazy(() => import('@/pages/AccountSettings')),
-  AuditLogs: createRouteLazy(() => import('@/pages/AuditLogs')),
-  EmailVerify: createRouteLazy(() => import('@/pages/EmailVerify')),
-  Keys: createRouteLazy(() => import('@/pages/Keys')),
-  Limits: createRouteLazy(() => import('@/pages/Limits')),
-  Onboarding: createRouteLazy(() => import('@/pages/Onboarding')),
-  OrganizationMembers: createRouteLazy(() => import('@/pages/OrganizationMembers')),
-  OrganizationSettings: createRouteLazy(() => import('@/pages/OrganizationSettings')),
-  Playground: createRouteLazy(() => import('@/pages/Playground')),
-  Regions: createRouteLazy(() => import('@/pages/Regions')),
   Registries: createRouteLazy(() => import('@/pages/Registries')),
   Runners: createRouteLazy(() => import('@/pages/Runners')),
   SandboxDetails: createRouteLazy(() => import('@/components/sandboxes/SandboxDetails')),
   Sandboxes: createRouteLazy(() => import('@/pages/Sandboxes')),
   Snapshots: createRouteLazy(() => import('@/pages/Snapshots')),
-  Spending: createRouteLazy(() => import('@/pages/Spending')),
-  UserOrganizationInvitations: createRouteLazy(() => import('@/pages/UserOrganizationInvitations')),
   Volumes: createRouteLazy(() => import('@/pages/Volumes')),
-  Wallet: createRouteLazy(() => import('@/pages/Wallet')),
-  WebhookEndpointDetails: createRouteLazy(() => import('@/pages/WebhookEndpointDetails')),
-  Webhooks: createRouteLazy(() => import('@/pages/Webhooks')),
 }

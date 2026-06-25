@@ -10,9 +10,9 @@ import { RunnerState } from '../enums/runner-state.enum'
 import { RunnerServiceInfo } from '../common/runner-service-info'
 
 @Entity()
-@Unique(['region', 'name'])
+@Unique(['target', 'name'])
 // TODO: extend with `sandboxClass` once multi-class runner pools become common.
-@Index(['state', 'unschedulable', 'region'])
+@Index(['state', 'unschedulable', 'target'])
 @Index('runner_tags_gin_idx', { synchronize: false })
 export class Runner {
   @PrimaryGeneratedColumn('uuid')
@@ -32,9 +32,6 @@ export class Runner {
     nullable: true,
   })
   proxyUrl: string | null
-
-  @Column()
-  apiKey: string
 
   @Column({
     type: 'float',
@@ -129,7 +126,7 @@ export class Runner {
   availabilityScore: number
 
   @Column()
-  region: string
+  target: string
 
   @Column()
   name: string
@@ -193,9 +190,8 @@ export class Runner {
   updatedAt: Date
 
   constructor(params?: {
-    region: string
+    target: string
     name: string
-    apiKey: string
     apiVersion: string
     cpu?: number
     memoryGiB?: number
@@ -208,9 +204,8 @@ export class Runner {
     sandboxClass?: SandboxClass
   }) {
     if (!params) return
-    this.region = params.region
+    this.target = params.target
     this.name = params.name
-    this.apiKey = params.apiKey
     this.cpu = params.cpu ?? 0
     this.memoryGiB = params.memoryGiB ?? 0
     this.diskGiB = params.diskGiB ?? 0
@@ -223,14 +218,5 @@ export class Runner {
     this.gpu = null
     this.gpuType = null
     this.tags = params.tags ?? []
-
-    if (this.apiVersion === '0') {
-      if (!this.apiUrl) {
-        throw new Error('API URL is required for runner version 0')
-      }
-      if (!this.proxyUrl) {
-        this.proxyUrl = this.apiUrl
-      }
-    }
   }
 }

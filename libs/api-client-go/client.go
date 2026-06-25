@@ -50,12 +50,6 @@ type APIClient struct {
 
 	// API Services
 
-	AdminAPI AdminAPI
-
-	ApiKeysAPI ApiKeysAPI
-
-	AuditAPI AuditAPI
-
 	ConfigAPI ConfigAPI
 
 	DockerRegistryAPI DockerRegistryAPI
@@ -66,11 +60,7 @@ type APIClient struct {
 
 	ObjectStorageAPI ObjectStorageAPI
 
-	OrganizationsAPI OrganizationsAPI
-
 	PreviewAPI PreviewAPI
-
-	RegionsAPI RegionsAPI
 
 	RunnersAPI RunnersAPI
 
@@ -78,13 +68,7 @@ type APIClient struct {
 
 	SnapshotsAPI SnapshotsAPI
 
-	ToolboxAPI ToolboxAPI
-
-	UsersAPI UsersAPI
-
 	VolumesAPI VolumesAPI
-
-	WebhooksAPI WebhooksAPI
 }
 
 type service struct {
@@ -103,24 +87,16 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.common.client = c
 
 	// API Services
-	c.AdminAPI = (*AdminAPIService)(&c.common)
-	c.ApiKeysAPI = (*ApiKeysAPIService)(&c.common)
-	c.AuditAPI = (*AuditAPIService)(&c.common)
 	c.ConfigAPI = (*ConfigAPIService)(&c.common)
 	c.DockerRegistryAPI = (*DockerRegistryAPIService)(&c.common)
 	c.HealthAPI = (*HealthAPIService)(&c.common)
 	c.JobsAPI = (*JobsAPIService)(&c.common)
 	c.ObjectStorageAPI = (*ObjectStorageAPIService)(&c.common)
-	c.OrganizationsAPI = (*OrganizationsAPIService)(&c.common)
 	c.PreviewAPI = (*PreviewAPIService)(&c.common)
-	c.RegionsAPI = (*RegionsAPIService)(&c.common)
 	c.RunnersAPI = (*RunnersAPIService)(&c.common)
 	c.SandboxAPI = (*SandboxAPIService)(&c.common)
 	c.SnapshotsAPI = (*SnapshotsAPIService)(&c.common)
-	c.ToolboxAPI = (*ToolboxAPIService)(&c.common)
-	c.UsersAPI = (*UsersAPIService)(&c.common)
 	c.VolumesAPI = (*VolumesAPIService)(&c.common)
-	c.WebhooksAPI = (*WebhooksAPIService)(&c.common)
 
 	return c
 }
@@ -469,11 +445,6 @@ func (c *APIClient) prepareRequest(
 		localVarRequest = localVarRequest.WithContext(ctx)
 
 		// Walk through any authentication.
-
-		// AccessToken Authentication
-		if auth, ok := ctx.Value(ContextAccessToken).(string); ok {
-			localVarRequest.Header.Add("Authorization", "Bearer "+auth)
-		}
 
 	}
 

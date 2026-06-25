@@ -18,21 +18,25 @@ export class Migration1778000000002 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "sandbox" DROP COLUMN IF EXISTS "class"`)
     await queryRunner.query(`DROP TYPE IF EXISTS "public"."sandbox_class_enum"`)
 
-    await queryRunner.query(
-      `ALTER TABLE "region_quota" DROP CONSTRAINT IF EXISTS "region_quota_organizationId_regionId_pk"`,
-    )
-    await queryRunner.query(
-      `ALTER TABLE "region_quota" ADD CONSTRAINT "region_quota_organizationId_regionId_sandboxClass_pk" PRIMARY KEY ("organizationId", "regionId", "sandboxClass")`,
-    )
+    if (await this.tableExists(queryRunner, 'region_quota')) {
+      await queryRunner.query(
+        `ALTER TABLE "region_quota" DROP CONSTRAINT IF EXISTS "region_quota_organizationId_regionId_pk"`,
+      )
+      await queryRunner.query(
+        `ALTER TABLE "region_quota" ADD CONSTRAINT "region_quota_organizationId_regionId_sandboxClass_pk" PRIMARY KEY ("organizationId", "regionId", "sandboxClass")`,
+      )
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "region_quota" DROP CONSTRAINT "region_quota_organizationId_regionId_sandboxClass_pk"`,
-    )
-    await queryRunner.query(
-      `ALTER TABLE "region_quota" ADD CONSTRAINT "region_quota_organizationId_regionId_pk" PRIMARY KEY ("organizationId", "regionId")`,
-    )
+    if (await this.tableExists(queryRunner, 'region_quota')) {
+      await queryRunner.query(
+        `ALTER TABLE "region_quota" DROP CONSTRAINT IF EXISTS "region_quota_organizationId_regionId_sandboxClass_pk"`,
+      )
+      await queryRunner.query(
+        `ALTER TABLE "region_quota" ADD CONSTRAINT "region_quota_organizationId_regionId_pk" PRIMARY KEY ("organizationId", "regionId")`,
+      )
+    }
 
     await queryRunner.query(`CREATE TYPE "public"."sandbox_class_enum" AS ENUM('small', 'medium', 'large')`)
     await queryRunner.query(`ALTER TABLE "sandbox" ADD "class" "public"."sandbox_class_enum" NOT NULL DEFAULT 'small'`)
@@ -44,5 +48,13 @@ export class Migration1778000000002 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "warm_pool" ADD "class" "public"."warm_pool_class_enum" NOT NULL DEFAULT 'small'`,
     )
+  }
+
+  private async tableExists(queryRunner: QueryRunner, tableName: string): Promise<boolean> {
+    const [{ exists }] = await queryRunner.query(`SELECT to_regclass($1) IS NOT NULL AS exists`, [
+      `public.${tableName}`,
+    ])
+
+    return exists
   }
 }

@@ -32,7 +32,6 @@ import {
 } from '@/constants/RegistryProviders'
 import { useCreateRegistryMutation } from '@/hooks/mutations/useCreateRegistryMutation'
 import { useUpdateRegistryMutation } from '@/hooks/mutations/useUpdateRegistryMutation'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { handleApiError } from '@/lib/error-handling'
 import { DockerRegistry } from '@daytona/api-client'
 import { useForm } from '@tanstack/react-form'
@@ -64,7 +63,7 @@ const ecrCreateFormSchema = baseFormSchema.extend({
   password: z.string(),
 })
 
-// Google Artifact Registry: URL is region-specific, must be provided.
+// Google Artifact Registry: URL is target-specific, must be provided.
 const gcpCreateFormSchema = baseFormSchema.extend({
   url: z.string().trim().min(1, 'Registry URL is required'),
   password: z.string().trim().min(1, 'Service Account JSON Key is required'),
@@ -133,7 +132,6 @@ export const UpsertRegistrySheet = ({
   // generic spec. Create mode reads the active provider's spec.
   const activeSpec = isEditMode ? REGISTRY_PROVIDER_SPECS.generic : REGISTRY_PROVIDER_SPECS[provider]
 
-  const { selectedOrganization } = useSelectedOrganization()
   const { reset: resetCreateRegistryMutation, ...createRegistryMutation } = useCreateRegistryMutation()
   const { reset: resetUpdateRegistryMutation, ...updateRegistryMutation } = useUpdateRegistryMutation()
   const formRef = useRef<HTMLFormElement>(null)
@@ -162,7 +160,7 @@ export const UpsertRegistrySheet = ({
       url: registry.url,
       username: registry.username,
       password: '',
-      project: registry.project,
+      project: registry.project ?? '',
     }
   }, [isEditMode, registry])
 
@@ -181,11 +179,6 @@ export const UpsertRegistrySheet = ({
       }
     },
     onSubmit: async ({ value }) => {
-      if (!selectedOrganization?.id) {
-        toast.error(`Select an organization to ${isEditMode ? 'edit' : 'create'} a registry.`)
-        return
-      }
-
       // docker.io fallback applies only to Generic / Edit (today's behavior);
       // other providers require URL via Zod validation above.
       const resolvedUrl = resolveField(activeSpec.url, value.url)
@@ -209,13 +202,11 @@ export const UpsertRegistrySheet = ({
           await updateRegistryMutation.mutateAsync({
             registryId: registry.id,
             registry: payload,
-            organizationId: selectedOrganization.id,
           })
           toast.success('Registry edited successfully')
         } else {
           await createRegistryMutation.mutateAsync({
             registry: payload,
-            organizationId: selectedOrganization.id,
           })
           toast.success('Registry created successfully')
         }
@@ -479,7 +470,6 @@ export const UpsertRegistrySheet = ({
                 disabled={
                   !canSubmit ||
                   isSubmitting ||
-                  !selectedOrganization?.id ||
                   (isEditMode ? updateRegistryMutation.isPending : createRegistryMutation.isPending)
                 }
               >

@@ -3,15 +3,11 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { NotificationSocketContext } from '@/contexts/NotificationSocketContext'
-import { useContext } from 'react'
+type NotificationSocket = {
+  on: (event: string, handler: (...args: any[]) => void) => void
+  off: (event: string, handler: (...args: any[]) => void) => void
+}
 
-export function useNotificationSocket() {
-  const context = useContext(NotificationSocketContext)
-
-  if (!context) {
-    throw new Error('useNotificationSocket must be used within a NotificationSocketProvider')
-  }
-
-  return context
+export function useNotificationSocket(): { notificationSocket: NotificationSocket | null } {
+  return { notificationSocket: null }
 }

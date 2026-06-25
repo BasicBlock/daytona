@@ -3,16 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { Controller, Get, Logger, ServiceUnavailableException, UseGuards } from '@nestjs/common'
+import { Controller, Get, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { HealthCheckService, HealthCheck, TypeOrmHealthIndicator } from '@nestjs/terminus'
 import { RedisHealthIndicator } from './redis.health'
-import { AnonymousRateLimitGuard } from '../common/guards/anonymous-rate-limit.guard'
-import { AuthenticatedRateLimitGuard } from '../common/guards/authenticated-rate-limit.guard'
-import { HealthCheckAuthContextGuard } from './guards/health-check-auth-context.guard'
-import { ApiBearerAuth } from '@nestjs/swagger'
-import { Public } from '../auth/decorators/public.decorator'
-import { AuthStrategy } from '../auth/decorators/auth-strategy.decorator'
-import { AuthStrategyType } from '../auth/enums/auth-strategy-type.enum'
 
 @Controller('health')
 export class HealthController {
@@ -25,17 +18,11 @@ export class HealthController {
   ) {}
 
   @Get()
-  @Public()
-  @UseGuards(AnonymousRateLimitGuard)
   live() {
     return { status: 'ok' }
   }
 
   @Get('ready')
-  @ApiBearerAuth()
-  @AuthStrategy(AuthStrategyType.API_KEY)
-  @UseGuards(AuthenticatedRateLimitGuard)
-  @UseGuards(HealthCheckAuthContextGuard)
   @HealthCheck()
   async check() {
     try {

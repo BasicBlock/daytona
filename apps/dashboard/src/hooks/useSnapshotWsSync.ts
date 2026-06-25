@@ -5,23 +5,21 @@
 
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { useNotificationSocket } from '@/hooks/useNotificationSocket'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { PaginatedSnapshots, SnapshotDto, SnapshotState } from '@daytona/api-client'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 export function useSnapshotWsSync() {
   const { notificationSocket } = useNotificationSocket()
-  const { selectedOrganization } = useSelectedOrganization()
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    if (!notificationSocket || !selectedOrganization?.id) return
+    if (!notificationSocket) return
 
-    const queryKey = queryKeys.snapshots.list(selectedOrganization.id)
+    const queryKey = queryKeys.snapshots.list()
 
     const updateSnapshotInCacheIfPresent = (snapshot: SnapshotDto) => {
-      queryClient.setQueryData<SnapshotDto>(queryKeys.snapshots.detail(selectedOrganization.id, snapshot.id), snapshot)
+      queryClient.setQueryData<SnapshotDto>(queryKeys.snapshots.detail(snapshot.id), snapshot)
 
       queryClient.setQueriesData<PaginatedSnapshots>({ queryKey }, (previousSnapshots) => {
         if (!previousSnapshots) return previousSnapshots
@@ -70,5 +68,5 @@ export function useSnapshotWsSync() {
       notificationSocket.off('snapshot.state.updated', handleSnapshotStateUpdatedEvent)
       notificationSocket.off('snapshot.removed', handleSnapshotRemovedEvent)
     }
-  }, [notificationSocket, queryClient, selectedOrganization?.id])
+  }, [notificationSocket, queryClient])
 }

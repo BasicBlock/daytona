@@ -24,6 +24,7 @@ type HealthcheckServiceConfig struct {
 	Collector  *metrics.Collector
 	Logger     *slog.Logger
 	Domain     string
+	RunnerID   string
 	ApiPort    int
 	ProxyPort  int
 	TlsEnabled bool
@@ -38,6 +39,7 @@ type Service struct {
 	collector  *metrics.Collector
 	client     *apiclient.APIClient
 	domain     string
+	runnerID   string
 	apiPort    int
 	proxyPort  int
 	tlsEnabled bool
@@ -67,6 +69,7 @@ func NewService(cfg *HealthcheckServiceConfig) (*Service, error) {
 		timeout:    cfg.Timeout,
 		collector:  cfg.Collector,
 		domain:     cfg.Domain,
+		runnerID:   cfg.RunnerID,
 		apiPort:    cfg.ApiPort,
 		proxyPort:  cfg.ProxyPort,
 		tlsEnabled: cfg.TlsEnabled,
@@ -100,9 +103,8 @@ func (s *Service) Start(ctx context.Context) {
 
 // sendHealthcheck sends a healthcheck to the API
 func (s *Service) sendHealthcheck(ctx context.Context) error {
-	// Create context with timeout
-	reqCtx, cancel := context.WithTimeout(ctx, s.timeout)
-	defer cancel()
+	probeCtx, cancelProbe := context.WithTimeout(ctx, s.timeout)
+	defer cancelProbe()
 
 	// Build healthcheck request
 	healthcheck := apiclient.NewRunnerHealthcheck(internal.Version)
@@ -124,9 +126,9 @@ func (s *Service) sendHealthcheck(ctx context.Context) error {
 		Healthy:     true,
 	}
 
-	err := s.docker.Ping(reqCtx)
+	err := s.docker.Ping(probeCtx)
 	if err != nil {
-		s.log.WarnContext(reqCtx, "Failed to ping Docker daemon", "error", err)
+		s.log.WarnContext(probeCtx, "Failed to ping Docker daemon", "error", err)
 
 		errStr := err.Error()
 		dockerHealth.Healthy = false
@@ -136,9 +138,9 @@ func (s *Service) sendHealthcheck(ctx context.Context) error {
 	healthcheck.SetServiceHealth([]apiclient.RunnerServiceHealth{dockerHealth})
 
 	// Collect metrics
-	m, err := s.collector.Collect(reqCtx)
+	m, err := s.collector.Collect(probeCtx)
 	if err != nil {
-		s.log.WarnContext(reqCtx, "Failed to collect metrics for healthcheck", "error", err)
+		s.log.WarnContext(probeCtx, "Failed to collect metrics for healthcheck", "error", err)
 	} else {
 		metrics := apiclient.RunnerHealthMetrics{
 			CurrentCpuLoadAverage:        m.CPULoadAverage,
@@ -161,12 +163,15 @@ func (s *Service) sendHealthcheck(ctx context.Context) error {
 		healthcheck.SetMetrics(metrics)
 	}
 
-	req := s.client.RunnersAPI.RunnerHealthcheck(reqCtx).RunnerHealthcheck(*healthcheck)
+	sendCtx, cancelSend := context.WithTimeout(ctx, s.timeout)
+	defer cancelSend()
+
+	req := s.client.RunnersAPI.RunnerHealthcheck(sendCtx).RunnerId(s.runnerID).RunnerHealthcheck(*healthcheck)
 	_, err = req.Execute()
 	if err != nil {
 		return err
 	}
 
-	s.log.DebugContext(reqCtx, "Healthcheck sent successfully")
+	s.log.DebugContext(sendCtx, "Healthcheck sent successfully")
 	return nil
 }

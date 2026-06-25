@@ -10,7 +10,6 @@ import { useApi } from '../useApi'
 
 export interface ActivateSnapshotMutationVariables {
   snapshotId: string
-  organizationId?: string
 }
 
 interface UseActivateSnapshotMutationOptions {
@@ -24,17 +23,14 @@ export const useActivateSnapshotMutation = ({
   const queryClient = useQueryClient()
 
   return useMutation<SnapshotDto, unknown, ActivateSnapshotMutationVariables>({
-    mutationFn: async ({ snapshotId, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-      const response = await snapshotApi.activateSnapshot(snapshotId, organizationId)
+    mutationFn: async ({ snapshotId }) => {
+      const response = await snapshotApi.activateSnapshot(snapshotId)
       return response.data
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (invalidateOnSuccess && organizationId) {
+    onSuccess: async () => {
+      if (invalidateOnSuccess) {
         await queryClient.invalidateQueries({
-          queryKey: queryKeys.snapshots.list(organizationId),
+          queryKey: queryKeys.snapshots.list(),
         })
       }
     },

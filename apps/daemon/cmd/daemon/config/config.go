@@ -22,8 +22,6 @@ type Config struct {
 	TerminationCheckInterval time.Duration `envconfig:"DAYTONA_TERMINATION_CHECK_INTERVAL" default:"100ms" validate:"min_duration=1ms"`
 	TerminationGracePeriod   time.Duration `envconfig:"DAYTONA_TERMINATION_GRACE_PERIOD" default:"5s" validate:"min_duration=1s"`
 	RecordingsDir            string        `envconfig:"DAYTONA_RECORDINGS_DIR"`
-	OrganizationId           *string       `envconfig:"DAYTONA_ORGANIZATION_ID"`
-	RegionId                 *string       `envconfig:"DAYTONA_REGION_ID"`
 	Snapshot                 *string       `envconfig:"DAYTONA_SANDBOX_SNAPSHOT"`
 }
 

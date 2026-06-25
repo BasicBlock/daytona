@@ -17,6 +17,7 @@ import (
 	"github.com/daytonaio/runner/pkg/api/dto"
 	"github.com/daytonaio/runner/pkg/common"
 	"github.com/daytonaio/runner/pkg/models/enums"
+	"github.com/distribution/distribution/v3/manifest/manifestlist"
 	"github.com/docker/docker/api/types/image"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -95,7 +96,7 @@ func (d *DockerClient) Create(ctx context.Context, sandboxDto dto.CreateSandboxD
 			return sandboxDto.Id, "", nil
 		}
 
-		daemonVersion, err := d.waitForDaemonRunning(ctx, containerIP, sandboxDto.AuthToken)
+		daemonVersion, err := d.waitForDaemonRunning(ctx, c, sandboxDto.AuthToken)
 		if err != nil {
 			return "", "", err
 		}
@@ -275,6 +276,10 @@ func (p *DockerClient) validateImageArchitecture(image *image.InspectResponse) e
 	}
 
 	arch := strings.ToLower(image.Architecture)
+	if arch == "" && isMultiPlatformImageDescriptor(image.Descriptor.MediaType) {
+		return nil
+	}
+
 	validArchs := []string{"amd64", "x86_64"}
 
 	for _, validArch := range validArchs {
@@ -284,4 +289,8 @@ func (p *DockerClient) validateImageArchitecture(image *image.InspectResponse) e
 	}
 
 	return common_errors.NewConflictError(fmt.Errorf("image %s architecture (%s) is not x64 compatible", image.ID, image.Architecture))
+}
+
+func isMultiPlatformImageDescriptor(mediaType string) bool {
+	return mediaType == v1.MediaTypeImageIndex || mediaType == manifestlist.MediaTypeManifestList
 }

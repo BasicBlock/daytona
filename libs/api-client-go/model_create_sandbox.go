@@ -24,21 +24,19 @@ type CreateSandbox struct {
 	Name *string `json:"name,omitempty"`
 	// The ID or name of the snapshot used for the sandbox
 	Snapshot *string `json:"snapshot,omitempty"`
-	// The user associated with the project
-	User *string `json:"user,omitempty"`
+	// The OS user used inside the sandbox
+	OsUser *string `json:"osUser,omitempty"`
 	// Environment variables for the sandbox
 	Env *map[string]string `json:"env,omitempty"`
 	// Labels for the sandbox
 	Labels *map[string]string `json:"labels,omitempty"`
-	// Whether the sandbox http preview is publicly accessible
-	Public *bool `json:"public,omitempty"`
 	// Whether to block all network access for the sandbox
 	NetworkBlockAll *bool `json:"networkBlockAll,omitempty"`
 	// Comma-separated list of allowed CIDR network addresses for the sandbox
 	NetworkAllowList *string `json:"networkAllowList,omitempty"`
 	// Comma-separated list of allowed domains for the sandbox
 	DomainAllowList *string `json:"domainAllowList,omitempty"`
-	// The target (region) where the sandbox will be created
+	// The target where the sandbox will be created
 	Target *string `json:"target,omitempty"`
 	// CPU cores allocated to the sandbox
 	Cpu *int32 `json:"cpu,omitempty"`
@@ -148,36 +146,36 @@ func (o *CreateSandbox) SetSnapshot(v string) {
 	o.Snapshot = &v
 }
 
-// GetUser returns the User field value if set, zero value otherwise.
-func (o *CreateSandbox) GetUser() string {
-	if o == nil || IsNil(o.User) {
+// GetOsUser returns the OsUser field value if set, zero value otherwise.
+func (o *CreateSandbox) GetOsUser() string {
+	if o == nil || IsNil(o.OsUser) {
 		var ret string
 		return ret
 	}
-	return *o.User
+	return *o.OsUser
 }
 
-// GetUserOk returns a tuple with the User field value if set, nil otherwise
+// GetOsUserOk returns a tuple with the OsUser field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CreateSandbox) GetUserOk() (*string, bool) {
-	if o == nil || IsNil(o.User) {
+func (o *CreateSandbox) GetOsUserOk() (*string, bool) {
+	if o == nil || IsNil(o.OsUser) {
 		return nil, false
 	}
-	return o.User, true
+	return o.OsUser, true
 }
 
-// HasUser returns a boolean if a field has been set.
-func (o *CreateSandbox) HasUser() bool {
-	if o != nil && !IsNil(o.User) {
+// HasOsUser returns a boolean if a field has been set.
+func (o *CreateSandbox) HasOsUser() bool {
+	if o != nil && !IsNil(o.OsUser) {
 		return true
 	}
 
 	return false
 }
 
-// SetUser gets a reference to the given string and assigns it to the User field.
-func (o *CreateSandbox) SetUser(v string) {
-	o.User = &v
+// SetOsUser gets a reference to the given string and assigns it to the OsUser field.
+func (o *CreateSandbox) SetOsUser(v string) {
+	o.OsUser = &v
 }
 
 // GetEnv returns the Env field value if set, zero value otherwise.
@@ -242,38 +240,6 @@ func (o *CreateSandbox) HasLabels() bool {
 // SetLabels gets a reference to the given map[string]string and assigns it to the Labels field.
 func (o *CreateSandbox) SetLabels(v map[string]string) {
 	o.Labels = &v
-}
-
-// GetPublic returns the Public field value if set, zero value otherwise.
-func (o *CreateSandbox) GetPublic() bool {
-	if o == nil || IsNil(o.Public) {
-		var ret bool
-		return ret
-	}
-	return *o.Public
-}
-
-// GetPublicOk returns a tuple with the Public field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CreateSandbox) GetPublicOk() (*bool, bool) {
-	if o == nil || IsNil(o.Public) {
-		return nil, false
-	}
-	return o.Public, true
-}
-
-// HasPublic returns a boolean if a field has been set.
-func (o *CreateSandbox) HasPublic() bool {
-	if o != nil && !IsNil(o.Public) {
-		return true
-	}
-
-	return false
-}
-
-// SetPublic gets a reference to the given bool and assigns it to the Public field.
-func (o *CreateSandbox) SetPublic(v bool) {
-	o.Public = &v
 }
 
 // GetNetworkBlockAll returns the NetworkBlockAll field value if set, zero value otherwise.
@@ -772,17 +738,14 @@ func (o CreateSandbox) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Snapshot) {
 		toSerialize["snapshot"] = o.Snapshot
 	}
-	if !IsNil(o.User) {
-		toSerialize["user"] = o.User
+	if !IsNil(o.OsUser) {
+		toSerialize["osUser"] = o.OsUser
 	}
 	if !IsNil(o.Env) {
 		toSerialize["env"] = o.Env
 	}
 	if !IsNil(o.Labels) {
 		toSerialize["labels"] = o.Labels
-	}
-	if !IsNil(o.Public) {
-		toSerialize["public"] = o.Public
 	}
 	if !IsNil(o.NetworkBlockAll) {
 		toSerialize["networkBlockAll"] = o.NetworkBlockAll
@@ -853,10 +816,9 @@ func (o *CreateSandbox) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "name")
 		delete(additionalProperties, "snapshot")
-		delete(additionalProperties, "user")
+		delete(additionalProperties, "osUser")
 		delete(additionalProperties, "env")
 		delete(additionalProperties, "labels")
-		delete(additionalProperties, "public")
 		delete(additionalProperties, "networkBlockAll")
 		delete(additionalProperties, "networkAllowList")
 		delete(additionalProperties, "domainAllowList")

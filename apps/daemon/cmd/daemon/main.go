@@ -186,8 +186,6 @@ func run() int {
 		SandboxId:             c.SandboxId,
 		SessionService:        sessionService,
 		RecordingService:      recordingService,
-		OrganizationId:        c.OrganizationId,
-		RegionId:              c.RegionId,
 		Snapshot:              c.Snapshot,
 		EntrypointLogFilePath: entrypointLogFilePath,
 	})

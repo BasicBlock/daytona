@@ -16,7 +16,6 @@ import {
 import { useSidebar } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getSandboxQueryErrorStatus, useSandboxQuery } from '@/hooks/queries/useSandboxQuery'
-import { useConfig } from '@/hooks/useConfig'
 import { useSandboxDetailsWsSync } from '@/hooks/useSandboxWsSync'
 import { lazyWithPreload } from '@/lib/lazy'
 import { SandboxSessionProvider } from '@/providers/SandboxSessionProvider'
@@ -42,7 +41,7 @@ export interface SandboxDetailsSheetProps {
   handlePause: (id: string) => void
   handleDelete: (id: string) => void
   handleArchive: (id: string) => void
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   writePermitted: boolean
   deletePermitted: boolean
   handleRecover: (id: string) => void
@@ -134,7 +133,7 @@ const SandboxDetailsSheet: React.FC<SandboxDetailsSheetProps> = ({
   handlePause,
   handleDelete,
   handleArchive,
-  getRegionName,
+  getTargetName,
   writePermitted,
   deletePermitted,
   handleRecover,
@@ -155,8 +154,6 @@ const SandboxDetailsSheet: React.FC<SandboxDetailsSheetProps> = ({
   const [internalActiveTab, setInternalActiveTab] = useState<SandboxDetailsSheetTabValue>('overview')
   const activeTab = internalActiveTab
   const [viewportWidth, setViewportWidth] = useState(() => getViewportWidth())
-  const config = useConfig()
-  const spendingTabAvailable = !!config.analyticsApiUrl
   const isDesktop = viewportWidth >= MOBILE_BREAKPOINT
 
   const { data: sandbox, error, isError, isLoading, isPending } = useSandboxQuery(sandboxId || '')
@@ -250,10 +247,10 @@ const SandboxDetailsSheet: React.FC<SandboxDetailsSheetProps> = ({
   }, [isDesktop, open, viewportWidth])
 
   useEffect(() => {
-    if (!spendingTabAvailable && activeTab === 'spending') {
+    if (activeTab === 'spending') {
       handleTabChange('logs')
     }
-  }, [activeTab, handleTabChange, spendingTabAvailable])
+  }, [activeTab, handleTabChange])
 
   const actionDisabled = sandbox ? !!sandboxIsLoading[sandbox.id] : false
 
@@ -320,7 +317,7 @@ const SandboxDetailsSheet: React.FC<SandboxDetailsSheetProps> = ({
           {isNotFound ? (
             <SandboxDetailsSheetEmptyState
               title="Sandbox not found"
-              description="This sandbox may not exist, or you may not have access to it in this organization."
+              description="This sandbox may not exist, or you may not have access to it in this workspace."
             />
           ) : sandbox ? (
             <React.Suspense fallback={<SandboxDetailsSheetSkeleton />}>
@@ -329,7 +326,7 @@ const SandboxDetailsSheet: React.FC<SandboxDetailsSheetProps> = ({
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 isDesktop={isDesktop}
-                spendingTabAvailable={spendingTabAvailable}
+                spendingTabAvailable={false}
                 actionDisabled={actionDisabled}
                 writePermitted={writePermitted}
                 deletePermitted={deletePermitted}
@@ -339,7 +336,7 @@ const SandboxDetailsSheet: React.FC<SandboxDetailsSheetProps> = ({
                 handleDelete={handleDelete}
                 handleArchive={handleArchive}
                 handleRecover={handleRecover}
-                getRegionName={getRegionName}
+                getTargetName={getTargetName}
                 onCreateSshAccess={onCreateSshAccess}
                 onRevokeSshAccess={onRevokeSshAccess}
                 onScreenRecordings={onScreenRecordings}

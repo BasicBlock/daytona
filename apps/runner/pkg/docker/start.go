@@ -44,7 +44,7 @@ func (d *DockerClient) Start(ctx context.Context, containerId string, authToken 
 			return c, "", nil
 		}
 
-		daemonVersion, err := d.waitForDaemonRunning(ctx, containerIP, authToken)
+		daemonVersion, err := d.waitForDaemonRunning(ctx, c, authToken)
 		if err != nil {
 			return nil, "", err
 		}
@@ -110,7 +110,7 @@ func (d *DockerClient) Start(ctx context.Context, containerId string, authToken 
 	// If daemon is the sandbox entrypoint (common.DAEMON_PATH), it is started as part of the sandbox;
 	// Otherwise, the daemon is started separately above.
 	// In either case, we wait for it here.
-	daemonVersion, err := d.waitForDaemonRunning(ctx, containerIP, authToken)
+	daemonVersion, err := d.waitForDaemonRunning(ctx, runningContainer, authToken)
 	if err != nil {
 		return nil, "", err
 	}

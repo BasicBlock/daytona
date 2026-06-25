@@ -29,8 +29,7 @@ import {
   SnapshotSorting,
   useSnapshotsQuery,
 } from '@/hooks/queries/useSnapshotsQuery'
-import { useRegionLookup } from '@/hooks/queries/useRegionsQuery'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
+import { useTargetLookup } from '@/hooks/queries/useTargetsQuery'
 import { useSnapshotWsSync } from '@/hooks/useSnapshotWsSync'
 import { createBulkActionToast } from '@/lib/bulk-action-toast'
 import { handleApiError } from '@/lib/error-handling'
@@ -38,7 +37,6 @@ import { pluralize } from '@/lib/utils'
 import {
   GetAllSnapshotsOrderEnum,
   GetAllSnapshotsSortEnum,
-  OrganizationRolePermissionsEnum,
   PaginatedSnapshots,
   SnapshotDto,
   SnapshotState,
@@ -103,8 +101,7 @@ const Snapshots: React.FC = () => {
   const [snapshotIdParam, setSnapshotIdParam] = useQueryState('snapshotId', parseAsString)
   const snapshotSheetRef = useRef<SnapshotSheetRef>(null)
 
-  const { selectedOrganization, authenticatedUserHasPermission } = useSelectedOrganization()
-  const { getRegionName } = useRegionLookup(selectedOrganization?.id)
+  const { getTargetName } = useTargetLookup()
   const deleteSnapshotMutation = useDeleteSnapshotMutation({ invalidateOnSuccess: false })
   const activateSnapshotMutation = useActivateSnapshotMutation({ invalidateOnSuccess: false })
   const deactivateSnapshotMutation = useDeactivateSnapshotMutation({ invalidateOnSuccess: false })
@@ -128,15 +125,9 @@ const Snapshots: React.FC = () => {
     [page, pageSize, sorting, searchQuery],
   )
 
-  const snapshotListQueryKey = useMemo(
-    () => queryKeys.snapshots.list(selectedOrganization?.id ?? ''),
-    [selectedOrganization?.id],
-  )
+  const snapshotListQueryKey = useMemo(() => queryKeys.snapshots.list(), [])
 
-  const queryKey = useMemo(
-    () => queryKeys.snapshots.list(selectedOrganization?.id ?? '', queryParams),
-    [selectedOrganization?.id, queryParams],
-  )
+  const queryKey = useMemo(() => queryKeys.snapshots.list(queryParams), [queryParams])
 
   const {
     data: snapshotsData,
@@ -151,11 +142,9 @@ const Snapshots: React.FC = () => {
 
   const seedSnapshotDetail = useCallback(
     (snapshot: SnapshotDto) => {
-      if (!selectedOrganization?.id) return
-
-      queryClient.setQueryData(queryKeys.snapshots.detail(selectedOrganization.id, snapshot.id), snapshot)
+      queryClient.setQueryData(queryKeys.snapshots.detail(snapshot.id), snapshot)
     },
-    [queryClient, selectedOrganization?.id],
+    [queryClient],
   )
 
   const filteredItems = useMemo(() => {
@@ -192,13 +181,10 @@ const Snapshots: React.FC = () => {
 
   const updateSnapshotInCache = useCallback(
     (snapshotId: string, updates: Partial<SnapshotDto>) => {
-      queryClient.setQueryData<SnapshotDto>(
-        queryKeys.snapshots.detail(selectedOrganization?.id ?? '', snapshotId),
-        (oldData) => {
-          if (!oldData) return oldData
-          return { ...oldData, ...updates }
-        },
-      )
+      queryClient.setQueryData<SnapshotDto>(queryKeys.snapshots.detail(snapshotId), (oldData) => {
+        if (!oldData) return oldData
+        return { ...oldData, ...updates }
+      })
 
       queryClient.setQueryData(queryKey, (oldData: PaginatedSnapshots | undefined) => {
         if (!oldData) return oldData
@@ -208,7 +194,7 @@ const Snapshots: React.FC = () => {
         }
       })
     },
-    [queryClient, queryKey, selectedOrganization?.id],
+    [queryClient, queryKey],
   )
 
   const markAllSnapshotQueriesAsStale = useCallback(
@@ -282,7 +268,6 @@ const Snapshots: React.FC = () => {
     try {
       await deleteSnapshotMutation.mutateAsync({
         snapshotId: snapshot.id,
-        organizationId: selectedOrganization?.id,
       })
       await markAllSnapshotQueriesAsStale(true)
       setSnapshotToDelete(null)
@@ -307,7 +292,6 @@ const Snapshots: React.FC = () => {
     try {
       await activateSnapshotMutation.mutateAsync({
         snapshotId: snapshot.id,
-        organizationId: selectedOrganization?.id,
       })
       await markAllSnapshotQueriesAsStale(true)
       toast.success(`Activating snapshot ${snapshot.name}`)
@@ -326,7 +310,6 @@ const Snapshots: React.FC = () => {
     try {
       await deactivateSnapshotMutation.mutateAsync({
         snapshotId: snapshot.id,
-        organizationId: selectedOrganization?.id,
       })
       await markAllSnapshotQueriesAsStale(true)
       toast.success(`Deactivating snapshot ${snapshot.name}`)
@@ -338,15 +321,8 @@ const Snapshots: React.FC = () => {
     }
   }
 
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_SNAPSHOTS),
-    [authenticatedUserHasPermission],
-  )
-
-  const deletePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_SNAPSHOTS),
-    [authenticatedUserHasPermission],
-  )
+  const writePermitted = true
+  const deletePermitted = true
 
   const executeBulkAction = useCallback(
     async ({
@@ -427,7 +403,6 @@ const Snapshots: React.FC = () => {
       apiCall: (id) =>
         deleteSnapshotMutation.mutateAsync({
           snapshotId: id,
-          organizationId: selectedOrganization?.id,
         }),
       toastMessages: {
         successTitle: `${pluralize(snapshots.length, 'Snapshot', 'Snapshots')} deleted.`,
@@ -445,7 +420,6 @@ const Snapshots: React.FC = () => {
       apiCall: (id) =>
         deactivateSnapshotMutation.mutateAsync({
           snapshotId: id,
-          organizationId: selectedOrganization?.id,
         }),
       toastMessages: {
         successTitle: `${pluralize(snapshots.length, 'Snapshot', 'Snapshots')} deactivated.`,
@@ -463,7 +437,6 @@ const Snapshots: React.FC = () => {
       apiCall: (id) =>
         activateSnapshotMutation.mutateAsync({
           snapshotId: id,
-          organizationId: selectedOrganization?.id,
         }),
       toastMessages: {
         successTitle: `${pluralize(snapshots.length, 'Snapshot', 'Snapshots')} activated.`,
@@ -534,7 +507,7 @@ const Snapshots: React.FC = () => {
           data={filteredItems}
           loading={snapshotsDataIsLoading}
           loadingSnapshots={loadingSnapshots}
-          getRegionName={getRegionName}
+          getTargetName={getTargetName}
           onDelete={(snapshot) => {
             setSnapshotToDelete(snapshot)
             setShowDeleteDialog(true)
@@ -566,7 +539,7 @@ const Snapshots: React.FC = () => {
           ref={snapshotSheetRef}
           snapshotId={snapshotIdParam}
           onOpenChange={handleSnapshotSheetOpenChange}
-          getRegionName={getRegionName}
+          getTargetName={getTargetName}
           onNavigate={handleSnapshotSheetNavigate}
           hasPrev={selectedSnapshotIndex > 0}
           hasNext={selectedSnapshotIndex >= 0 && selectedSnapshotIndex < snapshotItems.length - 1}

@@ -35,7 +35,7 @@ type SandboxTableMeta = {
   handleCreateSshAccess: (id: string) => void
   handleRevokeSshAccess: (id: string) => void
   handleRecover: (id: string) => void
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   handleScreenRecordings: (id: string) => void
   handleCreateSnapshot: (id: string) => void
   handleFork: (id: string) => void
@@ -248,16 +248,16 @@ const columns: ColumnDef<SandboxListItem>[] = [
     accessorKey: 'snapshot',
   },
   {
-    id: 'region',
+    id: 'target',
     size: 120,
     enableSorting: false,
     enableHiding: true,
-    header: () => <span>Region</span>,
+    header: () => <span>Target</span>,
     cell: ({ row, table }) => {
-      const { getRegionName } = getMeta(table)
+      const { getTargetName } = getMeta(table)
       return (
         <div className="w-full truncate">
-          <span className="block truncate">{getRegionName(row.original.target) ?? row.original.target}</span>
+          <span className="block truncate">{getTargetName(row.original.target) ?? row.original.target}</span>
         </div>
       )
     },

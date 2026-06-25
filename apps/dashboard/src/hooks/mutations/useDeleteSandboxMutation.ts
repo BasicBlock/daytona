@@ -4,7 +4,6 @@
  */
 
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { mutationKeys } from './mutationKeys'
@@ -19,13 +18,12 @@ interface UseDeleteSandboxMutationOptions {
 
 export const useDeleteSandboxMutation = ({ invalidate = true }: UseDeleteSandboxMutationOptions = {}) => {
   const { sandboxApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationKey: mutationKeys.sandboxes.remove(),
     mutationFn: async ({ sandboxId }: DeleteSandboxVariables) => {
-      await sandboxApi.deleteSandbox(sandboxId, selectedOrganization?.id)
+      await sandboxApi.deleteSandbox(sandboxId)
     },
     onSuccess: (_, { sandboxId }) => {
       if (!invalidate) {
@@ -33,7 +31,7 @@ export const useDeleteSandboxMutation = ({ invalidate = true }: UseDeleteSandbox
       }
 
       queryClient.invalidateQueries({
-        queryKey: queryKeys.sandboxes.detail(selectedOrganization?.id ?? '', sandboxId),
+        queryKey: queryKeys.sandboxes.detail(sandboxId),
       })
     },
   })

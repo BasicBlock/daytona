@@ -37,7 +37,7 @@ interface RunnerDetailsSheetProps {
   onDelete: (runner: Runner) => void
   onNavigate: (direction: 'prev' | 'next') => void
   onToggleEnabled: (runner: Runner) => void
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
 }
 
 const RunnerDetailsSheet: React.FC<RunnerDetailsSheetProps> = ({
@@ -52,7 +52,7 @@ const RunnerDetailsSheet: React.FC<RunnerDetailsSheetProps> = ({
   onDelete,
   onNavigate,
   onToggleEnabled,
-  getRegionName,
+  getTargetName,
 }) => {
   const [open, setOpen] = useState(false)
 
@@ -140,10 +140,10 @@ const RunnerDetailsSheet: React.FC<RunnerDetailsSheetProps> = ({
             </InfoSection>
 
             <InfoSection title="Placement">
-              <InfoRow label="Region" className="-mr-2">
+              <InfoRow label="Target" className="-mr-2">
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className="truncate">{getRegionName(runner.region) ?? runner.region}</span>
-                  <CopyButton value={runner.region} tooltipText="Copy region" size="icon-xs" />
+                  <span className="truncate">{getTargetName(runner.target) ?? runner.target}</span>
+                  <CopyButton value={runner.target} tooltipText="Copy target" size="icon-xs" />
                 </div>
               </InfoRow>
               <InfoRow label="Version">

@@ -4,70 +4,17 @@
  */
 
 import { SnapshotQueryParams } from './useSnapshotsQuery'
-import type { AuditLogsQueryParams } from './useAuditLogsQuery'
 import type { SandboxQueryParams } from './useSandboxesQuery'
 
 export const queryKeys = {
   config: {
     all: ['config'] as const,
   },
-  apiKeys: {
-    all: ['api-keys'] as const,
-    list: (organizationId: string) => [...queryKeys.apiKeys.all, organizationId, 'list'] as const,
-  },
-  webhooks: {
-    all: ['webhooks'] as const,
-    appPortalAccess: (organizationId: string) =>
-      [...queryKeys.webhooks.all, organizationId, 'app-portal-access'] as const,
-    initializationStatus: (organizationId: string) =>
-      [...queryKeys.webhooks.all, organizationId, 'initialization-status'] as const,
-  },
-  organization: {
-    all: ['organization'] as const,
-
-    list: () => [...queryKeys.organization.all, 'list'] as const,
-    detail: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'detail'] as const,
-    members: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'members'] as const,
-    roles: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'roles'] as const,
-    invitations: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'invitations'] as const,
-
-    usage: {
-      overview: (organizationId: string) =>
-        [...queryKeys.organization.all, organizationId, 'usage', 'overview'] as const,
-      current: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'usage', 'current'] as const,
-      past: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'usage', 'past'] as const,
-    },
-
-    tier: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'tier'] as const,
-    wallet: (organizationId: string) => [...queryKeys.organization.all, organizationId, 'wallet'] as const,
-  },
-  user: {
-    all: ['users'] as const,
-    accountProviders: () => [...queryKeys.user.all, 'account-providers'] as const,
-  },
-  billing: {
-    all: ['billing'] as const,
-    tiers: () => [...queryKeys.billing.all, 'tiers'] as const,
-    emails: (organizationId: string) => [...queryKeys.billing.all, organizationId, 'emails'] as const,
-    portalUrl: (organizationId: string) => [...queryKeys.billing.all, organizationId, 'portal-url'] as const,
-    usagePortalUrl: (organizationId: string) => [...queryKeys.billing.all, organizationId, 'usage-portal-url'] as const,
-    billingInfo: (organizationId: string) => [...queryKeys.billing.all, organizationId, 'billing-info'] as const,
-    paymentMethods: (organizationId: string) => [...queryKeys.billing.all, organizationId, 'payment-methods'] as const,
-    charges: (organizationId: string) => [...queryKeys.billing.all, organizationId, 'charges'] as const,
-    invoices: (organizationId: string, page?: number, perPage?: number) =>
-      [
-        ...queryKeys.billing.all,
-        organizationId,
-        'invoices',
-        ...(page !== undefined && perPage !== undefined ? [{ page, perPage }] : []),
-      ] as const,
-  },
   snapshots: {
     all: ['snapshots'] as const,
-    detail: (organizationId: string, snapshotId: string) =>
-      [...queryKeys.snapshots.all, organizationId, snapshotId, 'detail'] as const,
-    list: (organizationId: string, params?: SnapshotQueryParams) => {
-      const base = [...queryKeys.snapshots.all, organizationId, 'list'] as const
+    detail: (snapshotId: string) => [...queryKeys.snapshots.all, snapshotId, 'detail'] as const,
+    list: (params?: SnapshotQueryParams) => {
+      const base = [...queryKeys.snapshots.all, 'list'] as const
       if (!params) return base
       return [
         ...base,
@@ -82,46 +29,30 @@ export const queryKeys = {
   },
   registries: {
     all: ['registries'] as const,
-    list: (organizationId: string) => [...queryKeys.registries.all, organizationId, 'list'] as const,
+    list: () => [...queryKeys.registries.all, 'list'] as const,
   },
-  regions: {
-    all: ['regions'] as const,
-    shared: () => [...queryKeys.regions.all, 'shared'] as const,
-    available: (organizationId: string) => [...queryKeys.regions.all, organizationId, 'available'] as const,
+  targets: {
+    all: ['targets'] as const,
+    shared: () => [...queryKeys.targets.all, 'shared'] as const,
+    available: () => [...queryKeys.targets.all, 'available'] as const,
   },
   runners: {
     all: ['runners'] as const,
-    list: (organizationId: string, regionId?: string) => {
-      const base = [...queryKeys.runners.all, organizationId, 'list'] as const
-      if (!regionId) return base
+    list: (target?: string) => {
+      const base = [...queryKeys.runners.all, 'list'] as const
+      if (!target) return base
 
-      return [...base, { regionId }] as const
+      return [...base, { target }] as const
     },
   },
   volumes: {
     all: ['volumes'] as const,
-    list: (organizationId: string) => [...queryKeys.volumes.all, organizationId, 'list'] as const,
-  },
-  audit: {
-    all: ['audit'] as const,
-    logs: (organizationId: string, params: AuditLogsQueryParams) =>
-      [
-        ...queryKeys.audit.all,
-        organizationId,
-        'logs',
-        {
-          page: params.page,
-          pageSize: params.pageSize,
-          ...(params.from && { from: params.from.toISOString() }),
-          ...(params.to && { to: params.to.toISOString() }),
-          ...(params.cursor && { cursor: params.cursor }),
-        },
-      ] as const,
+    list: () => [...queryKeys.volumes.all, 'list'] as const,
   },
   sandboxes: {
     all: ['sandboxes'] as const,
-    list: (organizationId: string, params?: SandboxQueryParams) => {
-      const base = [...queryKeys.sandboxes.all, organizationId, 'list'] as const
+    list: (params?: SandboxQueryParams) => {
+      const base = [...queryKeys.sandboxes.all, 'list'] as const
       if (!params) return base
 
       return [
@@ -142,8 +73,7 @@ export const queryKeys = {
         },
       ] as const
     },
-    detail: (organizationId: string, sandboxId: string) =>
-      [...queryKeys.sandboxes.all, organizationId, sandboxId, 'detail'] as const,
+    detail: (sandboxId: string) => [...queryKeys.sandboxes.all, sandboxId, 'detail'] as const,
     terminalSession: (sandboxId: string) => [...queryKeys.sandboxes.all, sandboxId, 'terminal-session'] as const,
     vncInitialStatus: (sandboxId: string) => [...queryKeys.sandboxes.all, sandboxId, 'vnc-initial-status'] as const,
     vncPollStatus: (sandboxId: string) => [...queryKeys.sandboxes.all, sandboxId, 'vnc-poll-status'] as const,
@@ -165,16 +95,5 @@ export const queryKeys = {
     terminalUrl: (scope: string, id: string) => [...queryKeys.sandbox.all, scope, id, 'terminal-url'] as const,
     vncStatus: (scope: string, id: string) => [...queryKeys.sandbox.all, scope, id, 'vnc-status'] as const,
     vncUrl: (scope: string, id: string) => [...queryKeys.sandbox.all, scope, id, 'vnc-url'] as const,
-  },
-  analytics: {
-    all: ['analytics'] as const,
-    aggregatedUsage: (organizationId: string, params: object) =>
-      [...queryKeys.analytics.all, organizationId, 'aggregated-usage', params] as const,
-    usageChart: (organizationId: string, params: object) =>
-      [...queryKeys.analytics.all, organizationId, 'usage-chart', params] as const,
-    sandboxesUsage: (organizationId: string, params: object) =>
-      [...queryKeys.analytics.all, organizationId, 'sandboxes-usage', params] as const,
-    sandboxUsagePeriods: (organizationId: string, sandboxId: string, params: object) =>
-      [...queryKeys.analytics.all, organizationId, sandboxId, 'usage-periods', params] as const,
   },
 } as const

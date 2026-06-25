@@ -23,28 +23,24 @@ import {
 import { useDeleteRunnerMutation } from '@/hooks/mutations/useDeleteRunnerMutation'
 import { useMutatingRunners } from '@/hooks/mutations/useMutatingRunners'
 import { useUpdateRunnerSchedulingMutation } from '@/hooks/mutations/useUpdateRunnerSchedulingMutation'
-import { useAvailableRegionsQuery, useRegionLookup } from '@/hooks/queries/useRegionsQuery'
+import { useAvailableTargetsQuery, useTargetLookup } from '@/hooks/queries/useTargetsQuery'
 import { useRunnersQuery } from '@/hooks/queries/useRunnersQuery'
 import { useRunnerWsSync } from '@/hooks/useRunnerWsSync'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { handleApiError } from '@/lib/error-handling'
-import { EMPTY_REGIONS, filterCustomRegions } from '@/lib/regions'
-import { OrganizationRolePermissionsEnum, Runner } from '@daytona/api-client'
+import { EMPTY_TARGETS, filterCustomTargets } from '@/lib/targets'
+import { Runner } from '@daytona/api-client'
 import { PlusIcon } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 const Runners: React.FC = () => {
-  const { selectedOrganization, authenticatedUserHasPermission } = useSelectedOrganization()
   const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalValue>(false)
 
   useRunnerWsSync()
 
-  const { data: availableRegions = EMPTY_REGIONS, isLoading: loadingRegions } = useAvailableRegionsQuery(
-    selectedOrganization?.id,
-  )
-  const regions = useMemo(() => filterCustomRegions(availableRegions), [availableRegions])
-  const { getRegionName } = useRegionLookup(selectedOrganization?.id)
+  const { data: availableTargets = EMPTY_TARGETS, isLoading: loadingTargets } = useAvailableTargetsQuery()
+  const targets = useMemo(() => filterCustomTargets(availableTargets), [availableTargets])
+  const { getTargetName } = useTargetLookup()
   const {
     data: runners = [],
     dataUpdatedAt: runnersUpdatedAt,
@@ -124,7 +120,6 @@ const Runners: React.FC = () => {
     try {
       await updateRunnerSchedulingMutation.mutateAsync({
         runnerId: runnerToToggleScheduling.id,
-        organizationId: selectedOrganization?.id,
         unschedulable: !runnerToToggleScheduling.unschedulable,
       })
       toast.success(
@@ -149,7 +144,6 @@ const Runners: React.FC = () => {
     try {
       await deleteRunnerMutation.mutateAsync({
         runnerId: runnerToDelete.id,
-        organizationId: selectedOrganization?.id,
       })
       toast.success('Runner deleted successfully')
     } catch (error) {
@@ -160,18 +154,11 @@ const Runners: React.FC = () => {
     }
   }
 
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_RUNNERS),
-    [authenticatedUserHasPermission],
-  )
-
-  const deletePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_RUNNERS),
-    [authenticatedUserHasPermission],
-  )
+  const writePermitted = true
+  const deletePermitted = true
 
   const rootCommands: CommandConfig[] = useMemo(() => {
-    if (!writePermitted || regions.length === 0) {
+    if (!writePermitted || targets.length === 0) {
       return []
     }
 
@@ -183,7 +170,7 @@ const Runners: React.FC = () => {
         onSelect: () => createRunnerSheetRef.current?.open(),
       },
     ]
-  }, [writePermitted, regions.length])
+  }, [writePermitted, targets.length])
 
   useRegisterCommands(rootCommands, { groupId: 'runner-actions', groupLabel: 'Runner actions', groupOrder: 0 })
 
@@ -195,22 +182,22 @@ const Runners: React.FC = () => {
         <PageIntro
           title="Runners"
           actions={
-            writePermitted && regions.length > 0 ? (
-              <CreateRunnerSheet regions={regions} ref={createRunnerSheetRef} />
+            writePermitted && targets.length > 0 ? (
+              <CreateRunnerSheet targets={targets} ref={createRunnerSheetRef} />
             ) : undefined
           }
         />
         <RunnerTable
           data={runners}
-          regions={regions}
-          loading={loadingRunnersData || loadingRegions}
+          targets={targets}
+          loading={loadingRunnersData || loadingTargets}
           activeRunnerId={showRunnerDetails ? selectedRunner?.id : undefined}
           isLoadingRunner={(runner) => runnerIsLoading[runner.id] || false}
           writePermitted={writePermitted}
           deletePermitted={deletePermitted}
           onToggleEnabled={handleToggleEnabled}
           onDelete={handleDelete}
-          getRegionName={getRegionName}
+          getTargetName={getTargetName}
           onRowClick={(runner: Runner) => {
             setSelectedRunner(runner)
             runnerDetailsSheetRef.current?.open()
@@ -292,7 +279,7 @@ const Runners: React.FC = () => {
           setRunnerToDelete(runner)
           setDeleteRunnerDialogIsOpen(true)
         }}
-        getRegionName={getRegionName}
+        getTargetName={getTargetName}
       />
     </PageLayout>
   )

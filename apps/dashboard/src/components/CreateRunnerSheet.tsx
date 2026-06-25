@@ -4,17 +4,15 @@
  */
 
 import React, { Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Region, CreateRunnerResponse } from '@daytona/api-client'
+import { Target, CreateRunnerResponse } from '@daytona/api-client'
 import { useForm } from '@tanstack/react-form'
 import { z } from 'zod'
-import { AnimatePresence, motion } from 'framer-motion'
-import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon, InfoIcon } from 'lucide-react'
+import { InfoIcon } from 'lucide-react'
 import { CreateResourceButton } from '@/components/CreateResourceButton'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Sheet,
@@ -27,42 +25,38 @@ import {
 } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
-import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
 import { useCreateRunnerMutation } from '@/hooks/mutations/useCreateRunnerMutation'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { handleApiError } from '@/lib/error-handling'
-import { getMaskedToken } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  regionId: z.string().min(1, 'Region is required'),
+  target: z.string().min(1, 'Target is required'),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 interface CreateRunnerSheetProps {
-  regions: Region[]
+  targets: Target[]
   ref?: Ref<{ open: () => void }>
 }
 
-const buildDefaultValues = (regions: Region[]): FormValues => ({
+const buildDefaultValues = (targets: Target[]): FormValues => ({
   name: '',
-  regionId: regions[0]?.id ?? '',
+  target: targets[0]?.id ?? '',
 })
 
-export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, ref }) => {
+export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ targets, ref }) => {
   const [open, setOpen] = useState(false)
   const [createdRunner, setCreatedRunner] = useState<CreateRunnerResponse | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
-  const { selectedOrganization } = useSelectedOrganization()
   const { reset: resetCreateRunnerMutation, ...createRunnerMutation } = useCreateRunnerMutation()
 
   useImperativeHandle(ref, () => ({
     open: () => setOpen(true),
   }))
 
-  const defaultValues = useMemo(() => buildDefaultValues(regions), [regions])
+  const defaultValues = useMemo(() => buildDefaultValues(targets), [targets])
 
   const form = useForm({
     defaultValues,
@@ -79,23 +73,17 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
       }
     },
     onSubmit: async ({ value }) => {
-      if (!selectedOrganization?.id) {
-        toast.error('Select an organization to create a runner.')
-        return
-      }
-
       try {
         const runner = await createRunnerMutation.mutateAsync({
           runner: {
             name: value.name.trim(),
-            regionId: value.regionId,
+            target: value.target,
           },
-          organizationId: selectedOrganization.id,
         })
 
         toast.success('Runner created successfully')
         setCreatedRunner(runner)
-        resetForm(buildDefaultValues(regions))
+        resetForm(buildDefaultValues(targets))
       } catch (error) {
         handleApiError(error, 'Failed to create runner')
       }
@@ -104,16 +92,16 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
   const { reset: resetForm } = form
 
   useEffect(() => {
-    if (!form.getFieldValue('regionId') && regions[0]?.id) {
-      form.setFieldValue('regionId', regions[0].id)
+    if (!form.getFieldValue('target') && targets[0]?.id) {
+      form.setFieldValue('target', targets[0].id)
     }
-  }, [form, regions])
+  }, [form, targets])
 
   const resetState = useCallback(() => {
     setCreatedRunner(null)
-    resetForm(buildDefaultValues(regions))
+    resetForm(buildDefaultValues(targets))
     resetCreateRunnerMutation()
-  }, [resetForm, resetCreateRunnerMutation, regions])
+  }, [resetForm, resetCreateRunnerMutation, targets])
 
   useEffect(() => {
     if (open) {
@@ -121,7 +109,7 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
     }
   }, [open, resetState])
 
-  if (regions.length === 0) {
+  if (targets.length === 0) {
     return null
   }
 
@@ -136,8 +124,8 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
           <SheetTitle>{createdRunner ? 'Runner Created' : 'Create Runner'}</SheetTitle>
           <SheetDescription className="sr-only">
             {createdRunner
-              ? 'Your runner token has been created successfully.'
-              : 'Add configuration for a new runner in your selected region.'}
+              ? 'Your runner has been created successfully.'
+              : 'Add configuration for a new runner in your selected target.'}
           </SheetDescription>
         </SheetHeader>
 
@@ -156,12 +144,12 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
                   form.handleSubmit()
                 }}
               >
-                <form.Field name="regionId">
+                <form.Field name="target">
                   {(field) => {
                     const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
                     return (
                       <Field data-invalid={isInvalid}>
-                        <FieldLabel htmlFor={field.name}>Region</FieldLabel>
+                        <FieldLabel htmlFor={field.name}>Target</FieldLabel>
                         <Select
                           value={field.state.value}
                           onValueChange={(value) => {
@@ -169,12 +157,12 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
                           }}
                         >
                           <SelectTrigger className="h-8" id={field.name} aria-invalid={isInvalid}>
-                            <SelectValue placeholder="Select a region" />
+                            <SelectValue placeholder="Select a target" />
                           </SelectTrigger>
                           <SelectContent>
-                            {regions.map((region) => (
-                              <SelectItem key={region.id} value={region.id}>
-                                {region.name}
+                            {targets.map((target) => (
+                              <SelectItem key={target.id} value={target.id}>
+                                {target.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -222,12 +210,7 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
             <form.Subscribe
               selector={(state) => [state.canSubmit, state.isSubmitting]}
               children={([canSubmit, isSubmitting]) => (
-                <Button
-                  type="submit"
-                  form="create-runner-form"
-                  variant="default"
-                  disabled={!canSubmit || isSubmitting || !selectedOrganization?.id}
-                >
+                <Button type="submit" form="create-runner-form" variant="default" disabled={!canSubmit || isSubmitting}>
                   {isSubmitting && <Spinner />}
                   Create
                 </Button>
@@ -240,60 +223,17 @@ export const CreateRunnerSheet: React.FC<CreateRunnerSheetProps> = ({ regions, r
   )
 }
 
-const MotionCopyIcon = motion(CopyIcon)
-const MotionCheckIcon = motion(CheckIcon)
-
-const iconProps = {
-  initial: { opacity: 0, y: 5 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -5 },
-  transition: { duration: 0.1 },
-}
-
 function CreatedRunnerDisplay({ createdRunner }: { createdRunner: CreateRunnerResponse }) {
-  const [copiedToken, copyToken] = useCopyToClipboard()
-  const [tokenRevealed, setTokenRevealed] = useState(false)
-
   return (
     <div className="space-y-6">
       <Alert variant="warning">
         <InfoIcon />
-        <AlertDescription>You can only view this token once. Store it safely.</AlertDescription>
+        <AlertDescription>Runner created successfully.</AlertDescription>
       </Alert>
       <FieldGroup className="gap-4">
         <Field>
-          <FieldLabel htmlFor="runner-token">Runner Token</FieldLabel>
-
-          <InputGroup className="pr-1 flex-1">
-            <InputGroupInput
-              id="runner-token"
-              value={tokenRevealed ? createdRunner.apiKey : getMaskedToken(createdRunner.apiKey)}
-              readOnly
-            />
-            <InputGroupButton
-              variant="ghost"
-              size="icon-xs"
-              aria-label={tokenRevealed ? 'Hide runner token' : 'Show runner token'}
-              aria-pressed={tokenRevealed}
-              onClick={() => setTokenRevealed(!tokenRevealed)}
-            >
-              {tokenRevealed ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-            </InputGroupButton>
-            <InputGroupButton
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Copy runner token"
-              onClick={() => copyToken(createdRunner.apiKey)}
-            >
-              <AnimatePresence initial={false} mode="wait">
-                {copiedToken ? (
-                  <MotionCheckIcon className="h-4 w-4" key="copied" {...iconProps} />
-                ) : (
-                  <MotionCopyIcon className="h-4 w-4" key="copy" {...iconProps} />
-                )}
-              </AnimatePresence>
-            </InputGroupButton>
-          </InputGroup>
+          <FieldLabel htmlFor="runner-id">Runner ID</FieldLabel>
+          <Input id="runner-id" value={createdRunner.id} readOnly />
         </Field>
       </FieldGroup>
     </div>

@@ -3,37 +3,43 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
-import { ApiOAuth2, ApiResponse, ApiOperation, ApiParam, ApiTags, ApiHeader, ApiBearerAuth } from '@nestjs/swagger'
-import { OrganizationAuthContextGuard } from '../../organization/guards/organization-auth-context.guard'
-import { AuthenticatedRateLimitGuard } from '../../common/guards/authenticated-rate-limit.guard'
-import { SandboxAccessGuard } from '../../sandbox/guards/sandbox-access.guard'
-import { CustomHeaders } from '../../common/constants/header.constants'
+import { Controller, Get, Headers, NotFoundException, Param, Query } from '@nestjs/common'
+import { ApiResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger'
 import { SandboxTelemetryService } from '../services/sandbox-telemetry.service'
 import { LogsQueryParamsDto, TelemetryQueryParamsDto, MetricsQueryParamsDto } from '../dto/telemetry-query-params.dto'
 import { PaginatedLogsDto } from '../dto/paginated-logs.dto'
 import { PaginatedTracesDto } from '../dto/paginated-traces.dto'
 import { TraceSpanDto } from '../dto/trace-span.dto'
 import { MetricsResponseDto } from '../dto/metrics-response.dto'
-import { RequireFlagsEnabled } from '@openfeature/nestjs-sdk'
-import { AnalyticsApiDisabledGuard } from '../guards/analytics-api-disabled.guard'
-import { AuthStrategy } from '../../auth/decorators/auth-strategy.decorator'
-import { AuthStrategyType } from '../../auth/enums/auth-strategy-type.enum'
+import { OtelForwardingConfigDto } from '../dto/otel-forwarding-config.dto'
 
 @Controller('sandbox')
 @ApiTags('sandbox')
-@ApiOAuth2(['openid', 'profile', 'email'])
-@ApiBearerAuth()
-@ApiHeader(CustomHeaders.ORGANIZATION_ID)
-@AuthStrategy([AuthStrategyType.API_KEY, AuthStrategyType.JWT])
-@UseGuards(AuthenticatedRateLimitGuard)
-@UseGuards(AnalyticsApiDisabledGuard)
-@UseGuards(OrganizationAuthContextGuard, SandboxAccessGuard)
 export class SandboxTelemetryController {
   constructor(private readonly sandboxTelemetryService: SandboxTelemetryService) {}
 
+  @Get('telemetry/otel-config')
+  @ApiOperation({
+    summary: 'Get sandbox OTEL forwarding config',
+    operationId: 'getSandboxOtelForwardingConfig',
+    description: 'Retrieve the OTEL forwarding configuration for a sandbox auth token',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'OTEL forwarding configuration',
+    type: OtelForwardingConfigDto,
+  })
+  async getSandboxOtelForwardingConfig(
+    @Headers('sandbox-auth-token') sandboxAuthToken?: string,
+  ): Promise<OtelForwardingConfigDto> {
+    const config = await this.sandboxTelemetryService.getForwardingConfigBySandboxAuthToken(sandboxAuthToken)
+    if (!config) {
+      throw new NotFoundException()
+    }
+    return config
+  }
+
   @Get(':sandboxId/telemetry/logs')
-  @RequireFlagsEnabled({ flags: [{ flagKey: 'organization_experiments', defaultValue: true }] })
   @ApiOperation({
     summary: 'Get sandbox logs',
     operationId: 'getSandboxLogs',
@@ -65,7 +71,6 @@ export class SandboxTelemetryController {
   }
 
   @Get(':sandboxId/telemetry/traces')
-  @RequireFlagsEnabled({ flags: [{ flagKey: 'organization_experiments', defaultValue: true }] })
   @ApiOperation({
     summary: 'Get sandbox traces',
     operationId: 'getSandboxTraces',
@@ -95,7 +100,6 @@ export class SandboxTelemetryController {
   }
 
   @Get(':sandboxId/telemetry/traces/:traceId')
-  @RequireFlagsEnabled({ flags: [{ flagKey: 'organization_experiments', defaultValue: true }] })
   @ApiOperation({
     summary: 'Get trace spans',
     operationId: 'getSandboxTraceSpans',
@@ -124,7 +128,6 @@ export class SandboxTelemetryController {
   }
 
   @Get(':sandboxId/telemetry/metrics')
-  @RequireFlagsEnabled({ flags: [{ flagKey: 'organization_experiments', defaultValue: true }] })
   @ApiOperation({
     summary: 'Get sandbox metrics',
     operationId: 'getSandboxMetrics',

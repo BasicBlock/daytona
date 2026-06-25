@@ -7,13 +7,6 @@
 //	@license.name	Apache-2.0
 //	@license.url	https://www.apache.org/licenses/LICENSE-2.0
 
-//	@securityDefinitions.apikey	Bearer
-//	@in							header
-//	@name						Authorization
-//	@description				Type "Bearer" followed by a space and an API token.
-
-//	@Security	Bearer
-
 package api
 
 import (
@@ -48,7 +41,6 @@ import (
 type ApiServerConfig struct {
 	Logger      *slog.Logger
 	ApiPort     int
-	ApiToken    string
 	TLSCertFile string
 	TLSKeyFile  string
 	EnableTLS   bool
@@ -59,7 +51,6 @@ func NewApiServer(config ApiServerConfig) *ApiServer {
 	return &ApiServer{
 		logger:      config.Logger.With(slog.String("component", "server")),
 		apiPort:     config.ApiPort,
-		apiToken:    config.ApiToken,
 		tlsCertFile: config.TLSCertFile,
 		tlsKeyFile:  config.TLSKeyFile,
 		enableTLS:   config.EnableTLS,
@@ -70,7 +61,6 @@ func NewApiServer(config ApiServerConfig) *ApiServer {
 type ApiServer struct {
 	logger      *slog.Logger
 	apiPort     int
-	apiToken    string
 	tlsCertFile string
 	tlsKeyFile  string
 	enableTLS   bool
@@ -117,21 +107,20 @@ func (a *ApiServer) Start(ctx context.Context) error {
 		public.GET("/api/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}
 
-	protected := a.router.Group("/")
-	protected.Use(middlewares.AuthMiddleware(a.apiToken))
+	routes := a.router.Group("/")
 
-	metricsController := protected.Group("/metrics")
+	metricsController := routes.Group("/metrics")
 	{
 		metricsController.GET("", gin.WrapH(promhttp.Handler()))
 	}
 
-	infoController := protected.Group("/info")
+	infoController := routes.Group("/info")
 	{
 		infoController.GET("", controllers.RunnerInfo)
 	}
 
 	sandboxControllerLogger := a.logger.With(slog.String("component", "sandbox_controller"))
-	sandboxController := protected.Group("/sandboxes")
+	sandboxController := routes.Group("/sandboxes")
 	{
 		sandboxController.POST("", controllers.Create)
 		sandboxController.GET("/:sandboxId", controllers.Info)
@@ -151,7 +140,7 @@ func (a *ApiServer) Start(ctx context.Context) error {
 	}
 
 	snapshotControllerLogger := a.logger.With(slog.String("component", "snapshot_controller"))
-	snapshotController := protected.Group("/snapshots")
+	snapshotController := routes.Group("/snapshots")
 	{
 		snapshotController.POST("/pull", controllers.PullSnapshot(ctx, snapshotControllerLogger))
 		snapshotController.POST("/build", controllers.BuildSnapshot(ctx, snapshotControllerLogger))

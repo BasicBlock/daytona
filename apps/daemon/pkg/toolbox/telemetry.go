@@ -14,7 +14,7 @@ import (
 	"github.com/daytonaio/daemon/internal"
 )
 
-func (s *server) initTelemetry(ctx context.Context, serviceName, entrypointLogFilePath string, organizationId, regionId, snapshot *string) error {
+func (s *server) initTelemetry(ctx context.Context, serviceName, entrypointLogFilePath string, snapshot *string) error {
 	if s.otelEndpoint == nil {
 		s.logger.InfoContext(ctx, "Otel endpoint not provided, skipping telemetry initialization")
 		return nil
@@ -62,14 +62,6 @@ func (s *server) initTelemetry(ctx context.Context, serviceName, entrypointLogFi
 				extraLabels[key] = value
 			}
 		}
-	}
-
-	if organizationId != nil && *organizationId != "" {
-		extraLabels["daytona_organization_id"] = *organizationId
-	}
-
-	if regionId != nil && *regionId != "" {
-		extraLabels["daytona_region_id"] = *regionId
 	}
 
 	if snapshot != nil && *snapshot != "" {

@@ -41,13 +41,8 @@ type SSHGateway struct {
 func main() {
 	port := getEnvInt("SSH_GATEWAY_PORT", defaultPort)
 	apiURL := getEnv("API_URL", "http://localhost:3000")
-	apiKey := getEnv("API_KEY", "")
 	sshPk := getEnv("SSH_PRIVATE_KEY", "")
 	sshHostKey := getEnv("SSH_HOST_KEY", "")
-
-	if apiKey == "" {
-		log.Fatal("API_KEY environment variable is required")
-	}
 
 	if sshPk == "" {
 		log.Fatal("SSH_PRIVATE_KEY environment variable is required")
@@ -75,8 +70,6 @@ func main() {
 			URL: apiURL,
 		},
 	}
-
-	clientConfig.AddDefaultHeader("Authorization", "Bearer "+apiKey)
 
 	apiClient := apiclient.NewAPIClient(clientConfig)
 

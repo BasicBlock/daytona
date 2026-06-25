@@ -19,6 +19,7 @@ import (
 type PollerServiceConfig struct {
 	PollTimeout time.Duration
 	PollLimit   int
+	RunnerID    string
 	Logger      *slog.Logger
 	Executor    *executor.Executor
 }
@@ -28,6 +29,7 @@ type Service struct {
 	log         *slog.Logger
 	pollTimeout time.Duration
 	pollLimit   int
+	runnerID    string
 	executor    *executor.Executor
 	client      *apiclient.APIClient
 }
@@ -43,6 +45,7 @@ func NewService(cfg *PollerServiceConfig) (*Service, error) {
 		log:         cfg.Logger.With(slog.String("component", "poller")),
 		pollTimeout: cfg.PollTimeout,
 		pollLimit:   cfg.PollLimit,
+		runnerID:    cfg.RunnerID,
 		executor:    cfg.Executor,
 		client:      apiClient,
 	}, nil
@@ -50,7 +53,7 @@ func NewService(cfg *PollerServiceConfig) (*Service, error) {
 
 // Start begins the job polling loop
 func (s *Service) Start(ctx context.Context) {
-	inProgressJobs, _, err := s.client.JobsAPI.ListJobs(ctx).Status(apiclient.JOBSTATUS_IN_PROGRESS).Execute()
+	inProgressJobs, _, err := s.client.JobsAPI.ListJobs(ctx).RunnerId(s.runnerID).Status(apiclient.JOBSTATUS_IN_PROGRESS).Execute()
 	if err != nil {
 		// Only log error
 		s.log.WarnContext(ctx, "Failed to fetch IN_PROGRESS jobs", "error", err)
@@ -101,6 +104,7 @@ func (s *Service) pollJobs(ctx context.Context) ([]apiclient.Job, error) {
 	limit := float32(s.pollLimit)
 
 	req := s.client.JobsAPI.PollJobs(ctx).
+		RunnerId(s.runnerID).
 		Timeout(timeout).
 		Limit(limit)
 

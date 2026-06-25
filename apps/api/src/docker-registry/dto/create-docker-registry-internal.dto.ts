@@ -13,5 +13,4 @@ export class CreateDockerRegistryInternalDto {
   project?: string
   registryType: RegistryType
   isDefault?: boolean
-  regionId?: string | null
 }

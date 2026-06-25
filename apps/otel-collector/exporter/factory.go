@@ -15,8 +15,7 @@ import (
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 
 	common_cache "github.com/daytonaio/common-go/pkg/cache"
-	apiclient "github.com/daytonaio/daytona/libs/api-client-go"
-	"github.com/daytonaio/otel-collector/exporter/internal/config"
+	resolverconfig "github.com/daytonaio/otel-collector/exporter/internal/config"
 )
 
 const (
@@ -39,7 +38,6 @@ func NewFactory() exporter.Factory {
 func createDefaultConfig() component.Config {
 	return &Config{
 		SandboxAuthTokenHeader: "sandbox-auth-token",
-		OrganizationIdHeader:   "organization-id",
 		CacheTTL:               5 * time.Minute,
 		DefaultTimeout:         30 * time.Second,
 		RetrySettings:          configretry.NewDefaultBackOffConfig(),
@@ -55,33 +53,19 @@ func createTracesExporter(
 ) (exporter.Traces, error) {
 	c := cfg.(*Config)
 
-	clientConfig := apiclient.NewConfiguration()
-	clientConfig.Servers = apiclient.ServerConfigurations{
-		{
-			URL: c.ApiUrl,
-		},
-	}
-
-	clientConfig.AddDefaultHeader("Authorization", "Bearer "+c.ApiKey)
-	apiClient := apiclient.NewAPIClient(clientConfig)
-
-	apiClient.GetConfig().HTTPClient = &http.Client{
-		Transport: http.DefaultTransport,
-	}
-
-	var cache common_cache.ICache[apiclient.OtelConfig]
+	var cache common_cache.ICache[resolverconfig.OtelConfig]
 
 	if c.Redis != nil {
-		redisCache, err := common_cache.NewRedisCache[apiclient.OtelConfig](c.Redis, "org-otel-config:")
+		redisCache, err := common_cache.NewRedisCache[resolverconfig.OtelConfig](c.Redis, "sandbox-otel-config:")
 		if err != nil {
 			return nil, err
 		}
 		cache = redisCache
 	} else {
-		cache = common_cache.NewMapCache[apiclient.OtelConfig](ctx)
+		cache = common_cache.NewMapCache[resolverconfig.OtelConfig](ctx)
 	}
 
-	resolver := config.NewResolver(cache, set.Logger, apiClient, c.CacheTTL)
+	resolver := resolverconfig.NewResolver(cache, set.Logger, c.ApiUrl, &http.Client{Transport: http.DefaultTransport}, c.CacheTTL)
 
 	te := newTracesExporter(exporterConfig{
 		config:   c,
@@ -109,32 +93,18 @@ func createMetricsExporter(
 ) (exporter.Metrics, error) {
 	c := cfg.(*Config)
 
-	clientConfig := apiclient.NewConfiguration()
-	clientConfig.Servers = apiclient.ServerConfigurations{
-		{
-			URL: c.ApiUrl,
-		},
-	}
-
-	clientConfig.AddDefaultHeader("Authorization", "Bearer "+c.ApiKey)
-	apiClient := apiclient.NewAPIClient(clientConfig)
-
-	apiClient.GetConfig().HTTPClient = &http.Client{
-		Transport: http.DefaultTransport,
-	}
-
-	var cache common_cache.ICache[apiclient.OtelConfig]
+	var cache common_cache.ICache[resolverconfig.OtelConfig]
 	// Create cache and resolver
 	if c.Redis != nil {
-		redisCache, err := common_cache.NewRedisCache[apiclient.OtelConfig](c.Redis, "org-otel-config:")
+		redisCache, err := common_cache.NewRedisCache[resolverconfig.OtelConfig](c.Redis, "sandbox-otel-config:")
 		if err != nil {
 			return nil, err
 		}
 		cache = redisCache
 	} else {
-		cache = common_cache.NewMapCache[apiclient.OtelConfig](ctx)
+		cache = common_cache.NewMapCache[resolverconfig.OtelConfig](ctx)
 	}
-	resolver := config.NewResolver(cache, set.Logger, apiClient, c.CacheTTL)
+	resolver := resolverconfig.NewResolver(cache, set.Logger, c.ApiUrl, &http.Client{Transport: http.DefaultTransport}, c.CacheTTL)
 
 	me := newMetricExporter(exporterConfig{
 		config:   c,
@@ -162,32 +132,18 @@ func createLogsExporter(
 ) (exporter.Logs, error) {
 	c := cfg.(*Config)
 
-	clientConfig := apiclient.NewConfiguration()
-	clientConfig.Servers = apiclient.ServerConfigurations{
-		{
-			URL: c.ApiUrl,
-		},
-	}
-
-	clientConfig.AddDefaultHeader("Authorization", "Bearer "+c.ApiKey)
-	apiClient := apiclient.NewAPIClient(clientConfig)
-
-	apiClient.GetConfig().HTTPClient = &http.Client{
-		Transport: http.DefaultTransport,
-	}
-
 	// Create cache and resolver
-	var cache common_cache.ICache[apiclient.OtelConfig]
+	var cache common_cache.ICache[resolverconfig.OtelConfig]
 	if c.Redis != nil {
-		redisCache, err := common_cache.NewRedisCache[apiclient.OtelConfig](c.Redis, "org-otel-config:")
+		redisCache, err := common_cache.NewRedisCache[resolverconfig.OtelConfig](c.Redis, "sandbox-otel-config:")
 		if err != nil {
 			return nil, err
 		}
 		cache = redisCache
 	} else {
-		cache = common_cache.NewMapCache[apiclient.OtelConfig](ctx)
+		cache = common_cache.NewMapCache[resolverconfig.OtelConfig](ctx)
 	}
-	resolver := config.NewResolver(cache, set.Logger, apiClient, c.CacheTTL)
+	resolver := resolverconfig.NewResolver(cache, set.Logger, c.ApiUrl, &http.Client{Transport: http.DefaultTransport}, c.CacheTTL)
 
 	le := newLogsExporter(exporterConfig{
 		config:   c,

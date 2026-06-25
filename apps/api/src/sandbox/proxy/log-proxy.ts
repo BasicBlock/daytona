@@ -14,7 +14,6 @@ export class LogProxy {
   constructor(
     private readonly targetUrl: string,
     private readonly snapshotRef: string,
-    private readonly authToken: string,
     private readonly follow: boolean,
     private readonly req: IncomingMessage,
     private readonly res: ServerResponse<IncomingMessage>,
@@ -30,7 +29,6 @@ export class LogProxy {
       pathRewrite: () => `/snapshots/logs?snapshotRef=${this.snapshotRef}&follow=${this.follow}`,
       on: {
         proxyReq: (proxyReq: any, req: any) => {
-          proxyReq.setHeader('Authorization', `Bearer ${this.authToken}`)
           proxyReq.setHeader('Accept', 'application/octet-stream')
           fixRequestBody(proxyReq, req)
         },

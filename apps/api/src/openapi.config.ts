@@ -5,7 +5,7 @@
 
 import { DocumentBuilder } from '@nestjs/swagger'
 
-const getOpenApiConfig = (oidcIssuer: string) =>
+const getOpenApiConfig = () =>
   new DocumentBuilder()
     .setTitle('Daytona')
     .addServer('http://localhost:3000')
@@ -13,16 +13,6 @@ const getOpenApiConfig = (oidcIssuer: string) =>
     .setContact('Daytona Platforms Inc.', 'https://www.daytona.io', 'support@daytona.com')
     .setVersion('1.0')
     .setLicense('Apache-2.0', 'https://www.apache.org/licenses/LICENSE-2.0')
-    .addBearerAuth({
-      type: 'http',
-      scheme: 'bearer',
-      description: 'API Key access',
-    })
-    .addOAuth2({
-      type: 'openIdConnect',
-      flows: undefined,
-      openIdConnectUrl: `${oidcIssuer}/.well-known/openid-configuration`,
-    })
     .build()
 
 export { getOpenApiConfig }

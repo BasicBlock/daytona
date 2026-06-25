@@ -66,18 +66,15 @@ func (p *Proxy) getSnapshotTarget(ctx *gin.Context) (*url.URL, map[string]string
 	target.RawQuery = queryParams.Encode()
 
 	return target, map[string]string{
-		"X-Daytona-Authorization": fmt.Sprintf("Bearer %s", runnerInfo.ApiKey),
-		"X-Forwarded-Host":        ctx.Request.Host,
+		"X-Forwarded-Host": ctx.Request.Host,
 	}, nil
 }
 
 func (p *Proxy) getSnapshot(ctx *gin.Context, snapshotId string) (*apiclient.SnapshotDto, error) {
 	var snapshot *apiclient.SnapshotDto
-	bearerToken := p.getBearerToken(ctx)
-	apiClient := p.getUserApiClient(ctx, bearerToken)
 
 	err := utils.RetryWithExponentialBackoff(ctx, "getSnapshot", proxyMaxRetries, proxyBaseDelay, proxyMaxDelay, func() error {
-		s, _, e := apiClient.SnapshotsAPI.GetSnapshot(ctx, snapshotId).Execute()
+		s, _, e := p.apiclient.SnapshotsAPI.GetSnapshot(ctx, snapshotId).Execute()
 		snapshot = s
 		openapiErr := common_errors.ConvertOpenAPIError(e)
 
@@ -118,7 +115,6 @@ func (p *Proxy) getRunnerInfo(ctx context.Context, runnerId string) (*RunnerInfo
 
 	info := RunnerInfo{
 		ApiUrl: *runner.ApiUrl,
-		ApiKey: runner.ApiKey,
 	}
 
 	err = p.runnerCache.Set(ctx, runnerId, info, 2*time.Minute)

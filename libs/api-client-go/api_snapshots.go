@@ -135,13 +135,6 @@ type SnapshotsAPIActivateSnapshotRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPIActivateSnapshotRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPIActivateSnapshotRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r SnapshotsAPIActivateSnapshotRequest) Execute() (*SnapshotDto, *http.Response, error) {
@@ -202,9 +195,6 @@ func (a *SnapshotsAPIService) ActivateSnapshotExecute(r SnapshotsAPIActivateSnap
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -246,17 +236,10 @@ type SnapshotsAPICreateSnapshotRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
 	createSnapshot *CreateSnapshot
-	xDaytonaOrganizationID *string
 }
 
 func (r SnapshotsAPICreateSnapshotRequest) CreateSnapshot(createSnapshot CreateSnapshot) SnapshotsAPICreateSnapshotRequest {
 	r.createSnapshot = &createSnapshot
-	return r
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPICreateSnapshotRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPICreateSnapshotRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
 	return r
 }
 
@@ -318,9 +301,6 @@ func (a *SnapshotsAPIService) CreateSnapshotExecute(r SnapshotsAPICreateSnapshot
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	// body params
 	localVarPostBody = r.createSnapshot
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -364,13 +344,6 @@ type SnapshotsAPIDeactivateSnapshotRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPIDeactivateSnapshotRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPIDeactivateSnapshotRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r SnapshotsAPIDeactivateSnapshotRequest) Execute() (*http.Response, error) {
@@ -429,9 +402,6 @@ func (a *SnapshotsAPIService) DeactivateSnapshotExecute(r SnapshotsAPIDeactivate
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return nil, err
@@ -463,18 +433,11 @@ func (a *SnapshotsAPIService) DeactivateSnapshotExecute(r SnapshotsAPIDeactivate
 type SnapshotsAPIGetAllSnapshotsRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
-	xDaytonaOrganizationID *string
 	page *float32
 	limit *float32
 	name *string
 	sort *string
 	order *string
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPIGetAllSnapshotsRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPIGetAllSnapshotsRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 // Page number of the results
@@ -593,9 +556,6 @@ func (a *SnapshotsAPIService) GetAllSnapshotsExecute(r SnapshotsAPIGetAllSnapsho
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -637,13 +597,6 @@ type SnapshotsAPIGetSnapshotRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPIGetSnapshotRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPIGetSnapshotRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r SnapshotsAPIGetSnapshotRequest) Execute() (*SnapshotDto, *http.Response, error) {
@@ -704,9 +657,6 @@ func (a *SnapshotsAPIService) GetSnapshotExecute(r SnapshotsAPIGetSnapshotReques
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -748,14 +698,7 @@ type SnapshotsAPIGetSnapshotBuildLogsRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
 	id string
-	xDaytonaOrganizationID *string
 	follow *bool
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPIGetSnapshotBuildLogsRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPIGetSnapshotBuildLogsRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 // Whether to follow the logs stream
@@ -828,9 +771,6 @@ func (a *SnapshotsAPIService) GetSnapshotBuildLogsExecute(r SnapshotsAPIGetSnaps
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return nil, err
@@ -863,13 +803,6 @@ type SnapshotsAPIGetSnapshotBuildLogsUrlRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPIGetSnapshotBuildLogsUrlRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPIGetSnapshotBuildLogsUrlRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r SnapshotsAPIGetSnapshotBuildLogsUrlRequest) Execute() (*Url, *http.Response, error) {
@@ -930,9 +863,6 @@ func (a *SnapshotsAPIService) GetSnapshotBuildLogsUrlExecute(r SnapshotsAPIGetSn
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -974,13 +904,6 @@ type SnapshotsAPIRemoveSnapshotRequest struct {
 	ctx context.Context
 	ApiService SnapshotsAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r SnapshotsAPIRemoveSnapshotRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) SnapshotsAPIRemoveSnapshotRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r SnapshotsAPIRemoveSnapshotRequest) Execute() (*http.Response, error) {
@@ -1038,9 +961,6 @@ func (a *SnapshotsAPIService) RemoveSnapshotExecute(r SnapshotsAPIRemoveSnapshot
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {

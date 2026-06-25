@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,10 @@ import (
 )
 
 func TestRuntimeNetworkSettings(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("runtime network settings require Linux runner network rule support")
+	}
+
 	cfg := LoadConfig(t)
 	client := NewAPIClient(cfg)
 	runID := testRunID()
@@ -61,7 +66,7 @@ func TestRuntimeNetworkSettings(t *testing.T) {
 
 		req, err := http.NewRequest(http.MethodPost, baseURL+"/process/execute", bytes.NewReader(body))
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorizationHeader(req, cfg)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := httpCli.Do(req)
@@ -143,7 +148,7 @@ func TestRuntimeNetworkSettings(t *testing.T) {
 		}
 		if resp.StatusCode == http.StatusBadRequest &&
 			strings.Contains(string(body), "Network access is restricted and cannot be overridden at the sandbox level") {
-			t.Skip("organization has limited network egress enabled; runtime override endpoint is intentionally blocked")
+			t.Skip("network egress policy blocks sandbox-level runtime overrides")
 		}
 		require.Equal(t, http.StatusOK, resp.StatusCode, "update network settings failed: %s", string(body))
 	}

@@ -24,15 +24,6 @@ COPY nx.json tsconfig.base.json .nxignore ./
 COPY apps/api/ apps/api/
 COPY apps/dashboard/ apps/dashboard/
 
-# Lib dependencies
-COPY libs/runner-api-client/ libs/runner-api-client/
-COPY libs/api-client/ libs/api-client/
-COPY libs/analytics-api-client/ libs/analytics-api-client/
-COPY libs/toolbox-api-client/ libs/toolbox-api-client/
-COPY libs/sdk-typescript/ libs/sdk-typescript/
-COPY libs/runner-proto/ libs/runner-proto/
-COPY libs/billing-api-client/ libs/billing-api-client/
-
 ENV NX_DAEMON=false
 
 RUN yarn nx build api --configuration=production --nxBail=true
@@ -61,9 +52,8 @@ WORKDIR /daytona
 
 # Nx (generatePackageJson) emits a pruned manifest + pruned lockfile carrying
 # only the api bundle's runtime closure. apps/api/package.json augments it with
-# runtime deps Nx's static scan misses: @openfeature/core (a non-optional peer
-# of @openfeature/server-sdk) and pg (typeorm's Postgres driver, loaded via a
-# dynamic require). It also adds the typeorm-migration toolchain (ts-node,
+# runtime deps Nx's static scan misses: pg (typeorm's Postgres driver, loaded
+# via a dynamic require). It also adds the typeorm-migration toolchain (ts-node,
 # tsconfig-paths, typescript, reflect-metadata, dotenv) plus the migration:run:*
 # scripts, so the deploy migration init/pre/post-deploy jobs run from this image.
 # corepack hydrates yarn from the manifest's packageManager field; .yarnrc.yml

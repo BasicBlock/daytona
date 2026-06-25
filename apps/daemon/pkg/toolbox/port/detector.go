@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cakturk/go-netstat/netstat"
 	"github.com/gin-gonic/gin"
 	cmap "github.com/orcaman/concurrent-map/v2"
 )
@@ -34,19 +33,13 @@ func (d *portsDetector) Start(ctx context.Context) {
 			return
 		default:
 			time.Sleep(1 * time.Second)
-			// get only listening TCP sockets
-			tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
-				return s.State == netstat.Listen
-			})
+			freshMap, err := listeningTCPPorts()
 			if err != nil {
 				continue
 			}
 
-			freshMap := map[string]bool{}
-			for _, e := range tabs {
-				s := strconv.Itoa(int(e.LocalAddr.Port))
-				freshMap[s] = true
-				d.portMap.Set(s, true)
+			for port := range freshMap {
+				d.portMap.Set(port, true)
 			}
 
 			for _, port := range d.portMap.Keys() {

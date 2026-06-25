@@ -9,7 +9,6 @@ import { useApi } from '../useApi'
 
 export interface DeactivateSnapshotMutationVariables {
   snapshotId: string
-  organizationId?: string
 }
 
 interface UseDeactivateSnapshotMutationOptions {
@@ -23,16 +22,13 @@ export const useDeactivateSnapshotMutation = ({
   const queryClient = useQueryClient()
 
   return useMutation<void, unknown, DeactivateSnapshotMutationVariables>({
-    mutationFn: async ({ snapshotId, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-      await snapshotApi.deactivateSnapshot(snapshotId, organizationId)
+    mutationFn: async ({ snapshotId }) => {
+      await snapshotApi.deactivateSnapshot(snapshotId)
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (invalidateOnSuccess && organizationId) {
+    onSuccess: async () => {
+      if (invalidateOnSuccess) {
         await queryClient.invalidateQueries({
-          queryKey: queryKeys.snapshots.list(organizationId),
+          queryKey: queryKeys.snapshots.list(),
         })
       }
     },

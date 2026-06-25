@@ -61,9 +61,9 @@ export enum ScreenshotFormatOption {
 
 export enum ScreenshotActions {
   TAKE_COMPRESSED = 'takeCompressed',
-  TAKE_COMPRESSED_REGION = 'takeCompressedRegion',
+  TAKE_COMPRESSED_REGION = 'takeCompressedTarget',
   TAKE_FULL_SCREEN = 'takeFullScreen',
-  TAKE_REGION = 'takeRegion',
+  TAKE_REGION = 'takeTarget',
 }
 
 export enum FileSystemActions {

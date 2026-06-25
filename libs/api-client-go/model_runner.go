@@ -59,8 +59,8 @@ type Runner struct {
 	CurrentStartedSandboxes *float32 `json:"currentStartedSandboxes,omitempty"`
 	// Runner availability score
 	AvailabilityScore *float32 `json:"availabilityScore,omitempty"`
-	// The region of the runner
-	Region string `json:"region"`
+	// The target of the runner
+	Target string `json:"target"`
 	// The name of the runner
 	Name string `json:"name"`
 	// The state of the runner
@@ -96,13 +96,13 @@ type _Runner Runner
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewRunner(id string, cpu float32, memory float32, disk float32, region string, name string, state RunnerState, unschedulable bool, tags []string, createdAt string, updatedAt string, version string, apiVersion string, runnerClass RunnerClass) *Runner {
+func NewRunner(id string, cpu float32, memory float32, disk float32, target string, name string, state RunnerState, unschedulable bool, tags []string, createdAt string, updatedAt string, version string, apiVersion string, runnerClass RunnerClass) *Runner {
 	this := Runner{}
 	this.Id = id
 	this.Cpu = cpu
 	this.Memory = memory
 	this.Disk = disk
-	this.Region = region
+	this.Target = target
 	this.Name = name
 	this.State = state
 	this.Unschedulable = unschedulable
@@ -699,28 +699,28 @@ func (o *Runner) SetAvailabilityScore(v float32) {
 	o.AvailabilityScore = &v
 }
 
-// GetRegion returns the Region field value
-func (o *Runner) GetRegion() string {
+// GetTarget returns the Target field value
+func (o *Runner) GetTarget() string {
 	if o == nil {
 		var ret string
 		return ret
 	}
 
-	return o.Region
+	return o.Target
 }
 
-// GetRegionOk returns a tuple with the Region field value
+// GetTargetOk returns a tuple with the Target field value
 // and a boolean to check if the value has been set.
-func (o *Runner) GetRegionOk() (*string, bool) {
+func (o *Runner) GetTargetOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.Region, true
+	return &o.Target, true
 }
 
-// SetRegion sets field value
-func (o *Runner) SetRegion(v string) {
-	o.Region = v
+// SetTarget sets field value
+func (o *Runner) SetTarget(v string) {
+	o.Target = v
 }
 
 // GetName returns the Name field value
@@ -1074,7 +1074,7 @@ func (o Runner) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AvailabilityScore) {
 		toSerialize["availabilityScore"] = o.AvailabilityScore
 	}
-	toSerialize["region"] = o.Region
+	toSerialize["target"] = o.Target
 	toSerialize["name"] = o.Name
 	toSerialize["state"] = o.State
 	if !IsNil(o.LastChecked) {
@@ -1107,7 +1107,7 @@ func (o *Runner) UnmarshalJSON(data []byte) (err error) {
 		"cpu",
 		"memory",
 		"disk",
-		"region",
+		"target",
 		"name",
 		"state",
 		"unschedulable",
@@ -1165,7 +1165,7 @@ func (o *Runner) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "currentSnapshotCount")
 		delete(additionalProperties, "currentStartedSandboxes")
 		delete(additionalProperties, "availabilityScore")
-		delete(additionalProperties, "region")
+		delete(additionalProperties, "target")
 		delete(additionalProperties, "name")
 		delete(additionalProperties, "state")
 		delete(additionalProperties, "lastChecked")

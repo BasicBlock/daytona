@@ -10,7 +10,6 @@ import { useApi } from '../useApi'
 
 export interface CreateVolumeMutationVariables {
   volume: CreateVolume
-  organizationId?: string
 }
 
 export const useCreateVolumeMutation = () => {
@@ -18,17 +17,12 @@ export const useCreateVolumeMutation = () => {
   const queryClient = useQueryClient()
 
   return useMutation<VolumeDto, unknown, CreateVolumeMutationVariables>({
-    mutationFn: async ({ volume, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-      const response = await volumeApi.createVolume(volume, organizationId)
+    mutationFn: async ({ volume }) => {
+      const response = await volumeApi.createVolume(volume)
       return response.data
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (organizationId) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.volumes.list(organizationId) })
-      }
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.volumes.list() })
     },
   })
 }

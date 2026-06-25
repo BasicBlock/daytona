@@ -12,7 +12,6 @@ if [ ! -f /etc/daytona/runner.env ]; then
 # Daytona Runner Environment Variables
 # Add your configuration here, for example:
 # DAYTONA_API_URL=https://api.daytona.io
-# DAYTONA_RUNNER_TOKEN=your-token-here
 EOF
     chmod 600 /etc/daytona/runner.env
 fi

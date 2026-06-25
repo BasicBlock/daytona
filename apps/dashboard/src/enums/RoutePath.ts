@@ -10,41 +10,19 @@
 export enum RoutePath {
   // Main routes
   LANDING = '/',
-  LOGOUT = '/logout',
   DASHBOARD = '/dashboard',
   DOCS = '/docs',
   SLACK = '/slack',
 
   // Dashboard sub-routes
-  KEYS = '/dashboard/keys',
   SANDBOXES = '/dashboard/sandboxes',
   SNAPSHOTS = '/dashboard/snapshots',
   REGISTRIES = '/dashboard/registries',
   VOLUMES = '/dashboard/volumes',
-  LIMITS = '/dashboard/limits',
-  BILLING_SPENDING = '/dashboard/billing/spending',
-  BILLING_WALLET = '/dashboard/billing/wallet',
-  MEMBERS = '/dashboard/members',
-  ROLES = '/dashboard/roles',
-  SETTINGS = '/dashboard/settings',
-  ONBOARDING = '/dashboard/onboarding',
-  AUDIT_LOGS = '/dashboard/audit-logs',
-  REGIONS = '/dashboard/regions',
   RUNNERS = '/dashboard/runners',
-  PLAYGROUND = '/dashboard/playground',
 
-  // User routes
-  USER_INVITATIONS = '/dashboard/user/invitations',
-  ACCOUNT_SETTINGS = '/dashboard/user/account-settings',
-
-  // Webhooks
-  WEBHOOKS = '/dashboard/webhooks',
-  WEBHOOK_ENDPOINT_DETAILS = '/dashboard/webhooks/:endpointId',
   // Sandboxes
   SANDBOX_DETAILS = '/dashboard/sandboxes/:sandboxId',
-
-  // Email verification
-  EMAIL_VERIFY = '/dashboard/organization/:organizationId/verify-email/:email/:token',
 }
 
 /**

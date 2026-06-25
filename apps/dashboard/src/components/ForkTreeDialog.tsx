@@ -5,7 +5,6 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { getRelativeTimeString } from '@/lib/utils'
 import { Sandbox } from '@daytona/api-client'
 import { ChevronDown, ChevronRight, GitFork } from 'lucide-react'
@@ -96,14 +95,13 @@ function TreeNodeRow({ node, depth, onExpand }: { node: TreeNode; depth: number;
 
 export function ForkTreeDialog({ sandboxId, open, onClose }: ForkTreeDialogProps) {
   const { sandboxApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
   const [ancestors, setAncestors] = useState<Sandbox[]>([])
   const [currentSandbox, setCurrentSandbox] = useState<Sandbox | null>(null)
   const [childNodes, setChildNodes] = useState<TreeNode[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!open || !sandboxId || !selectedOrganization?.id) return
+    if (!open || !sandboxId) return
 
     const fetchData = async () => {
       setLoading(true)
@@ -112,9 +110,9 @@ export function ForkTreeDialog({ sandboxId, open, onClose }: ForkTreeDialogProps
       setChildNodes([])
       try {
         const [sandboxRes, ancestorsRes, forksRes] = await Promise.all([
-          sandboxApi.getSandbox(sandboxId, selectedOrganization.id),
-          sandboxApi.getSandboxAncestors(sandboxId, selectedOrganization.id),
-          sandboxApi.getSandboxForks(sandboxId, selectedOrganization.id),
+          sandboxApi.getSandbox(sandboxId),
+          sandboxApi.getSandboxAncestors(sandboxId),
+          sandboxApi.getSandboxForks(sandboxId),
         ])
         setCurrentSandbox(sandboxRes.data)
         setAncestors(ancestorsRes.data)
@@ -134,12 +132,10 @@ export function ForkTreeDialog({ sandboxId, open, onClose }: ForkTreeDialogProps
     }
 
     fetchData()
-  }, [open, sandboxId, selectedOrganization?.id, sandboxApi])
+  }, [open, sandboxId, sandboxApi])
 
   const handleExpand = useCallback(
     async (nodeId: string) => {
-      if (!selectedOrganization?.id) return
-
       const target = findNode(childNodes, nodeId)
       if (!target) return
 
@@ -155,7 +151,7 @@ export function ForkTreeDialog({ sandboxId, open, onClose }: ForkTreeDialogProps
 
       setChildNodes((prev) => updateNodes(prev, nodeId, (n) => ({ ...n, loading: true })))
       try {
-        const forksRes = await sandboxApi.getSandboxForks(nodeId, selectedOrganization.id)
+        const forksRes = await sandboxApi.getSandboxForks(nodeId)
         setChildNodes((prev) =>
           updateNodes(prev, nodeId, (n) => ({
             ...n,
@@ -174,7 +170,7 @@ export function ForkTreeDialog({ sandboxId, open, onClose }: ForkTreeDialogProps
         toast.error('Failed to load forks')
       }
     },
-    [childNodes, sandboxApi, selectedOrganization?.id],
+    [childNodes, sandboxApi],
   )
 
   return (

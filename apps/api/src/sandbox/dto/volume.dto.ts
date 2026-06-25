@@ -22,12 +22,6 @@ export class VolumeDto {
   name: string
 
   @ApiProperty({
-    description: 'Organization ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  organizationId: string
-
-  @ApiProperty({
     description: 'Volume state',
     enum: VolumeState,
     enumName: 'VolumeState',
@@ -66,7 +60,6 @@ export class VolumeDto {
     return {
       id: volume.id,
       name: volume.name,
-      organizationId: volume.organizationId,
       state: volume.state,
       createdAt: volume.createdAt?.toISOString(),
       updatedAt: volume.updatedAt?.toISOString(),

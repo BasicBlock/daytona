@@ -32,6 +32,10 @@ import (
 //
 // Idempotent: a no-op if an identical rule already exists at any position.
 func (manager *NetRulesManager) AllowSubnetICC(bridgeName, subnet string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	if bridgeName == "" || subnet == "" {
 		return nil
 	}
@@ -52,6 +56,10 @@ func (manager *NetRulesManager) AllowSubnetICC(bridgeName, subnet string) error 
 // — if a runner installed that variant before the upgrade, teardown should still
 // clean it up.
 func (manager *NetRulesManager) RemoveSubnetICC(bridgeName, subnet string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	if subnet == "" {
 		return nil
 	}
@@ -84,6 +92,10 @@ func (manager *NetRulesManager) RemoveSubnetICC(bridgeName, subnet string) error
 // jumps (inserted at DOCKER-USER position 1) still fire first — see
 // AllowSubnetICC for the rationale.
 func (manager *NetRulesManager) AllowBridgeICC(bridgeName string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	if bridgeName == "" {
 		return nil
 	}
@@ -149,6 +161,10 @@ func dockerUserReturnPos(ipt *iptables.IPTables) (int, bool, error) {
 // RemoveBridgeICC removes the rule installed by AllowBridgeICC. Missing-rule
 // errors are swallowed so teardown is idempotent.
 func (manager *NetRulesManager) RemoveBridgeICC(bridgeName string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	if bridgeName == "" {
 		return nil
 	}

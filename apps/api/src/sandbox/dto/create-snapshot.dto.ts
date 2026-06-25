@@ -124,14 +124,6 @@ export class CreateSnapshotDto {
   buildInfo?: CreateBuildInfoDto
 
   @ApiPropertyOptional({
-    description:
-      'ID of the region where the snapshot will be available. Defaults to organization default region if not specified.',
-  })
-  @IsOptional()
-  @IsString()
-  regionId?: string
-
-  @ApiPropertyOptional({
     description: 'Target sandbox class. Determines which runners can host sandboxes created from this snapshot.',
     enum: SandboxClass,
     enumName: 'SandboxClass',

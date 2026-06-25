@@ -31,12 +31,8 @@ jobs:
       - name: Set up toolchain
         uses: ./.github/actions/setup-toolchain
         with:
-          install-python: 'false'
-          install-ruby: 'false'
           install-java: 'false'
-          install-poetry: 'false'
           install-swag: 'false'
-          run-poetry-install: 'false'
 
       - name: Ensure go.work.sum exists
         # The composite runs `go work sync` but does not `touch go.work.sum`.

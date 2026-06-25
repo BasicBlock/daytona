@@ -4,7 +4,7 @@
  */
 
 export enum LocalStorageKey {
-  SelectedOrganizationId = 'SelectedOrganizationId',
+  SelectedWorkspaceId = 'SelectedWorkspaceId',
   SkipOnboardingPrefix = 'SkipOnboarding_',
   AnnouncementBannerDismissed = 'AnnouncementBannerDismissed',
 }

@@ -55,8 +55,8 @@ export class IsSafeDisplayStringConstraint implements ValidatorConstraintInterfa
 
 /**
  * Rejects HTML tags, URL schemes, and control characters.
- * Intended for user-facing display fields (names, descriptions) that are
- * rendered to other users in emails, dashboard UI, and other shared contexts.
+ * Intended for display fields (names, descriptions) rendered in the dashboard
+ * and other shared contexts.
  * NOT a general-purpose string safety validator.
  */
 export function IsSafeDisplayString(validationOptions?: ValidationOptions): PropertyDecorator {

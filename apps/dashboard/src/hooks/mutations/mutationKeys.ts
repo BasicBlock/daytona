@@ -16,33 +16,10 @@ export const mutationKeys = {
     vnc: () => [...mutationKeys.sandboxes.all, 'vnc'] as const,
     screenRecordings: () => [...mutationKeys.sandboxes.all, 'screen-recordings'] as const,
   },
-  regions: {
-    all: ['regions'] as const,
-    create: () => [...mutationKeys.regions.all, 'create'] as const,
-    update: () => [...mutationKeys.regions.all, 'update'] as const,
-    remove: () => [...mutationKeys.regions.all, 'remove'] as const,
-    regenerateProxyApiKey: () => [...mutationKeys.regions.all, 'regenerate-proxy-api-key'] as const,
-    regenerateSshGatewayApiKey: () => [...mutationKeys.regions.all, 'regenerate-ssh-gateway-api-key'] as const,
-    regenerateSnapshotManagerCredentials: () =>
-      [...mutationKeys.regions.all, 'regenerate-snapshot-manager-credentials'] as const,
-  },
   runners: {
     all: ['runners'] as const,
     create: () => [...mutationKeys.runners.all, 'create'] as const,
     updateScheduling: () => [...mutationKeys.runners.all, 'update-scheduling'] as const,
     remove: () => [...mutationKeys.runners.all, 'remove'] as const,
-  },
-  organization: {
-    members: {
-      all: ['organization-members'] as const,
-      updateAccess: () => [...mutationKeys.organization.members.all, 'update-access'] as const,
-      remove: () => [...mutationKeys.organization.members.all, 'remove'] as const,
-    },
-    invitations: {
-      all: ['organization-invitations'] as const,
-      create: () => [...mutationKeys.organization.invitations.all, 'create'] as const,
-      update: () => [...mutationKeys.organization.invitations.all, 'update'] as const,
-      cancel: () => [...mutationKeys.organization.invitations.all, 'cancel'] as const,
-    },
   },
 } as const

@@ -103,9 +103,8 @@ export class SandboxOpenSearchSearchAdapter implements SandboxSearchAdapter, OnM
             dynamic: 'false',
             properties: {
               id: { type: 'keyword' },
-              organizationId: { type: 'keyword' },
               name: { type: 'keyword' },
-              region: { type: 'keyword' },
+              target: { type: 'keyword' },
               runnerId: { type: 'keyword' },
               sandboxClass: { type: 'keyword' },
               state: { type: 'keyword' },
@@ -114,7 +113,6 @@ export class SandboxOpenSearchSearchAdapter implements SandboxSearchAdapter, OnM
               osUser: { type: 'keyword' },
               errorReason: { type: 'text' },
               recoverable: { type: 'boolean' },
-              public: { type: 'boolean' },
               cpu: { type: 'integer' },
               gpu: { type: 'integer' },
               mem: { type: 'integer' },
@@ -149,9 +147,6 @@ export class SandboxOpenSearchSearchAdapter implements SandboxSearchAdapter, OnM
   private buildSearchQuery(filters: SandboxSearchFilters): QueryContainer {
     const must: QueryContainer[] = []
     const mustNot: QueryContainer[] = []
-
-    // Organization filter (required)
-    must.push({ term: { organizationId: filters.organizationId } })
 
     // Exclude errored/deleted unless explicitly requested
     if (!filters.includeErroredDeleted) {
@@ -193,11 +188,6 @@ export class SandboxOpenSearchSearchAdapter implements SandboxSearchAdapter, OnM
       must.push({ terms: { snapshot: filters.snapshots } })
     }
 
-    // Regions filter
-    if (filters.regionIds?.length) {
-      must.push({ terms: { region: filters.regionIds } })
-    }
-
     // Sandbox class filter
     if (filters.sandboxClasses?.length) {
       must.push({ terms: { sandboxClass: filters.sandboxClasses } })
@@ -237,11 +227,6 @@ export class SandboxOpenSearchSearchAdapter implements SandboxSearchAdapter, OnM
           },
         },
       })
-    }
-
-    // Public filter
-    if (filters.isPublic !== undefined) {
-      must.push({ term: { public: filters.isPublic } })
     }
 
     // Recoverable filter
@@ -359,18 +344,16 @@ export class SandboxOpenSearchSearchAdapter implements SandboxSearchAdapter, OnM
 
     return new SandboxListItemDto({
       id: source.id,
-      organizationId: source.organizationId,
       name: source.name,
-      target: source.region,
+      target: source.target,
       runnerId: source.runnerId,
       sandboxClass: source.sandboxClass,
       state: source.state as SandboxState,
       desiredState: source.desiredState as SandboxDesiredState | undefined,
       snapshot: source.snapshot,
-      user: source.osUser,
+      osUser: source.osUser,
       errorReason: source.errorReason,
       recoverable: source.recoverable,
-      public: source.public,
       cpu: source.cpu,
       gpu: source.gpu,
       gpuType: source.gpu_type ?? undefined,

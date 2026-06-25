@@ -99,7 +99,7 @@ func runGitCloneCase(t *testing.T, cfg Config, envVars map[string]string) {
 
 	req, err := http.NewRequest(http.MethodPost, baseURL+"/git/clone", bytes.NewReader(cloneReq))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	setToolboxAuthorizationHeader(req, cfg)
 	req.Header.Set("Content-Type", "application/json")
 
 	cloneStart := time.Now()
@@ -161,7 +161,7 @@ func execSandboxCommand(t *testing.T, httpCli *http.Client, cfg Config, baseURL,
 
 	req, err := http.NewRequest(http.MethodPost, baseURL+"/process/execute", bytes.NewReader(body))
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	setToolboxAuthorizationHeader(req, cfg)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpCli.Do(req)

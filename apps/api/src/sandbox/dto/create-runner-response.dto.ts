@@ -14,16 +14,9 @@ export class CreateRunnerResponseDto {
   })
   id: string
 
-  @ApiProperty({
-    description: 'The API key for the runner',
-    example: 'dtn_1234567890',
-  })
-  apiKey: string
-
-  static fromRunner(runner: Runner, apiKey: string): CreateRunnerResponseDto {
+  static fromRunner(runner: Runner): CreateRunnerResponseDto {
     return {
       id: runner.id,
-      apiKey,
     }
   }
 }

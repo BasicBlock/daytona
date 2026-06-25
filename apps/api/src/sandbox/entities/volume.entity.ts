@@ -7,16 +7,10 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Unique, Updat
 import { VolumeState } from '../enums/volume-state.enum'
 
 @Entity()
-@Unique(['organizationId', 'name'])
+@Unique(['name'])
 export class Volume {
   @PrimaryGeneratedColumn('uuid')
   id: string
-
-  @Column({
-    nullable: true,
-    type: 'uuid',
-  })
-  organizationId?: string
 
   @Column()
   name: string

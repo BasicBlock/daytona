@@ -52,12 +52,6 @@ export class SandboxDto {
   id: string
 
   @ApiProperty({
-    description: 'The organization ID of the sandbox',
-    example: 'organization123',
-  })
-  organizationId: string
-
-  @ApiProperty({
     description: 'The name of the sandbox',
     example: 'MySandbox',
   })
@@ -70,10 +64,10 @@ export class SandboxDto {
   snapshot: string
 
   @ApiProperty({
-    description: 'The user associated with the project',
+    description: 'The OS user used inside the sandbox',
     example: 'daytona',
   })
-  user: string
+  osUser: string
 
   @ApiProperty({
     description: 'Environment variables for the sandbox',
@@ -87,15 +81,9 @@ export class SandboxDto {
     description: 'Labels for the sandbox',
     type: 'object',
     additionalProperties: { type: 'string' },
-    example: { 'daytona.io/public': 'true' },
+    example: { app: 'api' },
   })
   labels: { [key: string]: string }
-
-  @ApiProperty({
-    description: 'Whether the sandbox http preview is public',
-    example: false,
-  })
-  public: boolean
 
   @ApiProperty({
     description: 'Whether to block all network access for the sandbox',
@@ -320,18 +308,16 @@ export class SandboxDto {
   static fromSandbox(sandbox: Sandbox, toolboxProxyUrl: string): SandboxDto {
     return {
       id: sandbox.id,
-      organizationId: sandbox.organizationId,
       name: sandbox.name,
-      target: sandbox.region,
+      target: sandbox.target,
       snapshot: sandbox.snapshot,
-      user: sandbox.osUser,
+      osUser: sandbox.osUser,
       env: sandbox.env,
       cpu: sandbox.cpu,
       gpu: sandbox.gpu,
       gpuType: sandbox.gpuType ?? undefined,
       memory: sandbox.mem,
       disk: sandbox.disk,
-      public: sandbox.public,
       networkBlockAll: sandbox.networkBlockAll,
       networkAllowList: sandbox.networkAllowList,
       domainAllowList: sandbox.domainAllowList,

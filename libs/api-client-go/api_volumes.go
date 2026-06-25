@@ -93,17 +93,10 @@ type VolumesAPICreateVolumeRequest struct {
 	ctx context.Context
 	ApiService VolumesAPI
 	createVolume *CreateVolume
-	xDaytonaOrganizationID *string
 }
 
 func (r VolumesAPICreateVolumeRequest) CreateVolume(createVolume CreateVolume) VolumesAPICreateVolumeRequest {
 	r.createVolume = &createVolume
-	return r
-}
-
-// Use with JWT to specify the organization ID
-func (r VolumesAPICreateVolumeRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) VolumesAPICreateVolumeRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
 	return r
 }
 
@@ -165,9 +158,6 @@ func (a *VolumesAPIService) CreateVolumeExecute(r VolumesAPICreateVolumeRequest)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	// body params
 	localVarPostBody = r.createVolume
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -211,13 +201,6 @@ type VolumesAPIDeleteVolumeRequest struct {
 	ctx context.Context
 	ApiService VolumesAPI
 	volumeId string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r VolumesAPIDeleteVolumeRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) VolumesAPIDeleteVolumeRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r VolumesAPIDeleteVolumeRequest) Execute() (*http.Response, error) {
@@ -276,9 +259,6 @@ func (a *VolumesAPIService) DeleteVolumeExecute(r VolumesAPIDeleteVolumeRequest)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return nil, err
@@ -311,13 +291,6 @@ type VolumesAPIGetVolumeRequest struct {
 	ctx context.Context
 	ApiService VolumesAPI
 	volumeId string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r VolumesAPIGetVolumeRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) VolumesAPIGetVolumeRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r VolumesAPIGetVolumeRequest) Execute() (*VolumeDto, *http.Response, error) {
@@ -378,9 +351,6 @@ func (a *VolumesAPIService) GetVolumeExecute(r VolumesAPIGetVolumeRequest) (*Vol
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -422,13 +392,6 @@ type VolumesAPIGetVolumeByNameRequest struct {
 	ctx context.Context
 	ApiService VolumesAPI
 	name string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r VolumesAPIGetVolumeByNameRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) VolumesAPIGetVolumeByNameRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r VolumesAPIGetVolumeByNameRequest) Execute() (*VolumeDto, *http.Response, error) {
@@ -489,9 +452,6 @@ func (a *VolumesAPIService) GetVolumeByNameExecute(r VolumesAPIGetVolumeByNameRe
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -532,14 +492,7 @@ func (a *VolumesAPIService) GetVolumeByNameExecute(r VolumesAPIGetVolumeByNameRe
 type VolumesAPIListVolumesRequest struct {
 	ctx context.Context
 	ApiService VolumesAPI
-	xDaytonaOrganizationID *string
 	includeDeleted *bool
-}
-
-// Use with JWT to specify the organization ID
-func (r VolumesAPIListVolumesRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) VolumesAPIListVolumesRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 // Include deleted volumes in the response
@@ -605,9 +558,6 @@ func (a *VolumesAPIService) ListVolumesExecute(r VolumesAPIListVolumesRequest) (
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {

@@ -25,8 +25,6 @@ type VolumeDto struct {
 	Id string `json:"id"`
 	// Volume name
 	Name string `json:"name"`
-	// Organization ID
-	OrganizationId string `json:"organizationId"`
 	// Volume state
 	State VolumeState `json:"state"`
 	// Creation timestamp
@@ -46,11 +44,10 @@ type _VolumeDto VolumeDto
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewVolumeDto(id string, name string, organizationId string, state VolumeState, createdAt string, updatedAt string, errorReason NullableString) *VolumeDto {
+func NewVolumeDto(id string, name string, state VolumeState, createdAt string, updatedAt string, errorReason NullableString) *VolumeDto {
 	this := VolumeDto{}
 	this.Id = id
 	this.Name = name
-	this.OrganizationId = organizationId
 	this.State = state
 	this.CreatedAt = createdAt
 	this.UpdatedAt = updatedAt
@@ -112,30 +109,6 @@ func (o *VolumeDto) GetNameOk() (*string, bool) {
 // SetName sets field value
 func (o *VolumeDto) SetName(v string) {
 	o.Name = v
-}
-
-// GetOrganizationId returns the OrganizationId field value
-func (o *VolumeDto) GetOrganizationId() string {
-	if o == nil {
-		var ret string
-		return ret
-	}
-
-	return o.OrganizationId
-}
-
-// GetOrganizationIdOk returns a tuple with the OrganizationId field value
-// and a boolean to check if the value has been set.
-func (o *VolumeDto) GetOrganizationIdOk() (*string, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.OrganizationId, true
-}
-
-// SetOrganizationId sets field value
-func (o *VolumeDto) SetOrganizationId(v string) {
-	o.OrganizationId = v
 }
 
 // GetState returns the State field value
@@ -290,7 +263,6 @@ func (o VolumeDto) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["id"] = o.Id
 	toSerialize["name"] = o.Name
-	toSerialize["organizationId"] = o.OrganizationId
 	toSerialize["state"] = o.State
 	toSerialize["createdAt"] = o.CreatedAt
 	toSerialize["updatedAt"] = o.UpdatedAt
@@ -313,7 +285,6 @@ func (o *VolumeDto) UnmarshalJSON(data []byte) (err error) {
 	requiredProperties := []string{
 		"id",
 		"name",
-		"organizationId",
 		"state",
 		"createdAt",
 		"updatedAt",
@@ -349,7 +320,6 @@ func (o *VolumeDto) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "id")
 		delete(additionalProperties, "name")
-		delete(additionalProperties, "organizationId")
 		delete(additionalProperties, "state")
 		delete(additionalProperties, "createdAt")
 		delete(additionalProperties, "updatedAt")

@@ -14,10 +14,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { DEFAULT_PAGE_SIZE } from '@/constants/Pagination'
 import { SnapshotSorting } from '@/hooks/queries/useSnapshotsQuery'
 import { useCommandPaletteAnalytics } from '@/hooks/useCommandPaletteAnalytics'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { cn } from '@/lib/utils'
 import { DEFAULT_TABLE_COLUMN, getColumnSizeStyles, getTableSizeStyles } from '@/lib/utils/table'
-import { OrganizationRolePermissionsEnum, SnapshotDto, SnapshotState } from '@daytona/api-client'
+import { SnapshotDto, SnapshotState } from '@daytona/api-client'
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { Box } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
@@ -48,7 +47,7 @@ interface DataTableProps {
   data: SnapshotDto[]
   loading: boolean
   loadingSnapshots: Record<string, boolean>
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   onDelete: (snapshot: SnapshotDto) => void
   onBulkDelete?: (snapshots: SnapshotDto[]) => void
   onBulkDeactivate?: (snapshots: SnapshotDto[]) => void
@@ -117,7 +116,7 @@ export function SnapshotTable({
   data,
   loading,
   loadingSnapshots,
-  getRegionName,
+  getTargetName,
   onDelete,
   onActivate,
   onDeactivate,
@@ -138,17 +137,8 @@ export function SnapshotTable({
   stateFilter,
   onStateFilterChange,
 }: DataTableProps) {
-  const { authenticatedUserHasPermission } = useSelectedOrganization()
-
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_SNAPSHOTS),
-    [authenticatedUserHasPermission],
-  )
-
-  const deletePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_SNAPSHOTS),
-    [authenticatedUserHasPermission],
-  )
+  const writePermitted = true
+  const deletePermitted = true
 
   const tableSorting = useMemo(() => convertApiSortingToTableSorting(sorting), [sorting])
 
@@ -195,7 +185,7 @@ export function SnapshotTable({
         writePermitted,
         deletePermitted,
         loadingSnapshots,
-        getRegionName,
+        getTargetName,
         selectableCount,
         onDelete,
         loading,

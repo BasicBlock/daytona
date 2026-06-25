@@ -14,7 +14,6 @@ import (
 // Config holds all configuration for E2E tests loaded from environment variables.
 type Config struct {
 	BaseURL      string
-	APIKey       string
 	Snapshot     string
 	PollTimeout  time.Duration
 	PollInterval time.Duration
@@ -28,11 +27,6 @@ func LoadConfig(t *testing.T) Config {
 	baseURL := os.Getenv("DAYTONA_API_URL")
 	if baseURL == "" {
 		t.Skip("DAYTONA_API_URL not set — skipping E2E test")
-	}
-
-	apiKey := os.Getenv("DAYTONA_API_KEY")
-	if apiKey == "" {
-		t.Skip("DAYTONA_API_KEY not set — skipping E2E test")
 	}
 
 	pollTimeout := 5 * time.Minute
@@ -55,7 +49,6 @@ func LoadConfig(t *testing.T) Config {
 
 	return Config{
 		BaseURL:      baseURL,
-		APIKey:       apiKey,
 		Snapshot:     os.Getenv("DAYTONA_SNAPSHOT"),
 		PollTimeout:  pollTimeout,
 		PollInterval: pollInterval,

@@ -7,8 +7,6 @@ import { RegistryType } from './../../docker-registry/enums/registry-type.enum'
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
 
 @Entity()
-@Index(['organizationId', 'registryType'])
-@Index(['region', 'registryType'])
 @Index(['registryType', 'isDefault'])
 export class DockerRegistry {
   @PrimaryGeneratedColumn('uuid')
@@ -34,12 +32,6 @@ export class DockerRegistry {
 
   @Column({ default: '' })
   project: string
-
-  @Column({ nullable: true, type: 'uuid' })
-  organizationId?: string
-
-  @Column({ nullable: true })
-  region: string | null
 
   @Column({
     type: 'enum',

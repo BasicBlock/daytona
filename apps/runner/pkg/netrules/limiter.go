@@ -7,6 +7,9 @@ import "strings"
 
 // SetNetworkLimiter creates and configures network rules for a container
 func (manager *NetRulesManager) SetNetworkLimiter(name string, sourceIp string) error {
+	if manager.disabled() {
+		return nil
+	}
 
 	// Add prefix to chain name
 	chainName := formatChainName(name)
@@ -40,6 +43,10 @@ func (manager *NetRulesManager) SetNetworkLimiter(name string, sourceIp string) 
 
 // RemoveNetworkLimiter removes the network limiter for a container
 func (manager *NetRulesManager) RemoveNetworkLimiter(name string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	chainName := formatChainName(name)
 
 	manager.mu.Lock()

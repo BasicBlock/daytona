@@ -1396,7 +1396,7 @@
   "definitions": {
     "BuildSnapshotRequestDTO": {
       "type": "object",
-      "required": ["dockerfile", "organizationId"],
+      "required": ["dockerfile"],
       "properties": {
         "context": {
           "type": "array",
@@ -1405,9 +1405,6 @@
           }
         },
         "dockerfile": {
-          "type": "string"
-        },
-        "organizationId": {
           "type": "string"
         },
         "pushToInternalRegistry": {
@@ -1425,6 +1422,9 @@
           "items": {
             "$ref": "#/definitions/RegistryDTO"
           }
+        },
+        "storagePrefix": {
+          "type": "string"
         }
       }
     },
@@ -1442,7 +1442,7 @@
     },
     "CreateSandboxDTO": {
       "type": "object",
-      "required": ["id", "osUser", "snapshot", "userId"],
+      "required": ["id", "osUser", "snapshot"],
       "properties": {
         "authToken": {
           "type": "string"
@@ -1500,17 +1500,10 @@
         "networkBlockAll": {
           "type": "boolean"
         },
-        "organizationId": {
-          "description": "Nullable for backward compatibility",
-          "type": "string"
-        },
         "osUser": {
           "type": "string"
         },
         "otelEndpoint": {
-          "type": "string"
-        },
-        "regionId": {
           "type": "string"
         },
         "registry": {
@@ -1530,9 +1523,6 @@
           "type": "integer",
           "minimum": 1
         },
-        "userId": {
-          "type": "string"
-        },
         "volumes": {
           "type": "array",
           "items": {
@@ -1548,9 +1538,6 @@
         "name": {
           "type": "string",
           "example": "my-snapshot:latest"
-        },
-        "organizationId": {
-          "type": "string"
         },
         "registry": {
           "$ref": "#/definitions/RegistryDTO"
@@ -1644,7 +1631,7 @@
     },
     "RecoverSandboxDTO": {
       "type": "object",
-      "required": ["osUser", "userId"],
+      "required": ["osUser"],
       "properties": {
         "backupErrorReason": {
           "type": "string"
@@ -1692,9 +1679,6 @@
         "storageQuota": {
           "type": "integer",
           "minimum": 1
-        },
-        "userId": {
-          "type": "string"
         },
         "volumes": {
           "type": "array",
@@ -1987,18 +1971,5 @@
         "SandboxStatePullingSnapshot"
       ]
     }
-  },
-  "securityDefinitions": {
-    "Bearer": {
-      "description": "Type \"Bearer\" followed by a space and an API token.",
-      "type": "apiKey",
-      "name": "Authorization",
-      "in": "header"
-    }
-  },
-  "security": [
-    {
-      "Bearer": []
-    }
-  ]
+  }
 }

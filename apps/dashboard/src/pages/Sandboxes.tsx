@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { OrganizationSuspendedError } from '@/api/errors'
 import { useRegisterCommands, type CommandConfig } from '@/components/CommandPalette'
 import { CursorPagination } from '@/components/CursorPagination'
 import { ForkTreeDialog } from '@/components/ForkTreeDialog'
@@ -35,8 +34,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DAYTONA_DOCS_URL } from '@/constants/ExternalLinks'
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/constants/Pagination'
-import { LocalStorageKey } from '@/enums/LocalStorageKey'
-import { RoutePath } from '@/enums/RoutePath'
 import { mutationKeys } from '@/hooks/mutations/mutationKeys'
 import { useArchiveSandboxMutation } from '@/hooks/mutations/useArchiveSandboxMutation'
 import { useDeleteSandboxMutation } from '@/hooks/mutations/useDeleteSandboxMutation'
@@ -54,20 +51,15 @@ import {
   useSandboxesQuery,
 } from '@/hooks/queries/useSandboxesQuery'
 import { SnapshotFilters, SnapshotQueryParams, useSnapshotsQuery } from '@/hooks/queries/useSnapshotsQuery'
-import { useAvailableRegionsQuery, useRegionLookup } from '@/hooks/queries/useRegionsQuery'
+import { useAvailableTargetsQuery, useTargetLookup } from '@/hooks/queries/useTargetsQuery'
 import { useApi } from '@/hooks/useApi'
-import { useConfig } from '@/hooks/useConfig'
 import { useSandboxWsSync, type SandboxWsSyncEvent } from '@/hooks/useSandboxWsSync'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { createBulkActionToast } from '@/lib/bulk-action-toast'
 import { handleApiError } from '@/lib/error-handling'
-import { getLocalStorageItem, setLocalStorageItem } from '@/lib/local-storage'
-import { EMPTY_REGIONS } from '@/lib/regions'
+import { EMPTY_TARGETS } from '@/lib/targets'
 import { formatDuration, pluralize } from '@/lib/utils'
 import {
   ListSandboxesResponse,
-  OrganizationRolePermissionsEnum,
-  OrganizationUserRoleEnum,
   Sandbox,
   SandboxClass,
   SandboxDesiredState,
@@ -76,7 +68,6 @@ import {
   SandboxListSortField,
   SandboxState,
 } from '@daytona/api-client'
-import type { Sandbox as CreatedSandbox } from '@daytona/sdk'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { PlusIcon } from 'lucide-react'
 import {
@@ -91,8 +82,6 @@ import {
   useQueryStates,
 } from 'nuqs'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAuth } from 'react-oidc-context'
-import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 type CreateSandboxSnapshotVariables = {
@@ -129,7 +118,7 @@ const sandboxViewSearchParams = {
   search: parseAsString.withDefault(''),
   states: parseAsArrayOf(parseAsString).withDefault([]),
   snapshots: parseAsArrayOf(parseAsString).withDefault([]),
-  regions: parseAsArrayOf(parseAsString).withDefault([]),
+  targets: parseAsArrayOf(parseAsString).withDefault([]),
   sandboxClasses: parseAsArrayOf(parseAsString).withDefault([]),
   labels: labelsParser,
   minCpu: parseAsFloat,
@@ -285,13 +274,8 @@ function useSandboxesPageWsSync({
 }
 
 const Sandboxes: React.FC = () => {
-  const { sandboxApi, apiKeyApi, toolboxApi } = useApi()
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const config = useConfig()
+  const { sandboxApi, toolboxApi } = useApi()
   const queryClient = useQueryClient()
-  const { selectedOrganization, authenticatedUserOrganizationMember, authenticatedUserHasPermission } =
-    useSelectedOrganization()
 
   const createSandboxSheetRef = useRef<{ open: () => undefined }>(null)
   const sandboxSheetRef = useRef<SandboxSheetRef>(null)
@@ -321,7 +305,7 @@ const Sandboxes: React.FC = () => {
     if (states.length > 0) nextFilters.states = states
     if (sandboxClasses.length > 0) nextFilters.sandboxClasses = sandboxClasses
     if (viewParams.snapshots.length > 0) nextFilters.snapshots = viewParams.snapshots
-    if (viewParams.regions.length > 0) nextFilters.regions = viewParams.regions
+    if (viewParams.targets.length > 0) nextFilters.targets = viewParams.targets
     if (Object.keys(labels).length > 0) nextFilters.labels = labels
     if (viewParams.minCpu !== null) nextFilters.minCpu = viewParams.minCpu
     if (viewParams.maxCpu !== null) nextFilters.maxCpu = viewParams.maxCpu
@@ -351,7 +335,7 @@ const Sandboxes: React.FC = () => {
     viewParams.minCpu,
     viewParams.minDisk,
     viewParams.minMemory,
-    viewParams.regions,
+    viewParams.targets,
     viewParams.sandboxClasses,
     viewParams.search,
     viewParams.snapshots,
@@ -426,7 +410,7 @@ const Sandboxes: React.FC = () => {
         search: newFilters.name?.trim() || null,
         states: newFilters.states?.length ? newFilters.states : null,
         snapshots: newFilters.snapshots?.length ? newFilters.snapshots : null,
-        regions: newFilters.regions?.length ? newFilters.regions : null,
+        targets: newFilters.targets?.length ? newFilters.targets : null,
         sandboxClasses: newFilters.sandboxClasses?.length ? newFilters.sandboxClasses : null,
         labels: Object.keys(labels).length > 0 ? labels : null,
         minCpu: newFilters.minCpu ?? null,
@@ -473,14 +457,8 @@ const Sandboxes: React.FC = () => {
     [cursor, filters, pageSize, sorting],
   )
 
-  const sandboxListQueryKey = useMemo(
-    () => queryKeys.sandboxes.list(selectedOrganization?.id ?? ''),
-    [selectedOrganization?.id],
-  )
-  const queryKey = useMemo(
-    () => queryKeys.sandboxes.list(selectedOrganization?.id ?? '', queryParams),
-    [queryParams, selectedOrganization?.id],
-  )
+  const sandboxListQueryKey = useMemo(() => queryKeys.sandboxes.list(), [])
+  const queryKey = useMemo(() => queryKeys.sandboxes.list(queryParams), [queryParams])
 
   const {
     data: sandboxesData,
@@ -515,25 +493,20 @@ const Sandboxes: React.FC = () => {
 
   const seedSandboxDetailsCache = useCallback(
     (sandbox: SandboxListItem | Sandbox) => {
-      if (!selectedOrganization?.id) {
-        return
-      }
-
-      const queryKey = queryKeys.sandboxes.detail(selectedOrganization.id, sandbox.id)
+      const queryKey = queryKeys.sandboxes.detail(sandbox.id)
       if (queryClient.getQueryData<Sandbox>(queryKey)) {
         return
       }
 
       queryClient.setQueryData<Sandbox>(queryKey, sandbox as Sandbox, { updatedAt: 0 })
     },
-    [queryClient, selectedOrganization?.id],
+    [queryClient],
   )
 
   const updateSandboxInCache = useCallback(
     (sandboxId: string, updates: Partial<Sandbox>) => {
-      queryClient.setQueryData<Sandbox>(
-        queryKeys.sandboxes.detail(selectedOrganization?.id ?? '', sandboxId),
-        (oldData) => (oldData ? { ...oldData, ...updates } : oldData),
+      queryClient.setQueryData<Sandbox>(queryKeys.sandboxes.detail(sandboxId), (oldData) =>
+        oldData ? { ...oldData, ...updates } : oldData,
       )
 
       queryClient.setQueriesData<ListSandboxesResponse>({ queryKey: sandboxListQueryKey }, (oldData) => {
@@ -549,7 +522,7 @@ const Sandboxes: React.FC = () => {
 
       setSelectedSandbox((prev) => (prev?.id === sandboxId ? { ...prev, ...updates } : prev))
     },
-    [queryClient, sandboxListQueryKey, selectedOrganization?.id],
+    [queryClient, sandboxListQueryKey],
   )
 
   const markAllSandboxQueriesAsStale = useCallback(
@@ -593,22 +566,20 @@ const Sandboxes: React.FC = () => {
   const forkSandboxMutation = useMutation({
     mutationKey: mutationKeys.sandboxes.fork(),
     mutationFn: async ({ sandboxId }: { sandboxId: string }) => {
-      await sandboxApi.forkSandbox(sandboxId, {}, selectedOrganization?.id)
+      await sandboxApi.forkSandbox(sandboxId)
     },
   })
 
   const createSandboxSnapshotMutation = useMutation({
     mutationKey: mutationKeys.sandboxes.createSnapshot(),
     mutationFn: async ({ sandboxId, name, includeMemory }: CreateSandboxSnapshotVariables) => {
-      await sandboxApi.createSandboxSnapshot(sandboxId, { name, includeMemory }, selectedOrganization?.id)
+      await sandboxApi.createSandboxSnapshot(sandboxId, { name, includeMemory })
     },
   })
 
   const getSandboxById = useCallback(
     (sandboxId: string) => {
-      const cachedSandbox = selectedOrganization?.id
-        ? queryClient.getQueryData<Sandbox>(queryKeys.sandboxes.detail(selectedOrganization.id, sandboxId))
-        : undefined
+      const cachedSandbox = queryClient.getQueryData<Sandbox>(queryKeys.sandboxes.detail(sandboxId))
 
       return (
         sandboxes.find((sandbox) => sandbox.id === sandboxId) ??
@@ -616,14 +587,14 @@ const Sandboxes: React.FC = () => {
         (selectedSandbox?.id === sandboxId ? selectedSandbox : undefined)
       )
     },
-    [queryClient, sandboxes, selectedOrganization?.id, selectedSandbox],
+    [queryClient, sandboxes, selectedSandbox],
   )
 
   const getPortPreviewUrl = useCallback(
     async (sandboxId: string, port: number): Promise<string> => {
-      return (await sandboxApi.getSignedPortPreviewUrl(sandboxId, port, selectedOrganization?.id)).data.url
+      return (await sandboxApi.getSignedPortPreviewUrl(sandboxId, port)).data.url
     },
-    [sandboxApi, selectedOrganization?.id],
+    [sandboxApi],
   )
 
   const getVncUrl = useCallback(
@@ -645,7 +616,7 @@ const Sandboxes: React.FC = () => {
       toast.info('Checking VNC desktop status...')
 
       try {
-        const statusResponse = await toolboxApi.getComputerUseStatusDeprecated(sandboxId, selectedOrganization?.id)
+        const statusResponse = await toolboxApi.getComputerUseStatusDeprecated(sandboxId)
         const status = statusResponse.data.status
 
         if (status === 'active') {
@@ -658,11 +629,11 @@ const Sandboxes: React.FC = () => {
         }
 
         try {
-          await toolboxApi.startComputerUseDeprecated(sandboxId, selectedOrganization?.id)
+          await toolboxApi.startComputerUseDeprecated(sandboxId)
           toast.success('Starting VNC desktop...')
           await new Promise((resolve) => setTimeout(resolve, 5000))
 
-          const newStatusResponse = await toolboxApi.getComputerUseStatusDeprecated(sandboxId, selectedOrganization?.id)
+          const newStatusResponse = await toolboxApi.getComputerUseStatusDeprecated(sandboxId)
           const newStatus = newStatusResponse.data.status
 
           if (newStatus === 'active') {
@@ -783,10 +754,8 @@ const Sandboxes: React.FC = () => {
     }
   }, [snapshotsDataError])
 
-  const { data: regionsData = EMPTY_REGIONS, isLoading: regionsDataIsLoading } = useAvailableRegionsQuery(
-    selectedOrganization?.id,
-  )
-  const { getRegionName } = useRegionLookup(selectedOrganization?.id)
+  const { data: targetsData = EMPTY_TARGETS, isLoading: targetsDataIsLoading } = useAvailableTargetsQuery()
+  const { getTargetName } = useTargetLookup()
 
   const sandboxFromLoadedResults = useMemo(
     () => sandboxes.find((sandbox) => sandbox.id === sandboxIdParam),
@@ -831,7 +800,7 @@ const Sandboxes: React.FC = () => {
 
   const openDeleteDialog = async (id: string) => {
     try {
-      const forksRes = await sandboxApi.getSandboxForks(id, selectedOrganization?.id)
+      const forksRes = await sandboxApi.getSandboxForks(id)
       if (forksRes.data.length > 0) {
         setRecursiveDeleteSandboxId(id)
         return
@@ -862,16 +831,7 @@ const Sandboxes: React.FC = () => {
       toast.success(`${wasPaused ? 'Resuming' : 'Starting'} sandbox with ID: ${id}`)
       await markAllSandboxQueriesAsStale()
     } catch (error) {
-      handleApiError(error, `Failed to ${wasPaused ? 'resume' : 'start'} sandbox`, {
-        action:
-          error instanceof OrganizationSuspendedError &&
-          config.billingApiUrl &&
-          authenticatedUserOrganizationMember?.role === OrganizationUserRoleEnum.OWNER ? (
-            <Button variant="secondary" onClick={() => navigate(RoutePath.BILLING_WALLET)}>
-              Go to billing
-            </Button>
-          ) : null,
-      })
+      handleApiError(error, `Failed to ${wasPaused ? 'resume' : 'start'} sandbox`)
       revertSandboxStateOptimisticUpdate(id, previousState)
     }
   }
@@ -1187,22 +1147,14 @@ const Sandboxes: React.FC = () => {
     openSandboxDetails(sandbox, 'terminal')
   }
 
-  const handleSandboxCreated = (sandbox: CreatedSandbox) => {
-    const createdSandbox = sandbox as unknown as Sandbox
-
+  const handleSandboxCreated = (sandbox: Sandbox) => {
     markAllSandboxQueriesAsStale(true)
-    openSandboxDetails(createdSandbox)
+    openSandboxDetails(sandbox)
   }
 
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_SANDBOXES),
-    [authenticatedUserHasPermission],
-  )
-  const deletePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_SANDBOXES),
-    [authenticatedUserHasPermission],
-  )
-  const canCreateSandbox = writePermitted && !selectedOrganization?.suspended
+  const writePermitted = true
+  const deletePermitted = true
+  const canCreateSandbox = true
 
   const rootCommands: CommandConfig[] = useMemo(() => {
     if (!canCreateSandbox) {
@@ -1220,35 +1172,6 @@ const Sandboxes: React.FC = () => {
   }, [canCreateSandbox])
 
   useRegisterCommands(rootCommands, { groupId: 'sandbox-actions', groupLabel: 'Sandbox actions', groupOrder: 0 })
-
-  useEffect(() => {
-    const onboardIfNeeded = async () => {
-      if (!selectedOrganization) {
-        return
-      }
-
-      const skipOnboardingKey = `${LocalStorageKey.SkipOnboardingPrefix}${user?.profile.sub}`
-      const shouldSkipOnboarding = getLocalStorageItem(skipOnboardingKey) === 'true'
-
-      if (shouldSkipOnboarding) {
-        return
-      }
-
-      try {
-        const keys = (await apiKeyApi.listApiKeys(selectedOrganization.id)).data
-        if (keys.length === 0) {
-          setLocalStorageItem(skipOnboardingKey, 'true')
-          navigate(RoutePath.ONBOARDING)
-        } else {
-          setLocalStorageItem(skipOnboardingKey, 'true')
-        }
-      } catch (error) {
-        console.error('Failed to check if user needs onboarding', error)
-      }
-    }
-
-    onboardIfNeeded()
-  }, [apiKeyApi, navigate, selectedOrganization, user])
 
   const handleCreateSnapshotConfirm = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
@@ -1276,22 +1199,9 @@ const Sandboxes: React.FC = () => {
         <PageIntro
           title="Sandboxes"
           actions={
-            <>
-              {!sandboxesDataIsLoading && sandboxes.length === 0 && (
-                <Button
-                  variant="link"
-                  onClick={() => navigate(RoutePath.ONBOARDING)}
-                  size="sm"
-                  className="text-muted-foreground"
-                >
-                  Onboarding guide
-                </Button>
-              )}
-
-              {canCreateSandbox && (
-                <CreateSandboxSheet ref={createSandboxSheetRef} onSandboxCreated={handleSandboxCreated} />
-              )}
-            </>
+            canCreateSandbox ? (
+              <CreateSandboxSheet ref={createSandboxSheetRef} onSandboxCreated={handleSandboxCreated} />
+            ) : null
           }
         />
         <SandboxTable
@@ -1318,15 +1228,15 @@ const Sandboxes: React.FC = () => {
           snapshotsDataIsLoading={snapshotsDataIsLoading}
           snapshotsDataHasMore={snapshotsDataHasMore}
           onChangeSnapshotSearchValue={(name?: string) => handleSnapshotFiltersChange({ name })}
-          regionsData={regionsData ?? []}
-          regionsDataIsLoading={regionsDataIsLoading}
+          targetsData={targetsData ?? []}
+          targetsDataIsLoading={targetsDataIsLoading}
           onRowClick={handleSandboxRowClick}
           sorting={sorting}
           onSortingChange={handleSortingChange}
           filters={filters}
           onFiltersChange={handleFiltersChange}
           handleRecover={handleRecover}
-          getRegionName={getRegionName}
+          getTargetName={getTargetName}
           handleScreenRecordings={handleScreenRecordings}
           handleCreateSnapshot={handleCreateSnapshot}
           handleFork={handleFork}
@@ -1460,7 +1370,7 @@ const Sandboxes: React.FC = () => {
           writePermitted={writePermitted}
           deletePermitted={deletePermitted}
           handleRecover={handleRecover}
-          getRegionName={getRegionName}
+          getTargetName={getTargetName}
           onCreateSshAccess={openCreateSshDialog}
           onRevokeSshAccess={openRevokeSshDialog}
           onScreenRecordings={handleScreenRecordings}

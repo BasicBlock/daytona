@@ -11,7 +11,6 @@ import { mutationKeys } from './mutationKeys'
 
 export interface CreateRunnerMutationVariables {
   runner: CreateRunner
-  organizationId?: string
 }
 
 export const useCreateRunnerMutation = () => {
@@ -20,18 +19,12 @@ export const useCreateRunnerMutation = () => {
 
   return useMutation<CreateRunnerResponse, unknown, CreateRunnerMutationVariables>({
     mutationKey: mutationKeys.runners.create(),
-    mutationFn: async ({ runner, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-
-      const response = await runnersApi.createRunner(runner, organizationId)
+    mutationFn: async ({ runner }) => {
+      const response = await runnersApi.createRunner(runner)
       return response.data
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (organizationId) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.runners.list(organizationId) })
-      }
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.runners.list() })
     },
   })
 }

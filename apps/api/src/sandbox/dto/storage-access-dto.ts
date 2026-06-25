@@ -31,10 +31,10 @@ export class StorageAccessDto {
   storageUrl: string
 
   @ApiProperty({
-    description: 'Organization ID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
+    description: 'Shared object storage prefix',
+    example: 'objects',
   })
-  organizationId: string
+  storagePrefix: string
 
   @ApiProperty({
     description: 'S3 bucket name',

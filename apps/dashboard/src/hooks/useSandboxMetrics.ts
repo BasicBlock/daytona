@@ -5,7 +5,6 @@
 
 import { useQuery, UseQueryOptions } from '@tanstack/react-query'
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { MetricsResponse } from '@daytona/api-client'
 
@@ -21,18 +20,16 @@ export function useSandboxMetrics(
   options?: Omit<UseQueryOptions<MetricsResponse>, 'queryKey' | 'queryFn'>,
 ) {
   const api = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<MetricsResponse>({
     queryKey: queryKeys.telemetry.metrics(sandboxId ?? '', params),
     queryFn: async () => {
-      if (!selectedOrganization || !sandboxId || !api.analyticsTelemetryApi) {
+      if (!sandboxId || !api.analyticsTelemetryApi) {
         throw new Error('Missing required parameters')
       }
       const metricNames = params.metricNames?.length ? params.metricNames.join(',') : undefined
 
-      const response = await api.analyticsTelemetryApi.organizationOrganizationIdSandboxSandboxIdTelemetryMetricsGet(
-        selectedOrganization.id,
+      const response = await api.analyticsTelemetryApi.sandboxSandboxIdTelemetryMetricsGet(
         sandboxId,
         params.from.toISOString(),
         params.to.toISOString(),
@@ -59,7 +56,7 @@ export function useSandboxMetrics(
 
       return { series }
     },
-    enabled: !!sandboxId && !!selectedOrganization && !!api.analyticsTelemetryApi && !!params.from && !!params.to,
+    enabled: !!sandboxId && !!api.analyticsTelemetryApi && !!params.from && !!params.to,
     staleTime: 10_000,
     ...options,
   })

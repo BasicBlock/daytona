@@ -208,10 +208,6 @@ export class VolumeManager
                 Value: volume.id,
               },
               {
-                Key: 'OrganizationId',
-                Value: volume.organizationId,
-              },
-              {
                 Key: 'Environment',
                 Value: this.configService.get('environment'),
               },
@@ -269,9 +265,8 @@ export class VolumeManager
       // Refresh lock before final state update
       await this.redis.setex(lockKey, 30, '1')
 
-      // Delete any existing volume record with the deleted state and the same name in the same organization
+      // Delete any previous tombstone for this globally scoped volume name.
       await this.volumeRepository.delete({
-        organizationId: volume.organizationId,
         name: `${volume.name}-deleted`,
         state: VolumeState.DELETED,
       })

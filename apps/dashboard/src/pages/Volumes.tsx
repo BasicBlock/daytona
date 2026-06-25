@@ -20,12 +20,11 @@ import { VolumeTable } from '@/components/VolumeTable'
 import { useDeleteVolumeMutation } from '@/hooks/mutations/useDeleteVolumeMutation'
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { useVolumesQuery } from '@/hooks/queries/useVolumesQuery'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { useVolumeWsSync } from '@/hooks/useVolumeWsSync'
 import { createBulkActionToast } from '@/lib/bulk-action-toast'
 import { handleApiError } from '@/lib/error-handling'
 import { pluralize } from '@/lib/utils'
-import { OrganizationRolePermissionsEnum, VolumeDto, VolumeState } from '@daytona/api-client'
+import { VolumeDto, VolumeState } from '@daytona/api-client'
 import { useQueryClient } from '@tanstack/react-query'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -38,10 +37,9 @@ const Volumes: React.FC = () => {
   const [processingVolumeAction, setProcessingVolumeAction] = useState<Record<string, boolean>>({})
   const createVolumeSheetRef = useRef<{ open: () => void }>(null)
 
-  const { selectedOrganization, authenticatedUserHasPermission } = useSelectedOrganization()
   useVolumeWsSync()
 
-  const queryKey = useMemo(() => queryKeys.volumes.list(selectedOrganization?.id ?? ''), [selectedOrganization?.id])
+  const queryKey = useMemo(() => queryKeys.volumes.list(), [])
   const { data: volumes = [], isLoading: loadingVolumes, error: volumesError } = useVolumesQuery()
   const deleteVolumeMutation = useDeleteVolumeMutation({ invalidateOnSuccess: false })
 
@@ -70,11 +68,8 @@ const Volumes: React.FC = () => {
     try {
       await deleteVolumeMutation.mutateAsync({
         volumeId: volume.id,
-        organizationId: selectedOrganization?.id,
       })
-      if (selectedOrganization?.id) {
-        await queryClient.invalidateQueries({ queryKey })
-      }
+      await queryClient.invalidateQueries({ queryKey })
       setVolumeToDelete(null)
       setShowDeleteDialog(false)
       toast.success(`Deleting volume ${volume.name}`)
@@ -117,7 +112,6 @@ const Volumes: React.FC = () => {
         try {
           await deleteVolumeMutation.mutateAsync({
             volumeId: volume.id,
-            organizationId: selectedOrganization?.id,
           })
           successCount += 1
         } catch (error) {
@@ -129,9 +123,7 @@ const Volumes: React.FC = () => {
         }
       }
 
-      if (selectedOrganization?.id) {
-        await queryClient.invalidateQueries({ queryKey })
-      }
+      await queryClient.invalidateQueries({ queryKey })
 
       bulkToast.result(
         { successCount, failureCount },
@@ -148,10 +140,7 @@ const Volumes: React.FC = () => {
     }
   }
 
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_VOLUMES),
-    [authenticatedUserHasPermission],
-  )
+  const writePermitted = true
 
   return (
     <PageLayout contained>

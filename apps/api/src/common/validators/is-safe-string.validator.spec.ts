@@ -10,7 +10,7 @@ describe('IsSafeDisplayStringConstraint', () => {
 
   describe('valid inputs', () => {
     const validStrings = [
-      ['simple name', 'My Organization'],
+      ['simple name', 'My Project'],
       ['name with apostrophe', "John O'Brien-Smith"],
       ['name with dot', 'Acme Inc.'],
       ['name with underscore', 'my_sandbox_123'],

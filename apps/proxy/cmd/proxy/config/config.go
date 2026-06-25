@@ -4,14 +4,11 @@
 package config
 
 import (
-	"context"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/daytonaio/common-go/pkg/cache"
-	"github.com/daytonaio/common-go/pkg/utils"
 	apiclient "github.com/daytonaio/daytona/libs/api-client-go"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
@@ -22,13 +19,12 @@ type Config struct {
 	ProxyPort             int                `envconfig:"PROXY_PORT" validate:"required"`
 	MetricsPort           int                `envconfig:"METRICS_PORT"`
 	ProxyProtocol         string             `envconfig:"PROXY_PROTOCOL" validate:"required"`
-	ProxyApiKey           string             `envconfig:"PROXY_API_KEY" validate:"required"`
+	CookieSecret          string             `envconfig:"COOKIE_SECRET" validate:"required"`
 	CookieDomain          *string            `envconfig:"COOKIE_DOMAIN"`
 	TLSCertFile           string             `envconfig:"TLS_CERT_FILE"`
 	TLSKeyFile            string             `envconfig:"TLS_KEY_FILE"`
 	EnableTLS             bool               `envconfig:"ENABLE_TLS"`
 	DaytonaApiUrl         string             `envconfig:"DAYTONA_API_URL" validate:"required"`
-	Oidc                  OidcConfig         `envconfig:"OIDC"`
 	Redis                 *cache.RedisConfig `envconfig:"REDIS"`
 	ToolboxOnlyMode       bool               `envconfig:"TOOLBOX_ONLY_MODE"`
 	PreviewWarningEnabled bool               `envconfig:"PREVIEW_WARNING_ENABLED"`
@@ -39,14 +35,6 @@ type Config struct {
 	// Daytona API. Tighter IdleConnTimeout than http.DefaultTransport so we
 	// don't reuse a connection the API server has already closed.
 	ApiHTTPTransport http.RoundTripper
-}
-
-type OidcConfig struct {
-	ClientId     string  `envconfig:"CLIENT_ID"`
-	ClientSecret string  `envconfig:"CLIENT_SECRET"`
-	Domain       string  `envconfig:"DOMAIN"`
-	PublicDomain *string `envconfig:"PUBLIC_DOMAIN"`
-	Audience     string  `envconfig:"AUDIENCE"`
 }
 
 var DEFAULT_PROXY_PORT int = 4000
@@ -111,8 +99,6 @@ func GetConfig() (*Config, error) {
 		},
 	}
 
-	clientConfig.AddDefaultHeader("Authorization", "Bearer "+config.ProxyApiKey)
-
 	config.ApiClient = apiclient.NewAPIClient(clientConfig)
 
 	// Clone http.DefaultTransport so we inherit its dial/TLS/H2 defaults, then
@@ -133,44 +119,6 @@ func GetConfig() (*Config, error) {
 	config.ApiClient.GetConfig().HTTPClient = &http.Client{
 		Transport: config.ApiHTTPTransport,
 		Timeout:   config.ApiClientTimeout(),
-	}
-
-	ctx := context.Background()
-
-	// Retry fetching Daytona API config with exponential backoff
-	err = utils.RetryWithExponentialBackoff(
-		ctx,
-		"get Daytona API config",
-		10,
-		time.Second,
-		1*time.Minute,
-		func() error {
-			apiConfig, _, err := config.ApiClient.ConfigAPI.ConfigControllerGetConfig(ctx).Execute()
-			if err != nil {
-				return err
-			}
-
-			if config.Oidc.ClientId == "" {
-				config.Oidc.ClientId = apiConfig.Oidc.ClientId
-			}
-
-			if config.Oidc.Domain == "" {
-				config.Oidc.Domain = apiConfig.Oidc.Issuer
-
-				if !strings.HasSuffix(config.Oidc.Domain, "/") {
-					config.Oidc.Domain += "/"
-				}
-			}
-
-			if config.Oidc.Audience == "" {
-				config.Oidc.Audience = apiConfig.Oidc.Audience
-			}
-
-			return nil
-		},
-	)
-	if err != nil {
-		return nil, err
 	}
 
 	return config, nil

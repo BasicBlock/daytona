@@ -10,7 +10,6 @@ import { useApi } from '../useApi'
 
 export interface CreateRegistryMutationVariables {
   registry: CreateDockerRegistry
-  organizationId?: string
 }
 
 export const useCreateRegistryMutation = () => {
@@ -18,17 +17,12 @@ export const useCreateRegistryMutation = () => {
   const queryClient = useQueryClient()
 
   return useMutation<DockerRegistry, unknown, CreateRegistryMutationVariables>({
-    mutationFn: async ({ registry, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-      const response = await dockerRegistryApi.createRegistry(registry, organizationId)
+    mutationFn: async ({ registry }) => {
+      const response = await dockerRegistryApi.createRegistry(registry)
       return response.data
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (organizationId) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.registries.list(organizationId) })
-      }
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.registries.list() })
     },
   })
 }

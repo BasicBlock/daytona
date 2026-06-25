@@ -32,7 +32,7 @@ interface SandboxDetailsSheetContentProps {
   handleDelete: (id: string) => void
   handleArchive: (id: string) => void
   handleRecover: (id: string) => void
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   onCreateSshAccess: (id: string) => void
   onRevokeSshAccess: (id: string) => void
   onScreenRecordings: (id: string) => void
@@ -86,7 +86,7 @@ function SandboxDetailsSheetContent({
   handleDelete,
   handleArchive,
   handleRecover,
-  getRegionName,
+  getTargetName,
   onCreateSshAccess,
   onRevokeSshAccess,
   onScreenRecordings,
@@ -115,7 +115,7 @@ function SandboxDetailsSheetContent({
     <ScrollArea fade="mask" className="flex-1 min-h-0">
       <SandboxInfoPanel
         sandbox={sandbox}
-        getRegionName={getRegionName}
+        getTargetName={getTargetName}
         actionsDisabled={actionDisabled}
         writePermitted={writePermitted}
         onCreateSshAccess={() => onCreateSshAccess(sandbox.id)}

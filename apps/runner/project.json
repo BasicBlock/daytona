@@ -157,5 +157,5 @@
     },
     "push-manifest": {}
   },
-  "implicitDependencies": ["computer-use", "daemon"]
+  "implicitDependencies": ["daemon"]
 }

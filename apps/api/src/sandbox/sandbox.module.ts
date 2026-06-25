@@ -9,22 +9,16 @@ import { SandboxController } from './controllers/sandbox.controller'
 import { SandboxService } from './services/sandbox.service'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Sandbox } from './entities/sandbox.entity'
-import { UserModule } from '../user/user.module'
 import { RunnerService } from './services/runner.service'
 import { Runner } from './entities/runner.entity'
 import { RunnerController } from './controllers/runner.controller'
-import { ToolboxService } from './services/toolbox.deprecated.service'
 import { DockerRegistryModule } from '../docker-registry/docker-registry.module'
-import { SandboxManager } from './managers/sandbox.manager'
-import { ToolboxController } from './controllers/toolbox.deprecated.controller'
 import { Snapshot } from './entities/snapshot.entity'
 import { SnapshotController } from './controllers/snapshot.controller'
 import { SnapshotService } from './services/snapshot.service'
-import { SnapshotManager } from './managers/snapshot.manager'
 import { SnapshotRunner } from './entities/snapshot-runner.entity'
 import { DockerRegistry } from '../docker-registry/entities/docker-registry.entity'
 import { RedisLockProvider } from './common/redis-lock.provider'
-import { OrganizationModule } from '../organization/organization.module'
 import { SandboxWarmPoolService } from './services/sandbox-warm-pool.service'
 import { WarmPool } from './entities/warm-pool.entity'
 import { PreviewController } from './controllers/preview.controller'
@@ -42,20 +36,16 @@ import { SandboxStartAction } from './managers/sandbox-actions/sandbox-start.act
 import { SandboxStopAction } from './managers/sandbox-actions/sandbox-stop.action'
 import { SandboxDestroyAction } from './managers/sandbox-actions/sandbox-destroy.action'
 import { SandboxArchiveAction } from './managers/sandbox-actions/sandbox-archive.action'
+import { SandboxManager } from './managers/sandbox.manager'
 import { SshAccess } from './entities/ssh-access.entity'
 import { SandboxRepository } from './repositories/sandbox.repository'
 import { ProxyCacheInvalidationService } from './services/proxy-cache-invalidation.service'
-import { RegionModule } from '../region/region.module'
-import { Region } from '../region/entities/region.entity'
-import { SnapshotRegion } from './entities/snapshot-region.entity'
 import { SandboxFork } from './entities/sandbox-fork.entity'
 import { JobController } from './controllers/job.controller'
 import { JobService } from './services/job.service'
 import { JobStateHandlerService } from './services/job-state-handler.service'
 import { Job } from './entities/job.entity'
 import { SandboxLookupCacheInvalidationService } from './services/sandbox-lookup-cache-invalidation.service'
-import { ProxyAuthContextGuard } from './guards/proxy-auth-context.guard'
-import { SshGatewayAuthContextGuard } from './guards/ssh-gateway-auth-context.guard'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { SandboxLastActivity } from './entities/sandbox-last-activity.entity'
 import { SandboxActivityService } from './services/sandbox-activity.service'
@@ -65,22 +55,17 @@ import { SandboxSearchAdapterProvider } from './providers/sandbox-search.provide
 
 @Module({
   imports: [
-    UserModule,
     DockerRegistryModule,
-    OrganizationModule,
-    RegionModule,
     TypeOrmModule.forFeature([
       Sandbox,
       Runner,
       Snapshot,
       BuildInfo,
       SnapshotRunner,
-      SnapshotRegion,
       DockerRegistry,
       WarmPool,
       Volume,
       SshAccess,
-      Region,
       Job,
       SandboxLastActivity,
       SandboxFork,
@@ -95,7 +80,6 @@ import { SandboxSearchAdapterProvider } from './providers/sandbox-search.provide
   controllers: [
     SandboxController,
     RunnerController,
-    ToolboxController,
     SnapshotController,
     PreviewController,
     VolumeController,
@@ -107,11 +91,9 @@ import { SandboxSearchAdapterProvider } from './providers/sandbox-search.provide
     BackupManager,
     SandboxWarmPoolService,
     RunnerService,
-    ToolboxService,
     SnapshotService,
     ProxyCacheInvalidationService,
     SandboxLookupCacheInvalidationService,
-    SnapshotManager,
     RedisLockProvider,
     VolumeService,
     VolumeManager,
@@ -125,8 +107,6 @@ import { SandboxSearchAdapterProvider } from './providers/sandbox-search.provide
     JobService,
     JobStateHandlerService,
     SandboxActivityService,
-    ProxyAuthContextGuard,
-    SshGatewayAuthContextGuard,
     SandboxSearchAdapterProvider,
     {
       provide: SandboxRepository,
@@ -155,8 +135,6 @@ import { SandboxSearchAdapterProvider } from './providers/sandbox-search.provide
     SnapshotRepository,
     RunnerAdapterFactory,
     SandboxActivityService,
-    ProxyAuthContextGuard,
-    SshGatewayAuthContextGuard,
   ],
 })
 export class SandboxModule {}

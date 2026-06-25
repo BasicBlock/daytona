@@ -78,7 +78,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 
 		req, err := http.NewRequest(http.MethodPost, baseURL+"/process/execute", bytes.NewReader(body))
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorizationHeader(req, cfg)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := httpCli.Do(req)
@@ -162,7 +162,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 		require.NoError(t, err)
 		req, err := http.NewRequest(http.MethodPost, baseURL+"/process/session", bytes.NewReader(body))
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorizationHeader(req, cfg)
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := httpCli.Do(req)
 		require.NoError(t, err)
@@ -180,7 +180,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 		require.NoError(t, err)
 		req, err := http.NewRequest(http.MethodPost, baseURL+"/process/session/"+sessionID+"/exec", bytes.NewReader(body))
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorizationHeader(req, cfg)
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := httpCli.Do(req)
 		require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 		t.Helper()
 		req, err := http.NewRequest(http.MethodDelete, baseURL+"/process/session/"+sessionID, nil)
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorizationHeader(req, cfg)
 		resp, err := httpCli.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
@@ -292,7 +292,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 		require.NoError(t, err)
 		req, err := http.NewRequest(http.MethodPost, baseURL+"/process/pty", bytes.NewReader(body))
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorizationHeader(req, cfg)
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := httpCli.Do(req)
 		require.NoError(t, err)
@@ -305,7 +305,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 		t.Helper()
 		req, err := http.NewRequest(http.MethodDelete, baseURL+"/process/pty/"+ptyID, nil)
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorizationHeader(req, cfg)
 		resp, err := httpCli.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
@@ -328,7 +328,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 			parsed.Scheme = "wss"
 		}
 		hdr := http.Header{}
-		hdr.Set("Authorization", "Bearer "+cfg.APIKey)
+		setToolboxAuthorization(hdr, cfg)
 		dialer := *websocket.DefaultDialer
 		dialer.HandshakeTimeout = 15 * time.Second
 		conn, resp, err := dialer.Dial(parsed.String(), hdr)
@@ -383,7 +383,7 @@ func TestProcessZombieCleanup(t *testing.T) {
 			}
 			req, err := http.NewRequest(http.MethodDelete, baseURL+"/process/pty/"+ptyID, nil)
 			if err == nil {
-				req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+				setToolboxAuthorizationHeader(req, cfg)
 				if resp, derr := httpCli.Do(req); derr == nil {
 					resp.Body.Close()
 				}

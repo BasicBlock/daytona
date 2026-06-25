@@ -12,11 +12,10 @@ import { DockerRegistryController } from './controllers/docker-registry.controll
 import { HttpModule } from '@nestjs/axios'
 import { DockerRegistryProvider } from './providers/docker-registry.provider'
 import { DOCKER_REGISTRY_PROVIDER } from './providers/docker-registry.provider.interface'
-import { OrganizationModule } from '../organization/organization.module'
-import { RegionModule } from '../region/region.module'
+import { DockerRegistryBootstrapService } from './services/docker-registry-bootstrap.service'
 
 @Module({
-  imports: [OrganizationModule, RegionModule, TypeOrmModule.forFeature([DockerRegistry]), HttpModule],
+  imports: [TypeOrmModule.forFeature([DockerRegistry]), HttpModule],
   controllers: [DockerRegistryController],
   providers: [
     {
@@ -24,6 +23,7 @@ import { RegionModule } from '../region/region.module'
       useClass: DockerRegistryProvider,
     },
     DockerRegistryService,
+    DockerRegistryBootstrapService,
     EcrCredentialsService,
   ],
   exports: [DockerRegistryService],

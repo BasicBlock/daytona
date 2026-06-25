@@ -7,19 +7,19 @@ import { GpuType } from '../enums/gpu-type.enum'
 import { BadRequestError } from '../../exceptions/bad-request.exception'
 
 /**
- * Reconciles a request's GPU type preferences against the region's
+ * Reconciles a request's GPU type preferences against an optional
  * `allowedGpuTypes` allowlist. Call once at the start of every create flow,
  * before invoking the scheduler.
  *
- * Region allowlist semantics:
+ * Allowlist semantics:
  *  - `null` (or `undefined`): no restriction.
- *  - `[]`: empty allowlist — all GPU types are blocked in this region.
+ *  - `[]`: empty allowlist — all GPU types are blocked.
  *  - non-empty array: only the listed types are permitted.
  *
  * @returns Effective preference list to pass to the scheduler, or `undefined`
  *   when no GPU type filter should be applied.
- * @throws {BadRequestError} When the region blocks all GPU types, or none of
- *   the requested preferences intersect with the region's allowlist.
+ * @throws {BadRequestError} When all GPU types are blocked, or none of
+ *   the requested preferences intersect with the allowlist.
  */
 export function resolveGpuTypePreferences(
   gpu: number,
@@ -33,7 +33,7 @@ export function resolveGpuTypePreferences(
   }
 
   if (allowedGpuTypes.length === 0) {
-    throw new BadRequestError('No GPU types are allowed in this region.')
+    throw new BadRequestError('No GPU types are allowed for this runner target.')
   }
 
   if (!gpuTypePreferences || gpuTypePreferences.length === 0) {
@@ -43,7 +43,7 @@ export function resolveGpuTypePreferences(
   const permitted = gpuTypePreferences.filter((t) => allowedGpuTypes.includes(t))
   if (permitted.length === 0) {
     throw new BadRequestError(
-      `Requested GPU type(s) ${gpuTypePreferences.join(', ')} not permitted in this region. Allowed: ${allowedGpuTypes.join(', ')}.`,
+      `Requested GPU type(s) ${gpuTypePreferences.join(', ')} not permitted for this runner target. Allowed: ${allowedGpuTypes.join(', ')}.`,
     )
   }
   return permitted

@@ -150,8 +150,8 @@ export function findLast<T>(arr: T[], predicate: (item: T, index: number, array:
   return undefined
 }
 
-export function getRegionFullDisplayName(region: { id: string; name: string; organizationId?: string | null }): string {
-  return `${region.name}${region.organizationId && region.name !== region.id ? ` (${region.id})` : ''}`
+export function getTargetFullDisplayName(target: { id: string; name: string; scopeId?: string | null }): string {
+  return `${target.name}${target.scopeId && target.name !== target.id ? ` (${target.id})` : ''}`
 }
 
 export function getMetaKey(): string {

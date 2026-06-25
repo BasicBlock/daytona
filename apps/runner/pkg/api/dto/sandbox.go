@@ -10,7 +10,6 @@ type CreateSandboxDTO struct {
 	// by name.
 	Name             string            `json:"name,omitempty"`
 	FromVolumeId     string            `json:"fromVolumeId,omitempty"`
-	UserId           string            `json:"userId" validate:"required"`
 	Snapshot         string            `json:"snapshot" validate:"required"`
 	OsUser           string            `json:"osUser" validate:"required"`
 	CpuQuota         int64             `json:"cpuQuota" validate:"min=1"`
@@ -31,10 +30,6 @@ type CreateSandboxDTO struct {
 
 	// Optional for backward compatibility, but when provided, indicates the class of sandbox to create.
 	SandboxClass *string `json:"sandboxClass,omitempty"`
-
-	// Nullable for backward compatibility
-	OrganizationId *string `json:"organizationId,omitempty"`
-	RegionId       *string `json:"regionId,omitempty"`
 
 	// LinkedSandboxId identifies an existing sandbox this sandbox should be co-located with.
 	// When set, the runner should attach both sandboxes to a shared local network so they can communicate.
@@ -65,7 +60,6 @@ type UpdateNetworkSettingsDTO struct {
 
 type RecoverSandboxDTO struct {
 	FromVolumeId     string            `json:"fromVolumeId,omitempty"`
-	UserId           string            `json:"userId" validate:"required"`
 	Snapshot         *string           `json:"snapshot,omitempty"`
 	OsUser           string            `json:"osUser" validate:"required"`
 	CpuQuota         int64             `json:"cpuQuota" validate:"min=1"`

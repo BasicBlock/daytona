@@ -9,8 +9,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@daytona/*": ["../../libs/*"],
-      "@daytona/sdk": ["../../dist/libs/sdk-typescript/esm/index.d.ts"]
+      "@daytona/api-client": ["src/api/daytona-api-client.ts"],
+      "@daytona/api-client/src": ["src/api/daytona-api-client.ts"],
+      "@daytona/toolbox-api-client": ["src/api/toolbox-api-client.ts"]
     }
   },
   "exclude": [

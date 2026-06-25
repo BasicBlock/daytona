@@ -14,8 +14,6 @@ import { BaseRepository } from '../../common/repositories/base.repository'
 import { SandboxEvents } from '../constants/sandbox-events.constants'
 import { SandboxStateUpdatedEvent } from '../events/sandbox-state-updated.event'
 import { SandboxDesiredStateUpdatedEvent } from '../events/sandbox-desired-state-updated.event'
-import { SandboxPublicStatusUpdatedEvent } from '../events/sandbox-public-status-updated.event'
-import { SandboxOrganizationUpdatedEvent } from '../events/sandbox-organization-updated.event'
 import { SandboxLookupCacheInvalidationService } from '../services/sandbox-lookup-cache-invalidation.service'
 import { SandboxFork } from '../entities/sandbox-fork.entity'
 
@@ -107,7 +105,6 @@ export class SandboxRepository extends BaseRepository<Sandbox> {
           state: previousSandbox.state,
           desiredState: previousSandbox.desiredState,
           pending: previousSandbox.pending,
-          organizationId: previousSandbox.organizationId,
         },
         { ...updateData, ...invariantChanges },
       )
@@ -116,7 +113,7 @@ export class SandboxRepository extends BaseRepository<Sandbox> {
       }
       sandbox.updatedAt = new Date()
 
-      if (previousSandbox.state !== sandbox.state || previousSandbox.organizationId !== sandbox.organizationId) {
+      if (previousSandbox.state !== sandbox.state) {
         await this.upsertLastActivity(entityManager, id, sandbox.updatedAt)
         sandbox.lastActivityAt = { sandboxId: id, lastActivityAt: sandbox.updatedAt }
       }
@@ -174,7 +171,7 @@ export class SandboxRepository extends BaseRepository<Sandbox> {
       await entityManager.update(Sandbox, id, { ...updateData, ...invariantChanges })
       sandbox.updatedAt = new Date()
 
-      if (previousSandbox.state !== sandbox.state || previousSandbox.organizationId !== sandbox.organizationId) {
+      if (previousSandbox.state !== sandbox.state) {
         await this.upsertLastActivity(entityManager, id, sandbox.updatedAt)
         sandbox.lastActivityAt = { sandboxId: id, lastActivityAt: sandbox.updatedAt }
       }
@@ -202,14 +199,13 @@ export class SandboxRepository extends BaseRepository<Sandbox> {
    */
   private invalidateLookupCacheOnInsert(sandbox: Sandbox): void {
     try {
-      this.sandboxLookupCacheInvalidationService.invalidateOrgId({
+      this.sandboxLookupCacheInvalidationService.invalidate({
         sandboxId: sandbox.id,
-        organizationId: sandbox.organizationId,
         name: sandbox.name,
       })
     } catch (error) {
       this.logger.warn(
-        `Failed to enqueue sandbox lookup cache invalidation on insert (id, organizationId, name) for ${sandbox.id}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to enqueue sandbox lookup cache invalidation on insert for ${sandbox.id}: ${error instanceof Error ? error.message : String(error)}`,
       )
     }
   }
@@ -219,19 +215,17 @@ export class SandboxRepository extends BaseRepository<Sandbox> {
    */
   private invalidateLookupCacheOnUpdate(
     updatedSandbox: Sandbox,
-    previousSandbox: Pick<Sandbox, 'organizationId' | 'name' | 'authToken'>,
+    previousSandbox: Pick<Sandbox, 'name' | 'authToken'>,
   ): void {
     try {
       this.sandboxLookupCacheInvalidationService.invalidate({
         sandboxId: updatedSandbox.id,
-        organizationId: updatedSandbox.organizationId,
-        previousOrganizationId: previousSandbox.organizationId,
         name: updatedSandbox.name,
         previousName: previousSandbox.name,
       })
     } catch (error) {
       this.logger.warn(
-        `Failed to enqueue sandbox lookup cache invalidation on update (id, organizationId, name) for ${updatedSandbox.id}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to enqueue sandbox lookup cache invalidation on update for ${updatedSandbox.id}: ${error instanceof Error ? error.message : String(error)}`,
       )
     }
 
@@ -251,10 +245,7 @@ export class SandboxRepository extends BaseRepository<Sandbox> {
   /**
    * Emits events based on the changes made to a sandbox.
    */
-  private emitUpdateEvents(
-    updatedSandbox: Sandbox,
-    previousSandbox: Pick<Sandbox, 'state' | 'desiredState' | 'public' | 'organizationId'>,
-  ): void {
+  private emitUpdateEvents(updatedSandbox: Sandbox, previousSandbox: Pick<Sandbox, 'state' | 'desiredState'>): void {
     if (previousSandbox.state !== updatedSandbox.state) {
       this.eventEmitter.emit(
         SandboxEvents.STATE_UPDATED,
@@ -266,24 +257,6 @@ export class SandboxRepository extends BaseRepository<Sandbox> {
       this.eventEmitter.emit(
         SandboxEvents.DESIRED_STATE_UPDATED,
         new SandboxDesiredStateUpdatedEvent(updatedSandbox, previousSandbox.desiredState, updatedSandbox.desiredState),
-      )
-    }
-
-    if (previousSandbox.public !== updatedSandbox.public) {
-      this.eventEmitter.emit(
-        SandboxEvents.PUBLIC_STATUS_UPDATED,
-        new SandboxPublicStatusUpdatedEvent(updatedSandbox, previousSandbox.public, updatedSandbox.public),
-      )
-    }
-
-    if (previousSandbox.organizationId !== updatedSandbox.organizationId) {
-      this.eventEmitter.emit(
-        SandboxEvents.ORGANIZATION_UPDATED,
-        new SandboxOrganizationUpdatedEvent(
-          updatedSandbox,
-          previousSandbox.organizationId,
-          updatedSandbox.organizationId,
-        ),
       )
     }
   }

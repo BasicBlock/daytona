@@ -29,7 +29,6 @@ import {
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DEFAULT_PAGE_SIZE } from '@/constants/Pagination'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { cn, getRelativeTimeString } from '@/lib/utils'
 import {
   DEFAULT_TABLE_COLUMN,
@@ -37,7 +36,7 @@ import {
   getTableColumnMaxResizeSize,
   getTableSizeStyles,
 } from '@/lib/utils/table'
-import { OrganizationRolePermissionsEnum, VolumeDto, VolumeState } from '@daytona/api-client'
+import { VolumeDto, VolumeState } from '@daytona/api-client'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -92,17 +91,10 @@ export function VolumeTable({
   onBulkDelete,
   onCreateVolume,
 }: VolumeTableProps) {
-  const { authenticatedUserHasPermission } = useSelectedOrganization()
   const { setIsOpen } = useCommandPaletteActions()
 
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_VOLUMES),
-    [authenticatedUserHasPermission],
-  )
-  const deletePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_VOLUMES),
-    [authenticatedUserHasPermission],
-  )
+  const writePermitted = true
+  const deletePermitted = true
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])

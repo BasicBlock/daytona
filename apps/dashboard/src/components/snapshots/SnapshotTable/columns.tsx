@@ -28,7 +28,7 @@ type SnapshotTableMeta = {
   writePermitted: boolean
   deletePermitted: boolean
   loadingSnapshots: Record<string, boolean>
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   onActivate?: (snapshot: SnapshotDto) => void
   onDeactivate?: (snapshot: SnapshotDto) => void
   onDelete: (snapshot: SnapshotDto) => void
@@ -192,26 +192,26 @@ const columns: ColumnDef<SnapshotDto>[] = [
     },
   },
   {
-    accessorKey: 'regionIds',
+    accessorKey: 'targets',
     size: 140,
     maxSize: getTableColumnMaxResizeSize(140),
     enableSorting: false,
-    header: 'Region',
+    header: 'Target',
     cell: ({ row, table }) => {
-      const { getRegionName } = getMeta(table)
+      const { getTargetName } = getMeta(table)
       const snapshot = row.original
-      if (!snapshot.regionIds?.length) {
+      if (!snapshot.targets?.length) {
         return '-'
       }
 
-      const regionNames = snapshot.regionIds.map((id) => getRegionName(id) ?? id)
-      const firstRegion = regionNames[0]
-      const remainingCount = regionNames.length - 1
+      const targetNames = snapshot.targets.map((id) => getTargetName(id) ?? id)
+      const firstTarget = targetNames[0]
+      const remainingCount = targetNames.length - 1
 
       if (remainingCount === 0) {
         return (
-          <span className="truncate max-w-[150px] block" title={firstRegion}>
-            {firstRegion}
+          <span className="truncate max-w-[150px] block" title={firstTarget}>
+            {firstTarget}
           </span>
         )
       }
@@ -220,7 +220,7 @@ const columns: ColumnDef<SnapshotDto>[] = [
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex items-center gap-1.5">
-              <span className="truncate max-w-[150px]">{firstRegion}</span>
+              <span className="truncate max-w-[150px]">{firstTarget}</span>
               <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">
                 +{remainingCount}
               </Badge>
@@ -228,7 +228,7 @@ const columns: ColumnDef<SnapshotDto>[] = [
           </TooltipTrigger>
           <TooltipContent>
             <div className="flex flex-col gap-1">
-              {regionNames.map((name, idx) => (
+              {targetNames.map((name, idx) => (
                 <span key={idx}>{name}</span>
               ))}
             </div>

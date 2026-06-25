@@ -30,7 +30,6 @@ exporters:
 
     # Daytona API configuration
     api_url: ${env:DAYTONA_API_URL:-http://localhost:3000/api}
-    api_key: ${env:DAYTONA_API_KEY:-otel_collector_api_key}
 
     # Optional Redis configuration for caching
     redis:

@@ -3,13 +3,20 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Logger, Req, NotFoundException } from '@nestjs/common'
-import { AuthenticatedRateLimitGuard } from '../../common/guards/authenticated-rate-limit.guard'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  Logger,
+  Req,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common'
 import { Request } from 'express'
-import { ApiOAuth2, ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger'
-import { RunnerAuthContextGuard } from '../guards/runner-auth-context.guard'
-import { RunnerAuthContext } from '../../common/interfaces/runner-auth-context.interface'
-import { IsRunnerAuthContext } from '../../common/decorators/auth-context.decorator'
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger'
 import {
   JobDto,
   JobStatus,
@@ -19,17 +26,9 @@ import {
   UpdateJobStatusDto,
 } from '../dto/job.dto'
 import { JobService } from '../services/job.service'
-import { JobAccessGuard } from '../guards/job-access.guard'
-import { AuthStrategy } from '../../auth/decorators/auth-strategy.decorator'
-import { AuthStrategyType } from '../../auth/enums/auth-strategy-type.enum'
 
 @Controller('jobs')
 @ApiTags('jobs')
-@ApiOAuth2(['openid', 'profile', 'email'])
-@ApiBearerAuth()
-@AuthStrategy(AuthStrategyType.API_KEY)
-@UseGuards(AuthenticatedRateLimitGuard)
-@UseGuards(RunnerAuthContextGuard)
 export class JobController {
   private readonly logger = new Logger(JobController.name)
 
@@ -40,6 +39,12 @@ export class JobController {
     summary: 'List jobs for the runner',
     operationId: 'listJobs',
     description: 'Returns a paginated list of jobs for the runner, optionally filtered by status.',
+  })
+  @ApiQuery({
+    name: 'runnerId',
+    required: true,
+    type: String,
+    description: 'Runner ID',
   })
   @ApiQuery({
     name: 'status',
@@ -66,11 +71,11 @@ export class JobController {
     description: 'List of jobs for the runner',
     type: PaginatedJobsDto,
   })
-  async listJobs(
-    @IsRunnerAuthContext() runnerContext: RunnerAuthContext,
-    @Query() query: ListJobsQueryDto,
-  ): Promise<PaginatedJobsDto> {
-    return await this.jobService.findJobsForRunner(runnerContext.runnerId, query.status, query.page, query.limit)
+  async listJobs(@Query('runnerId') runnerId: string, @Query() query: ListJobsQueryDto): Promise<PaginatedJobsDto> {
+    if (!runnerId) {
+      throw new BadRequestException('runnerId is required')
+    }
+    return await this.jobService.findJobsForRunner(runnerId, query.status, query.page, query.limit)
   }
 
   @Get('poll')
@@ -92,6 +97,12 @@ export class JobController {
     type: Number,
     description: 'Maximum number of jobs to return (default: 10, max: 100)',
   })
+  @ApiQuery({
+    name: 'runnerId',
+    required: true,
+    type: String,
+    description: 'Runner ID',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of jobs for the runner',
@@ -99,11 +110,14 @@ export class JobController {
   })
   async pollJobs(
     @Req() req: Request,
-    @IsRunnerAuthContext() runnerContext: RunnerAuthContext,
+    @Query('runnerId') runnerId: string,
     @Query('timeout') timeout?: number,
     @Query('limit') limit?: number,
   ): Promise<PollJobsResponseDto> {
-    this.logger.debug(`Runner ${runnerContext.runnerId} polling for jobs (timeout: ${timeout}s, limit: ${limit})`)
+    if (!runnerId) {
+      throw new BadRequestException('runnerId is required')
+    }
+    this.logger.debug(`Runner ${runnerId} polling for jobs (timeout: ${timeout}s, limit: ${limit})`)
 
     const timeoutSeconds = timeout ? Math.min(Number(timeout), 60) : 30
     const limitNumber = limit ? Math.min(Number(limit), 100) : 10
@@ -111,26 +125,21 @@ export class JobController {
     // Create AbortSignal from request's 'close' event
     const abortController = new AbortController()
     const onClose = () => {
-      this.logger.debug(`Runner ${runnerContext.runnerId} disconnected during polling, aborting`)
+      this.logger.debug(`Runner ${runnerId} disconnected during polling, aborting`)
       abortController.abort()
     }
     req.on('close', onClose)
 
     try {
-      const jobs = await this.jobService.pollJobs(
-        runnerContext.runnerId,
-        limitNumber,
-        timeoutSeconds,
-        abortController.signal,
-      )
-      this.logger.debug(`Returning ${jobs.length} jobs to runner ${runnerContext.runnerId}`)
+      const jobs = await this.jobService.pollJobs(runnerId, limitNumber, timeoutSeconds, abortController.signal)
+      this.logger.debug(`Returning ${jobs.length} jobs to runner ${runnerId}`)
       return { jobs }
     } catch (error) {
       if (abortController.signal.aborted) {
-        this.logger.debug(`Polling aborted for disconnected runner ${runnerContext.runnerId}`)
+        this.logger.debug(`Polling aborted for disconnected runner ${runnerId}`)
         return { jobs: [] } // Return empty array on disconnect
       }
-      this.logger.error(`Error polling jobs for runner ${runnerContext.runnerId}: ${error.message}`, error.stack)
+      this.logger.error(`Error polling jobs for runner ${runnerId}: ${error.message}`, error.stack)
       throw error
     } finally {
       req.off('close', onClose)
@@ -152,12 +161,8 @@ export class JobController {
     description: 'Job details',
     type: JobDto,
   })
-  @UseGuards(JobAccessGuard)
-  async getJob(
-    @IsRunnerAuthContext() runnerContext: RunnerAuthContext,
-    @Param('jobId') jobId: string,
-  ): Promise<JobDto> {
-    this.logger.log(`Runner ${runnerContext.runnerId} fetching job ${jobId}`)
+  async getJob(@Param('jobId') jobId: string): Promise<JobDto> {
+    this.logger.log(`Fetching job ${jobId}`)
 
     const job = await this.jobService.findOne(jobId)
     if (!job) {
@@ -182,13 +187,11 @@ export class JobController {
     description: 'Job status updated successfully',
     type: JobDto,
   })
-  @UseGuards(JobAccessGuard)
   async updateJobStatus(
-    @IsRunnerAuthContext() runnerContext: RunnerAuthContext,
     @Param('jobId') jobId: string,
     @Body() updateJobStatusDto: UpdateJobStatusDto,
   ): Promise<JobDto> {
-    this.logger.debug(`Runner ${runnerContext.runnerId} updating job ${jobId} status to ${updateJobStatusDto.status}`)
+    this.logger.debug(`Updating job ${jobId} status to ${updateJobStatusDto.status}`)
 
     const job = await this.jobService.updateJobStatus(
       jobId,

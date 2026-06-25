@@ -7,7 +7,6 @@ import { GetAllSnapshotsOrderEnum, GetAllSnapshotsSortEnum, PaginatedSnapshots, 
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import { useApi } from '../useApi'
-import { useSelectedOrganization } from '../useSelectedOrganization'
 import { queryKeys } from './queryKeys'
 
 export interface SnapshotFilters {
@@ -46,23 +45,18 @@ export function useSnapshotQuery(
   { enabled = true }: { enabled?: boolean } = {},
 ) {
   const { snapshotApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<SnapshotDto>({
-    queryKey: queryKeys.snapshots.detail(selectedOrganization?.id ?? '', snapshotId ?? ''),
+    queryKey: queryKeys.snapshots.detail(snapshotId ?? ''),
     queryFn: async () => {
-      if (!selectedOrganization) {
-        throw new Error('No organization selected')
-      }
-
       if (!snapshotId) {
         throw new Error('No snapshot selected')
       }
 
-      const response = await snapshotApi.getSnapshot(snapshotId, selectedOrganization.id)
+      const response = await snapshotApi.getSnapshot(snapshotId)
       return response.data
     },
-    enabled: enabled && !!snapshotId && !!selectedOrganization,
+    enabled: enabled && !!snapshotId,
     staleTime: 1000 * 10,
     retry: (failureCount, error) => {
       const status = getSnapshotQueryErrorStatus(error)
@@ -82,29 +76,17 @@ export function useSnapshotQuery(
 
 export function useSnapshotsQuery(params: SnapshotQueryParams, { enabled = true }: { enabled?: boolean } = {}) {
   const { snapshotApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<PaginatedSnapshots>({
-    queryKey: queryKeys.snapshots.list(selectedOrganization?.id ?? '', params),
+    queryKey: queryKeys.snapshots.list(params),
     queryFn: async () => {
-      if (!selectedOrganization) {
-        throw new Error('No organization selected')
-      }
-
       const { page, pageSize, filters = {}, sorting = DEFAULT_SNAPSHOT_SORTING } = params
 
-      const response = await snapshotApi.getAllSnapshots(
-        selectedOrganization.id,
-        page,
-        pageSize,
-        filters.name,
-        sorting.field,
-        sorting.direction,
-      )
+      const response = await snapshotApi.getAllSnapshots(page, pageSize, filters.name, sorting.field, sorting.direction)
 
       return response.data
     },
-    enabled: enabled && !!selectedOrganization,
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 10,
     gcTime: 1000 * 60 * 5,

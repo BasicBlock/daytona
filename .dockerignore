@@ -16,7 +16,6 @@ dist
 docker
 .tmp
 libs
-!libs/sdk-typescript
 !libs/computer-use
 !libs/common-go
 !libs/api-client
@@ -25,8 +24,6 @@ libs
 !libs/api-client-go
 !libs/toolbox-api-client-go
 !libs/toolbox-api-client
-!libs/sdk-go
 !libs/runner-proto
-!libs/billing-api-client
 !libs/netleash
 Dockerfile

@@ -5,39 +5,37 @@
 
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { useNotificationSocket } from '@/hooks/useNotificationSocket'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import type { Runner, RunnerState } from '@daytona/api-client'
 import type { QueryKey } from '@tanstack/react-query'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-const getRunnerListRegionId = (queryKey: QueryKey) => {
-  const filters = queryKey[3]
+const getRunnerListTarget = (queryKey: QueryKey) => {
+  const filters = queryKey[2]
 
-  if (!filters || typeof filters !== 'object' || !('regionId' in filters)) {
+  if (!filters || typeof filters !== 'object' || !('target' in filters)) {
     return undefined
   }
 
-  return typeof filters.regionId === 'string' ? filters.regionId : undefined
+  return typeof filters.target === 'string' ? filters.target : undefined
 }
 
 export function useRunnerWsSync() {
   const { notificationSocket } = useNotificationSocket()
-  const { selectedOrganization } = useSelectedOrganization()
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    if (!notificationSocket || !selectedOrganization?.id) return
+    if (!notificationSocket) return
 
-    const queryKey = queryKeys.runners.list(selectedOrganization.id)
+    const queryKey = queryKeys.runners.list()
 
     const upsertRunnerInCache = (runner: Runner) => {
       queryClient.setQueriesData<Runner[]>(
         {
           queryKey,
           predicate: (query) => {
-            const regionId = getRunnerListRegionId(query.queryKey)
-            return !regionId || regionId === runner.region
+            const target = getRunnerListTarget(query.queryKey)
+            return !target || target === runner.target
           },
         },
         (previousRunners) => {
@@ -57,8 +55,8 @@ export function useRunnerWsSync() {
         {
           queryKey,
           predicate: (query) => {
-            const regionId = getRunnerListRegionId(query.queryKey)
-            return !regionId || regionId === runner.region
+            const target = getRunnerListTarget(query.queryKey)
+            return !target || target === runner.target
           },
         },
         (previousRunners) => {
@@ -113,5 +111,5 @@ export function useRunnerWsSync() {
       notificationSocket.off('runner.state.updated', handleRunnerStateUpdatedEvent)
       notificationSocket.off('runner.unschedulable.updated', handleRunnerUnschedulableUpdatedEvent)
     }
-  }, [notificationSocket, queryClient, selectedOrganization?.id])
+  }, [notificationSocket, queryClient])
 }

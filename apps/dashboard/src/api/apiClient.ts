@@ -3,61 +3,39 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { BillingApiClient } from '@/billing-api/billingApiClient'
 import { DashboardConfig } from '@/types/DashboardConfig'
 import {
-  Configuration as AnalyticsConfiguration,
-  TelemetryApi as AnalyticsTelemetryApi,
-  UsageApi as AnalyticsUsageApi,
-} from '@daytona/analytics-api-client'
-import { Configuration as BillingConfiguration } from '@daytona/billing-api-client'
-import {
-  ApiKeysApi,
-  AuditApi,
   Configuration,
   DockerRegistryApi,
-  OrganizationsApi,
-  RegionsApi,
   RunnersApi,
   SandboxApi,
+  SandboxTelemetryApi,
   SnapshotsApi,
   ToolboxApi,
-  UsersApi,
   VolumesApi,
-  WebhooksApi,
 } from '@daytona/api-client'
 import axios, { AxiosError } from 'axios'
 import { DaytonaError } from './errors'
 
 export class ApiClient {
   private config: Configuration
+  private axios: ReturnType<typeof axios.create>
   private _snapshotApi: SnapshotsApi
   private _sandboxApi: SandboxApi
-  private _userApi: UsersApi
-  private _apiKeyApi: ApiKeysApi
   private _dockerRegistryApi: DockerRegistryApi
-  private _organizationsApi: OrganizationsApi
-  private _billingApi: BillingApiClient
   private _volumeApi: VolumesApi
   private _toolboxApi: ToolboxApi
-  private _auditApi: AuditApi
-  private _regionsApi: RegionsApi
   private _runnersApi: RunnersApi
-  private _webhooksApi: WebhooksApi
-  private _analyticsUsageApi: AnalyticsUsageApi | null
-  private _analyticsTelemetryApi: AnalyticsTelemetryApi | null
+  private _analyticsTelemetryApi: SandboxTelemetryApi
 
-  constructor(config: DashboardConfig, accessToken: string) {
+  constructor(config: DashboardConfig) {
     this.config = new Configuration({
       basePath: config.apiUrl,
-      accessToken: accessToken,
     })
 
-    const axiosInstance = axios.create()
-    axiosInstance.interceptors.response.use(
-      (response) => {
-        return response
-      },
+    this.axios = axios.create()
+    this.axios.interceptors.response.use(
+      (response) => response,
       (error) => {
         let errorMessage: string
 
@@ -71,50 +49,13 @@ export class ApiClient {
       },
     )
 
-    // Initialize APIs
-    this._snapshotApi = new SnapshotsApi(this.config, undefined, axiosInstance)
-    this._sandboxApi = new SandboxApi(this.config, undefined, axiosInstance)
-    this._userApi = new UsersApi(this.config, undefined, axiosInstance)
-    this._apiKeyApi = new ApiKeysApi(this.config, undefined, axiosInstance)
-    this._dockerRegistryApi = new DockerRegistryApi(this.config, undefined, axiosInstance)
-    this._organizationsApi = new OrganizationsApi(this.config, undefined, axiosInstance)
-    const billingConfig = new BillingConfiguration({
-      basePath: config.billingApiUrl || window.location.origin,
-      accessToken: accessToken,
-      baseOptions: {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    })
-    this._billingApi = new BillingApiClient(billingConfig, axiosInstance)
-    this._volumeApi = new VolumesApi(this.config, undefined, axiosInstance)
-    this._toolboxApi = new ToolboxApi(this.config, undefined, axiosInstance)
-    this._auditApi = new AuditApi(this.config, undefined, axiosInstance)
-    this._regionsApi = new RegionsApi(this.config, undefined, axiosInstance)
-    this._runnersApi = new RunnersApi(this.config, undefined, axiosInstance)
-    this._webhooksApi = new WebhooksApi(this.config, undefined, axiosInstance)
-
-    if (config.analyticsApiUrl) {
-      const analyticsConfig = new AnalyticsConfiguration({
-        basePath: config.analyticsApiUrl,
-        accessToken: accessToken,
-        baseOptions: {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      })
-      this._analyticsUsageApi = new AnalyticsUsageApi(analyticsConfig, undefined, axiosInstance)
-      this._analyticsTelemetryApi = new AnalyticsTelemetryApi(analyticsConfig, undefined, axiosInstance)
-    } else {
-      this._analyticsUsageApi = null
-      this._analyticsTelemetryApi = null
-    }
-  }
-
-  public setAccessToken(accessToken: string) {
-    this.config.accessToken = accessToken
+    this._snapshotApi = new SnapshotsApi(this.config, undefined, this.axios)
+    this._sandboxApi = new SandboxApi(this.config, undefined, this.axios)
+    this._dockerRegistryApi = new DockerRegistryApi(this.config, undefined, this.axios)
+    this._volumeApi = new VolumesApi(this.config, undefined, this.axios)
+    this._toolboxApi = new ToolboxApi()
+    this._runnersApi = new RunnersApi(this.config, undefined, this.axios)
+    this._analyticsTelemetryApi = new SandboxTelemetryApi(this.config, undefined, this.axios)
   }
 
   public get snapshotApi() {
@@ -125,24 +66,8 @@ export class ApiClient {
     return this._sandboxApi
   }
 
-  public get userApi() {
-    return this._userApi
-  }
-
-  public get apiKeyApi() {
-    return this._apiKeyApi
-  }
-
   public get dockerRegistryApi() {
     return this._dockerRegistryApi
-  }
-
-  public get organizationsApi() {
-    return this._organizationsApi
-  }
-
-  public get billingApi() {
-    return this._billingApi
   }
 
   public get volumeApi() {
@@ -153,52 +78,21 @@ export class ApiClient {
     return this._toolboxApi
   }
 
-  public get auditApi() {
-    return this._auditApi
-  }
-
-  public get regionsApi() {
-    return this._regionsApi
-  }
-
   public get runnersApi() {
     return this._runnersApi
-  }
-
-  public get webhooksApi() {
-    return this._webhooksApi
-  }
-
-  public get analyticsUsageApi() {
-    return this._analyticsUsageApi
   }
 
   public get analyticsTelemetryApi() {
     return this._analyticsTelemetryApi
   }
 
-  public async webhookRequest(method: string, url: string, data?: any) {
-    // Use the existing axios instance that's already configured with interceptors
-    const axiosInstance = axios.create({
-      baseURL: this.config.basePath,
-      headers: {
-        Authorization: `Bearer ${this.config.accessToken}`,
-      },
-    })
-
-    return axiosInstance.request({
-      method,
-      url,
-      data,
-    })
+  public get analyticsUsageApi() {
+    return null
   }
 
   public get axiosInstance() {
     return axios.create({
       baseURL: this.config.basePath,
-      headers: {
-        Authorization: `Bearer ${this.config.accessToken}`,
-      },
     })
   }
 }

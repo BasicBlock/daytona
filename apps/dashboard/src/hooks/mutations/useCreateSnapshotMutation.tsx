@@ -10,7 +10,6 @@ import { useApi } from '../useApi'
 
 export interface CreateSnapshotMutationVariables {
   snapshot: CreateSnapshot
-  organizationId?: string
 }
 
 export const useCreateSnapshotMutation = () => {
@@ -18,14 +17,12 @@ export const useCreateSnapshotMutation = () => {
   const queryClient = useQueryClient()
 
   return useMutation<SnapshotDto, unknown, CreateSnapshotMutationVariables>({
-    mutationFn: async ({ snapshot, organizationId }) => {
-      const response = await snapshotApi.createSnapshot(snapshot, organizationId)
+    mutationFn: async ({ snapshot }) => {
+      const response = await snapshotApi.createSnapshot(snapshot)
       return response.data
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (organizationId) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all })
-      }
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all })
     },
   })
 }

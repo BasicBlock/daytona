@@ -7,6 +7,10 @@ import "strings"
 
 // UnassignNetworkRules removes network rules assignment from a container
 func (manager *NetRulesManager) UnassignNetworkRules(name string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	// Add prefix to chain name
 	chainName := formatChainName(name)
 

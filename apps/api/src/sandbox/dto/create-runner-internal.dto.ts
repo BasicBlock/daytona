@@ -5,25 +5,8 @@
 
 import { SandboxClass } from '../enums/sandbox-class.enum'
 
-export type CreateRunnerV0InternalDto = {
-  domain: string
-  apiUrl: string
-  proxyUrl: string
-  cpu: number
-  memoryGiB: number
-  diskGiB: number
-  regionId: string
-  name: string
-  apiKey?: string
-  apiVersion: '0'
-  appVersion?: string
-  tags?: string[]
-  sandboxClass?: SandboxClass
-}
-
 export type CreateRunnerV2InternalDto = {
-  apiKey?: string
-  regionId: string
+  target: string
   name: string
   apiVersion: '2'
   appVersion?: string
@@ -31,4 +14,4 @@ export type CreateRunnerV2InternalDto = {
   sandboxClass?: SandboxClass
 }
 
-export type CreateRunnerInternalDto = CreateRunnerV0InternalDto | CreateRunnerV2InternalDto
+export type CreateRunnerInternalDto = CreateRunnerV2InternalDto

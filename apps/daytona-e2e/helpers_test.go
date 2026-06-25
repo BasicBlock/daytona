@@ -22,7 +22,6 @@ import (
 // APIClient provides HTTP access to the Daytona API for E2E tests.
 type APIClient struct {
 	baseURL    string
-	apiKey     string
 	httpClient *http.Client
 }
 
@@ -30,14 +29,13 @@ type APIClient struct {
 func NewAPIClient(cfg Config) *APIClient {
 	return &APIClient{
 		baseURL: strings.TrimRight(cfg.BaseURL, "/"),
-		apiKey:  cfg.APIKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
 }
 
-// DoRequest performs an authenticated HTTP request to the Daytona API.
+// DoRequest performs an HTTP request to the Daytona API.
 // Retries on HTTP 429 (rate limit) with exponential backoff.
 // Returns the response and body bytes.
 func (c *APIClient) DoRequest(t *testing.T, method, path string, body interface{}) (*http.Response, []byte) {
@@ -64,7 +62,6 @@ func (c *APIClient) DoRequest(t *testing.T, method, path string, body interface{
 
 		req, err := http.NewRequest(method, url, bodyReader)
 		require.NoError(t, err, "failed to create HTTP request")
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 		if body != nil {
 			req.Header.Set("Content-Type", "application/json")
 		}
@@ -185,4 +182,12 @@ func sandboxLabels(runID string) map[string]string {
 		"e2e":      "true",
 		"test-run": runID,
 	}
+}
+
+func setToolboxAuthorizationHeader(req *http.Request, cfg Config) {
+	setToolboxAuthorization(req.Header, cfg)
+}
+
+func setToolboxAuthorization(headers http.Header, _ Config) {
+	headers.Set("X-Daytona-Preview-Token", "e2e-preview-token")
 }

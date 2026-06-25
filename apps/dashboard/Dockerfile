@@ -22,13 +22,6 @@ COPY nx.json tsconfig.base.json .nxignore ./
 # App source
 COPY apps/dashboard/ apps/dashboard/
 
-# Lib dependencies
-COPY libs/api-client/ libs/api-client/
-COPY libs/analytics-api-client/ libs/analytics-api-client/
-COPY libs/toolbox-api-client/ libs/toolbox-api-client/
-COPY libs/sdk-typescript/ libs/sdk-typescript/
-COPY libs/billing-api-client/ libs/billing-api-client/
-
 ENV NX_DAEMON=false
 
 RUN VITE_BASE_PATH=/dashboard/ VITE_API_URL=%DAYTONA_BASE_API_URL%/api yarn nx build dashboard --configuration=production --nxBail=true

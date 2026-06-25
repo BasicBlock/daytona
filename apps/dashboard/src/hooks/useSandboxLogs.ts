@@ -5,7 +5,6 @@
 
 import { useQuery, UseQueryOptions } from '@tanstack/react-query'
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { PaginatedLogs } from '@daytona/api-client'
 
@@ -24,12 +23,11 @@ export function useSandboxLogs(
   options?: Omit<UseQueryOptions<PaginatedLogs>, 'queryKey' | 'queryFn'>,
 ) {
   const api = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<PaginatedLogs>({
     queryKey: queryKeys.telemetry.logs(sandboxId ?? '', params),
     queryFn: async () => {
-      if (!selectedOrganization || !sandboxId || !api.analyticsTelemetryApi) {
+      if (!sandboxId || !api.analyticsTelemetryApi) {
         throw new Error('Missing required parameters')
       }
       const limit = params.limit ?? 50
@@ -37,8 +35,7 @@ export function useSandboxLogs(
       const offset = (page - 1) * limit
       const severity = params.severities?.length ? params.severities.join(',') : undefined
 
-      const response = await api.analyticsTelemetryApi.organizationOrganizationIdSandboxSandboxIdTelemetryLogsGet(
-        selectedOrganization.id,
+      const response = await api.analyticsTelemetryApi.sandboxSandboxIdTelemetryLogsGet(
         sandboxId,
         params.from.toISOString(),
         params.to.toISOString(),
@@ -67,7 +64,7 @@ export function useSandboxLogs(
         totalPages: items.length < limit ? page : page + 1,
       }
     },
-    enabled: !!sandboxId && !!selectedOrganization && !!api.analyticsTelemetryApi && !!params.from && !!params.to,
+    enabled: !!sandboxId && !!api.analyticsTelemetryApi && !!params.from && !!params.to,
     staleTime: 10_000,
     ...options,
   })

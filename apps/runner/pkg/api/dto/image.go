@@ -17,7 +17,7 @@ type BuildSnapshotRequestDTO struct {
 	SourceRegistries       []RegistryDTO `json:"sourceRegistries,omitempty"`
 	Registry               *RegistryDTO  `json:"registry,omitempty"`
 	Dockerfile             string        `json:"dockerfile" validate:"required"`
-	OrganizationId         string        `json:"organizationId" validate:"required"`
+	StoragePrefix          string        `json:"storagePrefix,omitempty"`
 	Context                []string      `json:"context"`
 	PushToInternalRegistry bool          `json:"pushToInternalRegistry"`
 } //	@name	BuildSnapshotRequestDTO

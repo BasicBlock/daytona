@@ -13,8 +13,7 @@ type StartSandboxPayload struct {
 }
 
 type SnapshotSandboxPayload struct {
-	SandboxId      string           `json:"sandboxId"`
-	Name           string           `json:"name"`
-	OrganizationId string           `json:"organizationId"`
-	Registry       *dto.RegistryDTO `json:"registry,omitempty"`
+	SandboxId string           `json:"sandboxId"`
+	Name      string           `json:"name"`
+	Registry  *dto.RegistryDTO `json:"registry,omitempty"`
 }

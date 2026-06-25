@@ -10,11 +10,13 @@ export class Migration1764844895058 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // drop region hidden field
-    await queryRunner.query(`ALTER TABLE "region" DROP COLUMN "hidden"`)
+    await queryRunner.query(`ALTER TABLE IF EXISTS "region" DROP COLUMN IF EXISTS "hidden"`)
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // revert drop region hidden field
-    await queryRunner.query(`ALTER TABLE "region" ADD "hidden" boolean NOT NULL DEFAULT false`)
+    await queryRunner.query(
+      `ALTER TABLE IF EXISTS "region" ADD COLUMN IF NOT EXISTS "hidden" boolean NOT NULL DEFAULT false`,
+    )
   }
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/daytonaio/runner/internal"
 	"github.com/daytonaio/runner/internal/metrics"
 	"github.com/daytonaio/runner/pkg/api"
+	runnerapiclient "github.com/daytonaio/runner/pkg/apiclient"
 	"github.com/daytonaio/runner/pkg/cache"
 	"github.com/daytonaio/runner/pkg/daemon"
 	"github.com/daytonaio/runner/pkg/docker"
@@ -194,11 +195,21 @@ func run() int {
 
 	sandboxService := services.NewSandboxService(logger, backupInfoCache, dockerClient)
 
+	runnerID := cfg.RunnerId
+	if cfg.ApiVersion == 2 {
+		runnerID, err = runnerapiclient.GetRunnerID(ctx)
+		if err != nil {
+			logger.Error("Failed to resolve runner id", "error", err)
+			return 2
+		}
+	}
+
 	// Initialize sandbox state synchronization service
 	sandboxSyncService := services.NewSandboxSyncService(services.SandboxSyncServiceConfig{
 		Logger:   logger,
 		Docker:   dockerClient,
 		Interval: 10 * time.Second, // Sync every 10 seconds
+		RunnerID: runnerID,
 	})
 	sandboxSyncService.StartSyncProcess(ctx)
 
@@ -249,6 +260,7 @@ func run() int {
 			Collector:  metricsCollector,
 			Logger:     logger,
 			Domain:     cfg.Domain,
+			RunnerID:   runnerID,
 			ApiPort:    cfg.ApiPort,
 			ProxyPort:  cfg.ApiPort,
 			TlsEnabled: cfg.EnableTLS,
@@ -277,6 +289,7 @@ func run() int {
 		pollerService, err := poller.NewService(&poller.PollerServiceConfig{
 			PollTimeout: cfg.PollTimeout,
 			PollLimit:   cfg.PollLimit,
+			RunnerID:    runnerID,
 			Logger:      logger,
 			Executor:    executorService,
 		})
@@ -294,7 +307,6 @@ func run() int {
 	apiServer := api.NewApiServer(api.ApiServerConfig{
 		Logger:      logger,
 		ApiPort:     cfg.ApiPort,
-		ApiToken:    cfg.ApiToken,
 		TLSCertFile: cfg.TLSCertFile,
 		TLSKeyFile:  cfg.TLSKeyFile,
 		EnableTLS:   cfg.EnableTLS,

@@ -105,17 +105,10 @@ type DockerRegistryAPICreateRegistryRequest struct {
 	ctx context.Context
 	ApiService DockerRegistryAPI
 	createDockerRegistry *CreateDockerRegistry
-	xDaytonaOrganizationID *string
 }
 
 func (r DockerRegistryAPICreateRegistryRequest) CreateDockerRegistry(createDockerRegistry CreateDockerRegistry) DockerRegistryAPICreateRegistryRequest {
 	r.createDockerRegistry = &createDockerRegistry
-	return r
-}
-
-// Use with JWT to specify the organization ID
-func (r DockerRegistryAPICreateRegistryRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) DockerRegistryAPICreateRegistryRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
 	return r
 }
 
@@ -177,9 +170,6 @@ func (a *DockerRegistryAPIService) CreateRegistryExecute(r DockerRegistryAPICrea
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	// body params
 	localVarPostBody = r.createDockerRegistry
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -223,13 +213,6 @@ type DockerRegistryAPIDeleteRegistryRequest struct {
 	ctx context.Context
 	ApiService DockerRegistryAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r DockerRegistryAPIDeleteRegistryRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) DockerRegistryAPIDeleteRegistryRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r DockerRegistryAPIDeleteRegistryRequest) Execute() (*http.Response, error) {
@@ -288,9 +271,6 @@ func (a *DockerRegistryAPIService) DeleteRegistryExecute(r DockerRegistryAPIDele
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return nil, err
@@ -323,13 +303,6 @@ type DockerRegistryAPIGetRegistryRequest struct {
 	ctx context.Context
 	ApiService DockerRegistryAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r DockerRegistryAPIGetRegistryRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) DockerRegistryAPIGetRegistryRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r DockerRegistryAPIGetRegistryRequest) Execute() (*DockerRegistry, *http.Response, error) {
@@ -390,9 +363,6 @@ func (a *DockerRegistryAPIService) GetRegistryExecute(r DockerRegistryAPIGetRegi
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -433,20 +403,6 @@ func (a *DockerRegistryAPIService) GetRegistryExecute(r DockerRegistryAPIGetRegi
 type DockerRegistryAPIGetTransientPushAccessRequest struct {
 	ctx context.Context
 	ApiService DockerRegistryAPI
-	xDaytonaOrganizationID *string
-	regionId *string
-}
-
-// Use with JWT to specify the organization ID
-func (r DockerRegistryAPIGetTransientPushAccessRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) DockerRegistryAPIGetTransientPushAccessRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
-}
-
-// ID of the region where the snapshot will be available (defaults to organization default region)
-func (r DockerRegistryAPIGetTransientPushAccessRequest) RegionId(regionId string) DockerRegistryAPIGetTransientPushAccessRequest {
-	r.regionId = &regionId
-	return r
 }
 
 func (r DockerRegistryAPIGetTransientPushAccessRequest) Execute() (*RegistryPushAccessDto, *http.Response, error) {
@@ -487,9 +443,6 @@ func (a *DockerRegistryAPIService) GetTransientPushAccessExecute(r DockerRegistr
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.regionId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "regionId", r.regionId, "form", "")
-	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -506,9 +459,6 @@ func (a *DockerRegistryAPIService) GetTransientPushAccessExecute(r DockerRegistr
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
@@ -550,13 +500,6 @@ func (a *DockerRegistryAPIService) GetTransientPushAccessExecute(r DockerRegistr
 type DockerRegistryAPIListRegistriesRequest struct {
 	ctx context.Context
 	ApiService DockerRegistryAPI
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r DockerRegistryAPIListRegistriesRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) DockerRegistryAPIListRegistriesRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r DockerRegistryAPIListRegistriesRequest) Execute() ([]DockerRegistry, *http.Response, error) {
@@ -614,9 +557,6 @@ func (a *DockerRegistryAPIService) ListRegistriesExecute(r DockerRegistryAPIList
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -659,17 +599,10 @@ type DockerRegistryAPIUpdateRegistryRequest struct {
 	ApiService DockerRegistryAPI
 	id string
 	updateDockerRegistry *UpdateDockerRegistry
-	xDaytonaOrganizationID *string
 }
 
 func (r DockerRegistryAPIUpdateRegistryRequest) UpdateDockerRegistry(updateDockerRegistry UpdateDockerRegistry) DockerRegistryAPIUpdateRegistryRequest {
 	r.updateDockerRegistry = &updateDockerRegistry
-	return r
-}
-
-// Use with JWT to specify the organization ID
-func (r DockerRegistryAPIUpdateRegistryRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) DockerRegistryAPIUpdateRegistryRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
 	return r
 }
 
@@ -733,9 +666,6 @@ func (a *DockerRegistryAPIService) UpdateRegistryExecute(r DockerRegistryAPIUpda
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	// body params
 	localVarPostBody = r.updateDockerRegistry

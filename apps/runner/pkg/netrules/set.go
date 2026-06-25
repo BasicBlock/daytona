@@ -7,6 +7,10 @@ import "strings"
 
 // SetNetworkRules creates and configures network rules for a container
 func (manager *NetRulesManager) SetNetworkRules(name string, sourceIp string, networkAllowList string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	// Parse the allowed networks
 	allowedNetworks, err := parseCidrNetworks(networkAllowList)
 	if err != nil {

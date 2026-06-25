@@ -5,12 +5,15 @@
 
 import { Injectable, Logger } from '@nestjs/common'
 import { ClickHouseService } from '../../clickhouse/clickhouse.service'
+import { TypedConfigService } from '../../config/typed-config.service'
+import { SandboxRepository } from '../../sandbox/repositories/sandbox.repository'
 import { LogEntryDto } from '../dto/log-entry.dto'
 import { PaginatedLogsDto } from '../dto/paginated-logs.dto'
 import { TraceSummaryDto } from '../dto/trace-summary.dto'
 import { TraceSpanDto } from '../dto/trace-span.dto'
 import { PaginatedTracesDto } from '../dto/paginated-traces.dto'
 import { MetricsResponseDto, MetricSeriesDto, MetricDataPointDto } from '../dto/metrics-response.dto'
+import { OtelForwardingConfigDto } from '../dto/otel-forwarding-config.dto'
 
 interface ClickHouseLogRow {
   Timestamp: string
@@ -60,7 +63,11 @@ interface ClickHouseCountRow {
 export class SandboxTelemetryService {
   private readonly logger = new Logger(SandboxTelemetryService.name)
 
-  constructor(private readonly clickhouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickhouseService: ClickHouseService,
+    private readonly configService: TypedConfigService,
+    private readonly sandboxRepository: SandboxRepository,
+  ) {}
 
   private getServiceName(sandboxId: string): string {
     return `sandbox-${sandboxId}`
@@ -68,6 +75,62 @@ export class SandboxTelemetryService {
 
   isConfigured(): boolean {
     return this.clickhouseService.isConfigured()
+  }
+
+  async getForwardingConfigBySandboxAuthToken(authToken?: string): Promise<OtelForwardingConfigDto | null> {
+    if (!authToken) {
+      return null
+    }
+
+    const sandbox = await this.sandboxRepository.findOneBy({ authToken })
+    if (!sandbox) {
+      return null
+    }
+
+    const endpoint = this.configService.get('otelCollector.forwardEndpointUrl')
+    if (!endpoint) {
+      return null
+    }
+
+    return {
+      endpoint,
+      headers: this.parseForwardHeaders(this.configService.get('otelCollector.forwardHeaders')),
+    }
+  }
+
+  private parseForwardHeaders(rawHeaders?: string): Record<string, string> {
+    if (!rawHeaders) {
+      return {}
+    }
+
+    try {
+      const parsed: unknown = JSON.parse(rawHeaders)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return Object.fromEntries(
+          Object.entries(parsed)
+            .filter(([, value]) => value !== undefined && value !== null)
+            .map(([key, value]) => [key, String(value)]),
+        )
+      }
+    } catch {
+      // Fall back to comma-separated key=value pairs below.
+    }
+
+    return Object.fromEntries(
+      rawHeaders
+        .split(',')
+        .map((header) => header.trim())
+        .filter(Boolean)
+        .map((header) => {
+          const separatorIndex = header.indexOf('=')
+          if (separatorIndex === -1) {
+            this.logger.warn(`Ignoring malformed OTEL forwarding header "${header}"`)
+            return null
+          }
+          return [header.slice(0, separatorIndex).trim(), header.slice(separatorIndex + 1).trim()] as const
+        })
+        .filter((entry): entry is readonly [string, string] => !!entry && !!entry[0]),
+    )
   }
 
   async getLogs(

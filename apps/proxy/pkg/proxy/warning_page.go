@@ -102,13 +102,13 @@ func (p *Proxy) browserWarningMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Skip warning for the acceptance endpoint itself or auth callbacks
+		// Skip warning for the acceptance endpoint itself and health checks.
 		targetPort, _, _, err := p.parseHost(ctx.Request.Host)
 		if err != nil {
 			switch ctx.Request.Method {
 			case "GET":
 				switch ctx.Request.URL.Path {
-				case "/callback", "/health":
+				case "/health":
 					ctx.Next()
 					return
 				}
@@ -296,8 +296,7 @@ func serveWarningPage(c *gin.Context, https bool) {
           • This website is served through <a href="https://daytona.io" target="_blank">daytona.io</a><br />
           • Content and functionality may change without notice<br />
           • You should only visit this website if you trust whoever sent the link to<br />
-          • Be careful about disclosing personal or financial information like passwords, phone numbers, or credit cards<br />
-          • To get rid of this warning for your organization, visit our docs: <a href="https://daytona.io/docs/en/preview-and-authentication" target="_blank">https://daytona.io/docs/en/preview-and-authentication</a>
+          • Be careful about disclosing personal or financial information like passwords, phone numbers, or credit cards
         </div>
 
         <form action="%s" method="POST" style="margin: 0">

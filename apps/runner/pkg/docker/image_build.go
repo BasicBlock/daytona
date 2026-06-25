@@ -27,6 +27,10 @@ func (d *DockerClient) BuildImage(ctx context.Context, buildImageDto dto.BuildSn
 	}
 
 	d.logger.InfoContext(ctx, "Building image")
+	storagePrefix := buildImageDto.StoragePrefix
+	if storagePrefix == "" {
+		storagePrefix = "objects"
+	}
 
 	// Check if image already exists
 	exists, err := d.ImageExists(ctx, buildImageDto.Snapshot, true)
@@ -66,7 +70,7 @@ func (d *DockerClient) BuildImage(ctx context.Context, buildImageDto dto.BuildSn
 		// Process each hash and extract the corresponding tar file
 		for _, hash := range buildImageDto.Context {
 			// Get the tar file from object storage
-			tarData, err := storageClient.GetObject(ctx, buildImageDto.OrganizationId, hash)
+			tarData, err := storageClient.GetObject(ctx, storagePrefix, hash)
 			if err != nil {
 				return fmt.Errorf("failed to get tar from storage with hash %s: %w", hash, err)
 			}

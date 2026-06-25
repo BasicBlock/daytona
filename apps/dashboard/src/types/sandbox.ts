@@ -7,6 +7,6 @@ export interface Sandbox {
   id: string
   name: string
   state: string
-  region: string
+  target: string
   runnerDomain: string
 }

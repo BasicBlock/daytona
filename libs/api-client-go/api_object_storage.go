@@ -41,13 +41,6 @@ type ObjectStorageAPIService service
 type ObjectStorageAPIGetPushAccessRequest struct {
 	ctx context.Context
 	ApiService ObjectStorageAPI
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r ObjectStorageAPIGetPushAccessRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) ObjectStorageAPIGetPushAccessRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r ObjectStorageAPIGetPushAccessRequest) Execute() (*StorageAccessDto, *http.Response, error) {
@@ -104,9 +97,6 @@ func (a *ObjectStorageAPIService) GetPushAccessExecute(r ObjectStorageAPIGetPush
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {

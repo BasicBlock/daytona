@@ -14,12 +14,6 @@
       "!{projectRoot}/**/*_test.go",
       "sharedGlobals"
     ],
-    "pythonLib": [
-      "default",
-      "{workspaceRoot}/pyproject.toml",
-      { "env": "PYPI_PKG_VERSION" },
-      { "env": "DEFAULT_PACKAGE_VERSION" }
-    ],
     "production": [
       "default",
       "!{projectRoot}/.eslintrc.json",
@@ -38,17 +32,11 @@
       { "env": "DEFAULT_PACKAGE_VERSION" },
       { "dependentTasksOutputFiles": "**/*", "transitive": true }
     ],
-    "pythonApiClient": [
-      "apiClient",
-      "{workspaceRoot}/hack/python-client/openapi-templates/**/*",
-      "{workspaceRoot}/hack/python-client/postprocess.sh"
-    ],
     "goApiClient": [
       "apiClient",
       "{workspaceRoot}/hack/go-client/openapi-templates/**/*",
       "{workspaceRoot}/hack/go-client/postprocess.sh"
-    ],
-    "tsApiClient": ["apiClient", "{workspaceRoot}/hack/ts-client/postprocess.sh"]
+    ]
   },
   "plugins": [
     {
@@ -212,32 +200,6 @@
         ]
       }
     },
-    "deps-check": {
-      "executor": "nx:run-commands",
-      "options": {
-        "cwd": "{projectRoot}",
-        "commands": ["poetry run deptry .", "poetry lock --regenerate"],
-        "parallel": false
-      },
-      "cache": true,
-      "inputs": ["pythonLib"],
-      "outputs": ["{projectRoot}/poetry.lock"]
-    },
-    "build-py-lib": {
-      "executor": "nx:run-commands",
-      "options": {
-        "cwd": "{projectRoot}",
-        "commands": [
-          "rm -rf dist",
-          "if [ -n \"$PYPI_PKG_VERSION\" ] || [ -n \"$DEFAULT_PACKAGE_VERSION\" ]; then VER=${PYPI_PKG_VERSION:-$DEFAULT_PACKAGE_VERSION}; sed -i \"s/^VERSION = \\\".*\\\"$/VERSION = \\\"$VER\\\"/\" setup.py && poetry version \"$VER\" && find . -maxdepth 2 -name '__init__.py' -exec sed -i \"s/__version__ = \\\"[^\\\"]*\\\"/__version__ = \\\"$VER\\\"/\" {} +; fi && poetry build"
-        ],
-        "parallel": false
-      },
-      "dependsOn": ["deps-check"],
-      "cache": true,
-      "inputs": ["pythonLib", { "dependentTasksOutputFiles": "**/*", "transitive": true }],
-      "outputs": ["{projectRoot}/dist/**"]
-    },
     "format": {
       "cache": true,
       "inputs": ["default"],
@@ -255,10 +217,6 @@
     },
     "generate:api-client": {
       "cache": true
-    },
-    "docs": {
-      "cache": true,
-      "inputs": ["default", { "dependentTasksOutputFiles": "**/*", "transitive": true }]
     },
     "tidy": {
       "cache": true,

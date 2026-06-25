@@ -15,12 +15,6 @@ export class SnapshotDto {
   @ApiProperty()
   id: string
 
-  @ApiPropertyOptional()
-  organizationId?: string
-
-  @ApiProperty()
-  general: boolean
-
   @ApiProperty()
   name: string
 
@@ -80,12 +74,6 @@ export class SnapshotDto {
   buildInfo?: BuildInfoDto
 
   @ApiPropertyOptional({
-    description: 'IDs of regions where the snapshot is available',
-    type: [String],
-  })
-  regionIds?: string[]
-
-  @ApiPropertyOptional({
     description: 'The initial runner ID of the snapshot',
     example: 'runner123',
     required: false,
@@ -114,8 +102,6 @@ export class SnapshotDto {
   static fromSnapshot(snapshot: Snapshot): SnapshotDto {
     return {
       id: snapshot.id,
-      organizationId: snapshot.organizationId,
-      general: snapshot.general,
       name: snapshot.name,
       imageName: snapshot.imageName,
       state: snapshot.state,
@@ -139,7 +125,6 @@ export class SnapshotDto {
             snapshotRef: snapshot.buildInfo.snapshotRef,
           }
         : undefined,
-      regionIds: snapshot.snapshotRegions?.map((sr) => sr.regionId) ?? undefined,
       initialRunnerId: snapshot.initialRunnerId,
       ref: snapshot.ref,
       sandboxClass: snapshot.sandboxClass,

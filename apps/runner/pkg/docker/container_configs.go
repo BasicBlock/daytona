@@ -5,6 +5,7 @@ package docker
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
+	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/docker/api/types/container"
 )
@@ -31,6 +33,7 @@ const (
 // androidDeviceLabel is set on containers created for sandboxes tagged as "android-device".
 // The Start path reads it to skip the daytona daemon exec/wait that regular sandboxes need.
 const androidDeviceLabel = "daytona.android_device"
+const sandboxAuthTokenLabel = "daytona.auth_token"
 
 // isAndroidDeviceContainer reports whether an already-created container was provisioned for
 // an android-device sandbox, based on the label written at create time.
@@ -39,6 +42,13 @@ func isAndroidDeviceContainer(c *container.InspectResponse) bool {
 		return false
 	}
 	return c.Config.Labels[androidDeviceLabel] == "true"
+}
+
+func GetContainerAuthToken(c *container.InspectResponse) string {
+	if c == nil || c.Config == nil || c.Config.Labels == nil {
+		return ""
+	}
+	return c.Config.Labels[sandboxAuthTokenLabel]
 }
 
 func (d *DockerClient) getContainerConfigs(sandboxDto dto.CreateSandboxDTO, image *image.InspectResponse, volumeMountPathBinds []string, gpuIndex *int) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
@@ -92,17 +102,12 @@ func (d *DockerClient) getContainerCreateConfig(sandboxDto dto.CreateSandboxDTO,
 		envVars = append(envVars, "DAYTONA_OTEL_ENDPOINT="+*sandboxDto.OtelEndpoint)
 	}
 
-	if sandboxDto.OrganizationId != nil && *sandboxDto.OrganizationId != "" {
-		envVars = append(envVars, "DAYTONA_ORGANIZATION_ID="+*sandboxDto.OrganizationId)
-	}
-
-	if sandboxDto.RegionId != nil && *sandboxDto.RegionId != "" {
-		envVars = append(envVars, "DAYTONA_REGION_ID="+*sandboxDto.RegionId)
-	}
-
 	labels := make(map[string]string)
 	if sandboxDto.Name != "" {
 		labels[sandboxNameLabel] = sandboxDto.Name
+	}
+	if sandboxDto.AuthToken != nil && *sandboxDto.AuthToken != "" {
+		labels[sandboxAuthTokenLabel] = *sandboxDto.AuthToken
 	}
 	if len(sandboxDto.Volumes) > 0 {
 		volumeMountPaths := make([]string, len(sandboxDto.Volumes))
@@ -110,14 +115,6 @@ func (d *DockerClient) getContainerCreateConfig(sandboxDto dto.CreateSandboxDTO,
 			volumeMountPaths[i] = v.MountPath
 		}
 		labels["daytona.volume_mount_paths"] = strings.Join(volumeMountPaths, ",")
-	}
-	if sandboxDto.Metadata != nil {
-		if orgID, ok := sandboxDto.Metadata["organizationId"]; ok && orgID != "" {
-			labels["daytona.organization_id"] = orgID
-		}
-		if orgName, ok := sandboxDto.Metadata["organizationName"]; ok && orgName != "" {
-			labels["daytona.organization_name"] = orgName
-		}
 	}
 	if gpuIndex != nil {
 		labels[GpuIndexLabel] = strconv.Itoa(*gpuIndex)
@@ -174,6 +171,7 @@ func (d *DockerClient) getContainerCreateConfig(sandboxDto dto.CreateSandboxDTO,
 		Labels:       labels,
 		AttachStdout: true,
 		AttachStderr: true,
+		ExposedPorts: getDaemonExposedPorts(),
 	}, nil
 }
 
@@ -204,6 +202,11 @@ func (d *DockerClient) getContainerHostConfig(sandboxDto dto.CreateSandboxDTO, v
 		// for their current workloads.
 		Privileged: gpuIndex == nil,
 		Binds:      binds,
+	}
+	if runtime.GOOS != "linux" {
+		hostConfig.PortBindings = nat.PortMap{
+			daemonTCPPort: []nat.PortBinding{{HostIP: "127.0.0.1"}},
+		}
 	}
 
 	if sandboxDto.OtelEndpoint != nil && strings.Contains(*sandboxDto.OtelEndpoint, "host.docker.internal") {

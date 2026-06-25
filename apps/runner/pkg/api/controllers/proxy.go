@@ -15,6 +15,7 @@ import (
 	common_errors "github.com/daytonaio/common-go/pkg/errors"
 	proxy "github.com/daytonaio/common-go/pkg/proxy"
 	"github.com/daytonaio/common-go/pkg/utils"
+	runnerdocker "github.com/daytonaio/runner/pkg/docker"
 	"github.com/daytonaio/runner/pkg/runner"
 	"github.com/gin-gonic/gin"
 )
@@ -61,24 +62,22 @@ func getProxyTarget(ctx *gin.Context) (*url.URL, map[string]string, error) {
 		return nil, nil, errors.New("sandbox ID is required")
 	}
 
-	// Resolve the container IP with retries to handle transient Docker
-	// networking states where the container exists but has no IP yet.
-	var containerIP string
+	// Resolve the daemon address with retries to handle transient Docker
+	// networking states where the container exists but has no reachable endpoint yet.
+	var daemonAddress string
+	var sandboxAuthToken string
 	var containerNotFound bool
-	err = utils.RetryWithExponentialBackoff(ctx.Request.Context(), "resolve container IP", 3, 100*time.Millisecond, 500*time.Millisecond, func() error {
+	err = utils.RetryWithExponentialBackoff(ctx.Request.Context(), "resolve container daemon address", 3, 100*time.Millisecond, 500*time.Millisecond, func() error {
 		container, err := runner.Docker.ContainerInspect(ctx.Request.Context(), sandboxId)
 		if err != nil {
 			containerNotFound = true
 			return &utils.NonRetryableError{Err: fmt.Errorf("sandbox container not found: %w", err)}
 		}
 
-		for _, network := range container.NetworkSettings.Networks {
-			containerIP = network.IPAddress
-			break
-		}
-
-		if containerIP == "" {
-			return errors.New("no IP address found")
+		daemonAddress = runnerdocker.GetContainerDaemonAddress(ctx.Request.Context(), container)
+		sandboxAuthToken = runnerdocker.GetContainerAuthToken(container)
+		if daemonAddress == "" {
+			return errors.New("no daemon address found")
 		}
 
 		return nil
@@ -93,7 +92,7 @@ func getProxyTarget(ctx *gin.Context) (*url.URL, map[string]string, error) {
 	}
 
 	// Build the target URL
-	targetURL := fmt.Sprintf("http://%s:2280", containerIP)
+	targetURL := fmt.Sprintf("http://%s", daemonAddress)
 
 	// Get the wildcard path preserving original percent-encoding.
 	// ctx.Param() decodes the path, which causes mutations when the decoded
@@ -114,5 +113,10 @@ func getProxyTarget(ctx *gin.Context) (*url.URL, map[string]string, error) {
 		return nil, nil, fmt.Errorf("failed to parse target URL: %w", err)
 	}
 
-	return target, nil, nil
+	headers := map[string]string{}
+	if sandboxAuthToken != "" {
+		headers["Authorization"] = "Bearer " + sandboxAuthToken
+	}
+
+	return target, headers, nil
 }

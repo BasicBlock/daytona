@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { Entity, PrimaryColumn, CreateDateColumn, UpdateDateColumn, Column } from 'typeorm'
+import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm'
 
 @Entity()
 export class WebhookInitialization {
   @PrimaryColumn()
-  organizationId: string
+  applicationId: string
 
   @Column({
     nullable: true,

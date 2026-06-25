@@ -37,9 +37,6 @@ export class SandboxTypeormSearchAdapter implements SandboxSearchAdapter {
     const qb = this.sandboxRepository.createQueryBuilder('sandbox')
     qb.leftJoinAndSelect('sandbox.lastActivityAt', 'lastActivity')
 
-    // Base filters
-    qb.andWhere('sandbox.organizationId = :organizationId', { organizationId: filters.organizationId })
-
     if (filters.idPrefix) {
       qb.andWhere('LOWER(sandbox.id) LIKE LOWER(:idPrefix)', { idPrefix: `${filters.idPrefix}%` })
     }
@@ -52,14 +49,8 @@ export class SandboxTypeormSearchAdapter implements SandboxSearchAdapter {
     if (filters.snapshots?.length) {
       qb.andWhere('sandbox.snapshot IN (:...snapshots)', { snapshots: filters.snapshots })
     }
-    if (filters.regionIds?.length) {
-      qb.andWhere('sandbox.region IN (:...regionIds)', { regionIds: filters.regionIds })
-    }
     if (filters.sandboxClasses?.length) {
       qb.andWhere('sandbox.sandboxClass IN (:...sandboxClasses)', { sandboxClasses: filters.sandboxClasses })
-    }
-    if (filters.isPublic !== undefined) {
-      qb.andWhere('sandbox.public = :isPublic', { isPublic: filters.isPublic })
     }
     if (filters.isRecoverable !== undefined) {
       qb.andWhere('sandbox.recoverable = :isRecoverable', { isRecoverable: filters.isRecoverable })
@@ -175,18 +166,16 @@ export class SandboxTypeormSearchAdapter implements SandboxSearchAdapter {
   private mapEntityToDto(sandbox: Sandbox): SandboxListItemDto {
     return new SandboxListItemDto({
       id: sandbox.id,
-      organizationId: sandbox.organizationId,
       name: sandbox.name,
-      target: sandbox.region,
+      target: sandbox.target,
       runnerId: sandbox.runnerId,
       sandboxClass: sandbox.sandboxClass,
       state: sandbox.state,
       desiredState: sandbox.desiredState,
       snapshot: sandbox.snapshot,
-      user: sandbox.osUser,
+      osUser: sandbox.osUser,
       errorReason: sandbox.errorReason,
       recoverable: sandbox.recoverable,
-      public: sandbox.public,
       cpu: sandbox.cpu,
       gpu: sandbox.gpu,
       gpuType: sandbox.gpuType ?? undefined,

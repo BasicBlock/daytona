@@ -6,16 +6,6 @@ import { AppModule } from './app.module'
 import { SwaggerModule } from '@nestjs/swagger'
 import type { OpenAPIObject } from '@nestjs/swagger'
 import { getOpenApiConfig } from './openapi.config'
-import { addWebhookDocumentation } from './openapi-webhooks'
-import {
-  SandboxCreatedWebhookDto,
-  SandboxStateUpdatedWebhookDto,
-  SnapshotCreatedWebhookDto,
-  SnapshotStateUpdatedWebhookDto,
-  SnapshotRemovedWebhookDto,
-  VolumeCreatedWebhookDto,
-  VolumeStateUpdatedWebhookDto,
-} from './webhook/dto/webhook-event-payloads.dto'
 
 async function generateOpenAPI() {
   try {
@@ -23,7 +13,7 @@ async function generateOpenAPI() {
       logger: ['error'], // Reduce logging noise
     })
 
-    const config = getOpenApiConfig('http://localhost:3000')
+    const config = getOpenApiConfig()
 
     const document = {
       ...SwaggerModule.createDocument(app, config),
@@ -33,27 +23,14 @@ async function generateOpenAPI() {
     fs.mkdirSync(path.dirname(openapiPath), { recursive: true })
     fs.writeFileSync(openapiPath, JSON.stringify(document, null, 2))
 
-    // Generate 3.1.0 version of the OpenAPI specification
-    // Needed for the webhook documentation
     const document_3_1_0 = {
-      ...SwaggerModule.createDocument(app, config, {
-        extraModels: [
-          SandboxCreatedWebhookDto,
-          SandboxStateUpdatedWebhookDto,
-          SnapshotCreatedWebhookDto,
-          SnapshotStateUpdatedWebhookDto,
-          SnapshotRemovedWebhookDto,
-          VolumeCreatedWebhookDto,
-          VolumeStateUpdatedWebhookDto,
-        ],
-      }),
+      ...SwaggerModule.createDocument(app, config),
       openapi: '3.1.0',
     }
     addEnumVarnames(document_3_1_0)
-    const documentWithWebhooks = addWebhookDocumentation(document_3_1_0)
     const openapi310Path = './dist/apps/api/openapi.3.1.0.json'
     fs.mkdirSync(path.dirname(openapi310Path), { recursive: true })
-    fs.writeFileSync(openapi310Path, JSON.stringify(documentWithWebhooks, null, 2))
+    fs.writeFileSync(openapi310Path, JSON.stringify(document_3_1_0, null, 2))
 
     await app.close()
     console.log('OpenAPI specification generated successfully!')

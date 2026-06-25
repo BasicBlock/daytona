@@ -20,6 +20,7 @@ type SandboxSyncServiceConfig struct {
 	Logger   *slog.Logger
 	Docker   *docker.DockerClient
 	Interval time.Duration
+	RunnerID string
 }
 
 type SandboxSyncService struct {
@@ -27,6 +28,7 @@ type SandboxSyncService struct {
 	docker   *docker.DockerClient
 	interval time.Duration
 	client   *apiclient.APIClient
+	runnerID string
 }
 
 func NewSandboxSyncService(config SandboxSyncServiceConfig) *SandboxSyncService {
@@ -34,6 +36,7 @@ func NewSandboxSyncService(config SandboxSyncServiceConfig) *SandboxSyncService 
 		log:      config.Logger.With(slog.String("component", "sandbox_sync_service")),
 		docker:   config.Docker,
 		interval: config.Interval,
+		runnerID: config.RunnerID,
 	}
 }
 
@@ -76,7 +79,7 @@ func (s *SandboxSyncService) GetRemoteSandboxStates(ctx context.Context) (map[st
 		s.client = client
 	}
 	sandboxes, _, err := s.client.SandboxAPI.GetSandboxesForRunner(ctx).
-		States(string(apiclient.SANDBOXSTATE_STARTED)).SkipReconcilingSandboxes(true).
+		RunnerId(s.runnerID).States(string(apiclient.SANDBOXSTATE_STARTED)).SkipReconcilingSandboxes(true).
 		Execute()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandboxes from API: %w", err)

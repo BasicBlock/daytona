@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -56,17 +57,22 @@ func (d *DockerClient) startDaytonaDaemon(ctx context.Context, containerId strin
 	return nil
 }
 
-func (d *DockerClient) waitForDaemonRunning(ctx context.Context, containerIP string, authToken *string) (string, error) {
+func (d *DockerClient) waitForDaemonRunning(ctx context.Context, container *container.InspectResponse, authToken *string) (string, error) {
 	defer timer.Timer()()
+
+	daemonAddress := GetContainerDaemonAddress(ctx, container)
+	if daemonAddress == "" {
+		return "", errors.New("sandbox daemon address not found? Is the sandbox started?")
+	}
 
 	tracer := otel.Tracer("runner")
 	ctx, span := tracer.Start(ctx, "wait_for_daemon_running",
-		trace.WithAttributes(attribute.String("container.ip", containerIP)),
+		trace.WithAttributes(attribute.String("container.daemon_address", daemonAddress)),
 	)
 	defer span.End()
 
 	// Build the target URL
-	targetURL := fmt.Sprintf("http://%s:2280/version", containerIP)
+	targetURL := fmt.Sprintf("http://%s/version", daemonAddress)
 	target, err := url.Parse(targetURL)
 	if err != nil {
 		span.RecordError(err)
@@ -116,7 +122,7 @@ func (d *DockerClient) waitForDaemonRunning(ctx context.Context, containerIP str
 			go func() {
 				// Don't cancel context
 				initContext := context.WithoutCancel(ctx)
-				err := d.initializeDaemon(initContext, containerIP, *authToken, otelClient)
+				err := d.initializeDaemon(initContext, daemonAddress, *authToken, otelClient)
 				if err != nil {
 					d.logger.ErrorContext(initContext, "Failed to initialize daemon telemetry", "error", err)
 				}
@@ -131,7 +137,7 @@ type sandboxToken struct {
 	Token string `json:"token"`
 }
 
-func (d *DockerClient) initializeDaemon(ctx context.Context, containerIP string, token string, client *http.Client) error {
+func (d *DockerClient) initializeDaemon(ctx context.Context, daemonAddress string, token string, client *http.Client) error {
 	if client == nil {
 		return fmt.Errorf("http client is nil")
 	}
@@ -149,7 +155,7 @@ func (d *DockerClient) initializeDaemon(ctx context.Context, containerIP string,
 		return fmt.Errorf("failed to marshal sandbox token data: %w", err)
 	}
 
-	url := fmt.Sprintf("http://%s:2280/init", containerIP)
+	url := fmt.Sprintf("http://%s/init", daemonAddress)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create init request: %w", err)

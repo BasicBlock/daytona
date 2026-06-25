@@ -3,30 +3,18 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useMemo } from 'react'
 
-import { AnnouncementBanner } from '@/components/AnnouncementBanner'
 import { CommandPalette, useRegisterCommands, type CommandConfig } from '@/components/CommandPalette'
-import {
-  SetDefaultRegionDialog,
-  type SetDefaultRegionDialogRef,
-} from '@/components/Organizations/SetDefaultRegionDialog'
-import { PrivacyBanner } from '@/components/PrivacyBanner'
 import { Sidebar } from '@/components/Sidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
-import { VerifyEmailDialog } from '@/components/VerifyEmailDialog'
 import { DAYTONA_DOCS_URL, DAYTONA_SLACK_URL } from '@/constants/ExternalLinks'
 import { useTheme } from '@/contexts/ThemeContext'
-import { LocalStorageKey } from '@/enums/LocalStorageKey'
-import { useOwnerWalletQuery } from '@/hooks/queries/billingQueries'
 import { useConfig } from '@/hooks/useConfig'
-import { useDocsSearchCommands } from '@/hooks/useDocsSearchCommands'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
-import { useSuspensionBanner } from '@/hooks/useSuspensionBanner'
 import { cn } from '@/lib/utils'
 import { SlackLogoIcon } from '@phosphor-icons/react'
-import { BookOpen, BookSearchIcon, SunMoon } from 'lucide-react'
+import { BookOpen, SunMoon } from 'lucide-react'
 
 function useDashboardCommands() {
   const { theme, setTheme } = useTheme()
@@ -44,12 +32,6 @@ function useDashboardCommands() {
         label: 'Open Docs',
         icon: <BookOpen className="w-4 h-4" />,
         onSelect: () => window.open(DAYTONA_DOCS_URL, '_blank'),
-      },
-      {
-        id: 'search-docs',
-        label: 'Search Docs',
-        icon: <BookSearchIcon className="w-4 h-4" />,
-        page: 'search-docs',
       },
     ],
     [],
@@ -75,70 +57,16 @@ type DashboardProps = {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ children }) => {
-  const { selectedOrganization } = useSelectedOrganization()
-  const [showVerifyEmailDialog, setShowVerifyEmailDialog] = useState(false)
-  const setDefaultRegionDialogRef = useRef<SetDefaultRegionDialogRef>(null)
   const config = useConfig()
 
-  useOwnerWalletQuery() // prefetch wallet
-
   useDashboardCommands()
-  useDocsSearchCommands()
 
-  useSuspensionBanner(selectedOrganization)
-
-  useEffect(() => {
-    if (
-      selectedOrganization?.suspended &&
-      selectedOrganization.suspensionReason === 'Please verify your email address'
-    ) {
-      setShowVerifyEmailDialog(true)
-    }
-  }, [selectedOrganization])
-
-  useEffect(() => {
-    if (selectedOrganization?.id && !selectedOrganization.defaultRegionId) {
-      setDefaultRegionDialogRef.current?.open()
-    }
-  }, [selectedOrganization?.id, selectedOrganization?.defaultRegionId])
-
-  const [bannerText, bannerLearnMoreUrl] = useMemo(() => {
-    if (!config.announcements || Object.entries(config.announcements).length === 0) {
-      return [null, null]
-    }
-
-    return [Object.values(config.announcements)[0].text, Object.values(config.announcements)[0].learnMoreUrl]
-  }, [config.announcements])
-  const [isBannerVisible, setIsBannerVisible] = useState(false)
-
-  useEffect(() => {
-    if (!bannerText) {
-      setIsBannerVisible(false)
-      return
-    }
-
-    // Check if this announcement has been dismissed
-    const dismissedBanners = JSON.parse(localStorage.getItem(LocalStorageKey.AnnouncementBannerDismissed) || '[]')
-    const isDismissed = dismissedBanners.includes(bannerText)
-
-    setIsBannerVisible(!isDismissed)
-  }, [bannerText])
-
-  const handleDismissBanner = () => {
-    // Add this announcement to the dismissed list
-    const dismissedBanners = JSON.parse(localStorage.getItem(LocalStorageKey.AnnouncementBannerDismissed) || '[]')
-    localStorage.setItem(LocalStorageKey.AnnouncementBannerDismissed, JSON.stringify([...dismissedBanners, bannerText]))
-
-    setIsBannerVisible(false)
-  }
+  const isBannerVisible = false
 
   return (
     <div className="relative w-full">
-      {isBannerVisible && bannerText && (
-        <AnnouncementBanner text={bannerText} onDismiss={handleDismissBanner} learnMoreUrl={bannerLearnMoreUrl} />
-      )}
       <SidebarProvider isBannerVisible={isBannerVisible} defaultOpen={true}>
-        <Sidebar isBannerVisible={isBannerVisible} billingEnabled={!!config.billingApiUrl} version={config.version} />
+        <Sidebar isBannerVisible={isBannerVisible} version={config.version} />
         <SidebarInset className="overflow-y-auto">
           <div
             className={cn('w-full min-h-screen overscroll-none', {
@@ -150,9 +78,6 @@ const Dashboard: React.FC<DashboardProps> = ({ children }) => {
           </div>
         </SidebarInset>
         <Toaster />
-        <VerifyEmailDialog open={showVerifyEmailDialog} onOpenChange={setShowVerifyEmailDialog} />
-        <SetDefaultRegionDialog ref={setDefaultRegionDialogRef} />
-        <PrivacyBanner />
       </SidebarProvider>
     </div>
   )

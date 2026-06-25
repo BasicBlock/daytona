@@ -4,7 +4,6 @@
  */
 
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { mutationKeys } from './mutationKeys'
@@ -19,13 +18,12 @@ interface UseStopSandboxMutationOptions {
 
 export const useStopSandboxMutation = ({ invalidate = true }: UseStopSandboxMutationOptions = {}) => {
   const { sandboxApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationKey: mutationKeys.sandboxes.stop(),
     mutationFn: async ({ sandboxId }: StopSandboxVariables) => {
-      await sandboxApi.stopSandbox(sandboxId, selectedOrganization?.id)
+      await sandboxApi.stopSandbox(sandboxId)
     },
     onSuccess: (_, { sandboxId }) => {
       if (!invalidate) {
@@ -33,7 +31,7 @@ export const useStopSandboxMutation = ({ invalidate = true }: UseStopSandboxMuta
       }
 
       queryClient.invalidateQueries({
-        queryKey: queryKeys.sandboxes.detail(selectedOrganization?.id ?? '', sandboxId),
+        queryKey: queryKeys.sandboxes.detail(sandboxId),
       })
     },
   })

@@ -5,20 +5,18 @@
 
 import { queryKeys } from '@/hooks/queries/queryKeys'
 import { useNotificationSocket } from '@/hooks/useNotificationSocket'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { VolumeDto, VolumeState } from '@daytona/api-client'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 export function useVolumeWsSync() {
   const { notificationSocket } = useNotificationSocket()
-  const { selectedOrganization } = useSelectedOrganization()
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    if (!notificationSocket || !selectedOrganization?.id) return
+    if (!notificationSocket) return
 
-    const queryKey = queryKeys.volumes.list(selectedOrganization.id)
+    const queryKey = queryKeys.volumes.list()
 
     const upsertVolumeInCache = (volume: VolumeDto) => {
       queryClient.setQueriesData<VolumeDto[]>({ queryKey }, (previousVolumes) => {
@@ -79,5 +77,5 @@ export function useVolumeWsSync() {
       notificationSocket.off('volume.state.updated', handleVolumeStateUpdatedEvent)
       notificationSocket.off('volume.lastUsedAt.updated', handleVolumeLastUsedAtUpdatedEvent)
     }
-  }, [notificationSocket, queryClient, selectedOrganization?.id])
+  }, [notificationSocket, queryClient])
 }

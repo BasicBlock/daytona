@@ -7,14 +7,12 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useRegionLookup } from '@/hooks/queries/useRegionsQuery'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
+import { useTargetLookup } from '@/hooks/queries/useTargetsQuery'
 import type { SandboxListItem } from '@daytona/api-client'
 import { SandboxFileSystemTab } from './SandboxFileSystemTab'
 import { SandboxInfoPanel } from './SandboxInfoPanel'
 import { SandboxLogsTab } from './SandboxLogsTab'
 import { SandboxMetricsTab } from './SandboxMetricsTab'
-import { SandboxSpendingTab } from './SandboxSpendingTab'
 import { SandboxTerminalTab } from './SandboxTerminalTab'
 import { SandboxTracesTab } from './SandboxTracesTab'
 import { SandboxVncTab } from './SandboxVncTab'
@@ -23,16 +21,15 @@ import { TabValue } from './SearchParams'
 interface SandboxContentTabsProps {
   sandbox: SandboxListItem | undefined
   isLoading: boolean
-  spendingTabAvailable: boolean
+  spendingTabAvailable?: boolean
   tab: TabValue
   onTabChange: (tab: TabValue) => void
 }
 
 export function SandboxContentTabTriggers({
-  spendingTabAvailable,
   triggerClassName,
 }: {
-  spendingTabAvailable: boolean
+  spendingTabAvailable?: boolean
   triggerClassName?: string
 }) {
   return (
@@ -46,11 +43,6 @@ export function SandboxContentTabTriggers({
       <TabsTrigger value="metrics" className={triggerClassName}>
         Metrics
       </TabsTrigger>
-      {spendingTabAvailable && (
-        <TabsTrigger value="spending" className={triggerClassName}>
-          Spending
-        </TabsTrigger>
-      )}
       <TabsTrigger value="terminal" className={triggerClassName}>
         Terminal
       </TabsTrigger>
@@ -64,13 +56,7 @@ export function SandboxContentTabTriggers({
   )
 }
 
-export function SandboxContentTabPanels({
-  sandbox,
-  spendingTabAvailable,
-}: {
-  sandbox: SandboxListItem
-  spendingTabAvailable: boolean
-}) {
+export function SandboxContentTabPanels({ sandbox }: { sandbox: SandboxListItem; spendingTabAvailable?: boolean }) {
   return (
     <>
       <TabsContent value="logs" className="flex-1 min-h-0 m-0 data-[state=active]:flex flex-col overflow-hidden">
@@ -82,11 +68,6 @@ export function SandboxContentTabPanels({
       <TabsContent value="metrics" className="flex-1 min-h-0 m-0 data-[state=active]:flex flex-col overflow-hidden">
         <SandboxMetricsTab sandboxId={sandbox.id} />
       </TabsContent>
-      {spendingTabAvailable && (
-        <TabsContent value="spending" className="flex-1 min-h-0 m-0 data-[state=active]:flex flex-col overflow-hidden">
-          <SandboxSpendingTab sandboxId={sandbox.id} />
-        </TabsContent>
-      )}
       <TabsContent value="terminal" className="flex-1 min-h-0 m-0 data-[state=active]:flex flex-col overflow-hidden">
         <SandboxTerminalTab sandbox={sandbox} />
       </TabsContent>
@@ -103,12 +84,11 @@ export function SandboxContentTabPanels({
 export function SandboxContentTabs({
   sandbox,
   isLoading,
-  spendingTabAvailable,
+  spendingTabAvailable: _spendingTabAvailable,
   tab,
   onTabChange,
 }: SandboxContentTabsProps) {
-  const { selectedOrganization } = useSelectedOrganization()
-  const { getRegionName } = useRegionLookup(selectedOrganization?.id)
+  const { getTargetName } = useTargetLookup()
 
   if (isLoading) {
     return (
@@ -143,14 +123,14 @@ export function SandboxContentTabs({
           <TabsTrigger value="overview" className="lg:hidden">
             Overview
           </TabsTrigger>
-          <SandboxContentTabTriggers spendingTabAvailable={spendingTabAvailable} />
+          <SandboxContentTabTriggers />
         </TabsList>
       </ScrollArea>
 
       <TabsContent value="overview" className="flex-1 min-h-0 m-0 overflow-y-auto scrollbar-sm lg:hidden">
-        <SandboxInfoPanel sandbox={sandbox} getRegionName={getRegionName} />
+        <SandboxInfoPanel sandbox={sandbox} getTargetName={getTargetName} />
       </TabsContent>
-      <SandboxContentTabPanels sandbox={sandbox} spendingTabAvailable={spendingTabAvailable} />
+      <SandboxContentTabPanels sandbox={sandbox} />
     </Tabs>
   )
 }

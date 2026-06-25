@@ -15,10 +15,6 @@ export { SandboxSearchSortField, SandboxSearchSortDirection }
 
 export interface SandboxSearchFilters {
   /**
-   * Filter by organization ID
-   */
-  organizationId: string
-  /**
    * Filter by ID prefix (case-insensitive)
    */
   idPrefix?: string
@@ -42,10 +38,6 @@ export interface SandboxSearchFilters {
    * Filter by snapshots
    */
   snapshots?: string[]
-  /**
-   * Filter by region IDs
-   */
-  regionIds?: string[]
   /**
    * Filter by sandbox classes
    */
@@ -74,10 +66,6 @@ export interface SandboxSearchFilters {
    * Filter by maximum disk space in GiB
    */
   maxDiskGiB?: number
-  /**
-   * Filter by public status
-   */
-  isPublic?: boolean
   /**
    * Filter by recoverable status
    */
@@ -129,11 +117,11 @@ export interface SandboxSearchResult {
 
 /**
  * Interface for sandbox search operations
- * Provides search functionality for sandboxes with filtering and cursor-based pagination
+ * Provides search functionality for sandboxes with filtering and cursor-based pagination.
  */
 export interface SandboxSearchAdapter {
   /**
-   * Search sandboxes for an organization
+   * Search sandboxes.
    * @param params - Search parameters
    * @param params.filters - Filters to apply
    * @param params.pagination - Pagination parameters

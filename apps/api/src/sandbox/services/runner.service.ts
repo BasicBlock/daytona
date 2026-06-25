@@ -29,19 +29,15 @@ import { SandboxState } from '../enums/sandbox-state.enum'
 import { SnapshotRunner } from '../entities/snapshot-runner.entity'
 import { SnapshotRunnerState } from '../enums/snapshot-runner-state.enum'
 import { RunnerSnapshotDto } from '../dto/runner-snapshot.dto'
-import { RunnerAdapterFactory, RunnerInfo } from '../runner-adapter/runnerAdapter'
 import { RedisLockProvider } from '../common/redis-lock.provider'
 import { TypedConfigService } from '../../config/typed-config.service'
 import { LogExecution } from '../../common/decorators/log-execution.decorator'
 import { WithInstrumentation } from '../../common/decorators/otel.decorator'
-import { RegionService } from '../../region/services/region.service'
 import { RUNNER_NAME_REGEX } from '../constants/runner-name-regex.constant'
-import { RegionType } from '../../region/enums/region-type.enum'
 import { RunnerDto } from '../dto/runner.dto'
 import { RunnerEvents } from '../constants/runner-events'
 import { RunnerStateUpdatedEvent } from '../events/runner-state-updated.event'
 import { RunnerDeletedEvent } from '../events/runner-deleted.event'
-import { generateApiKeyValue } from '../../common/utils/api-key'
 import { RunnerFullDto } from '../dto/runner-full.dto'
 import { InjectRedis } from '@nestjs-modules/ioredis'
 import Redis from 'ioredis'
@@ -61,13 +57,11 @@ export class RunnerService {
   constructor(
     @InjectRepository(Runner)
     private readonly runnerRepository: Repository<Runner>,
-    private readonly runnerAdapterFactory: RunnerAdapterFactory,
     private readonly sandboxRepository: SandboxRepository,
     @InjectRepository(SnapshotRunner)
     private readonly snapshotRunnerRepository: Repository<SnapshotRunner>,
     private readonly redisLockProvider: RedisLockProvider,
     private readonly configService: TypedConfigService,
-    private readonly regionService: RegionService,
     private readonly snapshotRepository: SnapshotRepository,
     @Inject(EventEmitter2)
     private eventEmitter: EventEmitter2,
@@ -80,12 +74,11 @@ export class RunnerService {
 
   /**
    * @throws {BadRequestException} If the runner name or class is invalid.
-   * @throws {NotFoundException} If the region is not found.
+   * @throws {NotFoundException} If the target is not found.
    * @throws {ConflictException} If a runner with the same values already exists.
    */
   async create(createRunnerDto: CreateRunnerInternalDto): Promise<{
     runner: Runner
-    apiKey: string
   }> {
     if (!RUNNER_NAME_REGEX.test(createRunnerDto.name)) {
       throw new BadRequestException('Runner name must contain only letters, numbers, underscores, periods, and hyphens')
@@ -94,54 +87,26 @@ export class RunnerService {
       throw new BadRequestException('Runner name must be between 3 and 255 characters')
     }
 
-    const apiKey = createRunnerDto.apiKey ?? generateApiKeyValue()
-
-    let runner: Runner
-
-    switch (createRunnerDto.apiVersion) {
-      case '0':
-        runner = new Runner({
-          region: createRunnerDto.regionId,
-          name: createRunnerDto.name,
-          apiVersion: createRunnerDto.apiVersion,
-          apiKey: apiKey,
-          cpu: createRunnerDto.cpu,
-          memoryGiB: createRunnerDto.memoryGiB,
-          diskGiB: createRunnerDto.diskGiB,
-          domain: createRunnerDto.domain,
-          apiUrl: createRunnerDto.apiUrl,
-          proxyUrl: createRunnerDto.proxyUrl,
-          appVersion: createRunnerDto.appVersion,
-          tags: createRunnerDto.tags,
-          sandboxClass: createRunnerDto.sandboxClass,
-        })
-        break
-      case '2':
-        runner = new Runner({
-          region: createRunnerDto.regionId,
-          name: createRunnerDto.name,
-          apiVersion: createRunnerDto.apiVersion,
-          apiKey: apiKey,
-          appVersion: createRunnerDto.appVersion,
-          tags: createRunnerDto.tags,
-          sandboxClass: createRunnerDto.sandboxClass,
-        })
-        break
-      default:
-        throw new BadRequestException('Invalid runner version')
-    }
+    const runner = new Runner({
+      target: createRunnerDto.target,
+      name: createRunnerDto.name,
+      apiVersion: '2',
+      appVersion: createRunnerDto.appVersion,
+      tags: createRunnerDto.tags,
+      sandboxClass: createRunnerDto.sandboxClass,
+    })
 
     try {
       const savedRunner = await this.runnerRepository.save(runner)
       this.invalidateRunnerCache(savedRunner.id)
-      return { runner: savedRunner, apiKey }
+      return { runner: savedRunner }
     } catch (error) {
       if (error.code === '23505') {
         if (error.detail.includes('domain')) {
           throw new ConflictException('This domain is already in use')
         }
         if (error.detail.includes('name')) {
-          throw new ConflictException(`Runner with name ${createRunnerDto.name} already exists in this region`)
+          throw new ConflictException(`Runner with name ${createRunnerDto.name} already exists in this target`)
         }
         throw new ConflictException('A runner with these values already exists')
       }
@@ -152,49 +117,31 @@ export class RunnerService {
   async findAllFull(): Promise<RunnerFullDto[]> {
     const runners = await this.runnerRepository.find()
 
-    const regionIds = new Set(runners.map((runner) => runner.region))
-    const regions = await this.regionService.findByIds(Array.from(regionIds))
-
-    const regionTypeMap = new Map<string, RegionType>()
-    regions.forEach((region) => {
-      regionTypeMap.set(region.id, region.regionType)
-    })
-
-    return runners.map((runner) => RunnerFullDto.fromRunner(runner, regionTypeMap.get(runner.region)))
+    return runners.map((runner) => RunnerFullDto.fromRunner(runner))
   }
 
-  async findAllByRegion(regionId: string): Promise<RunnerDto[]> {
+  async findAllByTarget(target: string): Promise<RunnerDto[]> {
     const runners = await this.runnerRepository.find({
       where: {
-        region: regionId,
+        target: target,
       },
     })
 
     return runners.map(RunnerDto.fromRunner)
   }
 
-  async findAllByRegionFull(regionId: string): Promise<RunnerFullDto[]> {
+  async findAllByTargetFull(target: string): Promise<RunnerFullDto[]> {
     const runners = await this.runnerRepository.find({
       where: {
-        region: regionId,
+        target: target,
       },
     })
 
-    const region = await this.regionService.findOne(regionId)
-
-    return runners.map((runner) => RunnerFullDto.fromRunner(runner, region?.regionType))
+    return runners.map((runner) => RunnerFullDto.fromRunner(runner))
   }
 
-  async findAllByOrganization(organizationId: string, regionType?: RegionType): Promise<RunnerDto[]> {
-    const regions = await this.regionService.findAllByOrganization(organizationId, regionType)
-    const regionIds = regions.map((region) => region.id)
-
-    const runners = await this.runnerRepository.find({
-      where: {
-        region: In(regionIds),
-      },
-    })
-
+  async findAll(): Promise<RunnerDto[]> {
+    const runners = await this.runnerRepository.find()
     return runners.map(RunnerDto.fromRunner)
   }
 
@@ -240,9 +187,8 @@ export class RunnerService {
 
   async findOneFullOrFail(id: string): Promise<RunnerFullDto> {
     const runner = await this.findOneOrFail(id)
-    const region = await this.regionService.findOne(runner.region)
 
-    return RunnerFullDto.fromRunner(runner, region?.regionType)
+    return RunnerFullDto.fromRunner(runner)
   }
 
   async findOneByDomain(domain: string): Promise<Runner | null> {
@@ -257,10 +203,6 @@ export class RunnerService {
     return this.runnerRepository.find({
       where: { id: In(runnerIds) },
     })
-  }
-
-  async findByApiKey(apiKey: string): Promise<Runner | null> {
-    return this.runnerRepository.findOneBy({ apiKey })
   }
 
   async findBySandboxId(sandboxId: string): Promise<Runner | null> {
@@ -278,20 +220,20 @@ export class RunnerService {
     return this.findOne(sandbox.runnerId)
   }
 
-  async getRegionId(runnerId: string): Promise<string> {
+  async getTargetId(runnerId: string): Promise<string> {
     const runner = await this.runnerRepository.findOne({
       where: {
         id: runnerId,
       },
-      select: ['region'],
+      select: ['target'],
       loadEagerRelations: false,
     })
 
-    if (!runner || !runner.region) {
+    if (!runner || !runner.target) {
       throw new NotFoundException('Runner not found')
     }
 
-    return runner.region
+    return runner.target
   }
 
   async findAvailableRunners(params: GetRunnerParams): Promise<Runner[]> {
@@ -346,8 +288,8 @@ export class RunnerService {
       runnerFilter.id = Not(In(Array.from(excludedRunnerIds)))
     }
 
-    if (params.regions?.length) {
-      runnerFilter.region = In(params.regions)
+    if (params.targets?.length) {
+      runnerFilter.target = In(params.targets)
     }
 
     if (params.sandboxClass !== undefined) {
@@ -362,7 +304,7 @@ export class RunnerService {
   }
 
   /**
-   * Returns true if at least one runner is registered for the given (region, sandboxClass)
+   * Returns true if at least one runner is registered for the given (target, sandboxClass)
    * and is currently schedulable.
    *
    * Callers must apply `getRunnerSandboxClass(snapshot.sandboxClass)` before calling, matching the
@@ -373,13 +315,13 @@ export class RunnerService {
    * Intentionally ignores transient signals like `state` (e.g. UNRESPONSIVE) and
    * `availabilityScore`, so this returns true even if every matching runner is temporarily
    * unhealthy. The purpose is to detect a *structural* misconfiguration where no runner could
-   * ever host a snapshot of that (region, sandboxClass) combination, and to fail snapshot
+   * ever host a snapshot of that (target, sandboxClass) combination, and to fail snapshot
    * creation fast with a 400 instead of letting it sit in PENDING indefinitely.
    */
-  async hasSchedulableRunner(regionId: string, sandboxClass: SandboxClass): Promise<boolean> {
+  async hasSchedulableRunner(target: string, sandboxClass: SandboxClass): Promise<boolean> {
     return this.runnerRepository.exists({
       where: {
-        region: regionId,
+        target: target,
         sandboxClass,
         unschedulable: Not(true),
         draining: Not(true),
@@ -570,17 +512,10 @@ export class RunnerService {
 
     try {
       const runners = await this.runnerRepository.find({
-        where: [
-          {
-            apiVersion: '0',
-            state: Not(RunnerState.DECOMMISSIONED),
-          },
-          {
-            // v2 runners report health via healthcheck endpoint, so we only check if the health is stale (lastChecked timestamp)
-            apiVersion: '2',
-            state: RunnerState.READY,
-          },
-        ],
+        where: {
+          apiVersion: '2',
+          state: RunnerState.READY,
+        },
         order: {
           lastChecked: {
             direction: 'ASC',
@@ -592,86 +527,7 @@ export class RunnerService {
 
       await Promise.allSettled(
         runners.map(async (runner) => {
-          // v2 runners report health via healthcheck endpoint, check based on lastChecked timestamp
-          if (runner.apiVersion === '2') {
-            await this.checkRunnerV2Health(runner)
-            return
-          }
-
-          // v0 runners: imperative health check via adapter
-          const shouldRetry = runner.state === RunnerState.READY
-          const retryDelays = shouldRetry ? [500, 1000] : []
-
-          for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
-            if (attempt > 0) {
-              await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt - 1]))
-            }
-
-            const abortController = new AbortController()
-            let timeoutId: NodeJS.Timeout | null = null
-
-            const runnerHealthTimeoutSeconds = this.configService.get('runnerHealthTimeout')
-
-            try {
-              await Promise.race([
-                (async () => {
-                  this.logger.debug(`Checking runner ${runner.id}`)
-                  const runnerAdapter = await this.runnerAdapterFactory.create(runner)
-
-                  await runnerAdapter.healthCheck(abortController.signal)
-
-                  let runnerInfo: RunnerInfo | undefined
-                  try {
-                    runnerInfo = await runnerAdapter.runnerInfo(abortController.signal)
-                  } catch (e) {
-                    this.logger.warn(`Failed to get runner info for runner ${runner.id}: ${e.message}`)
-                  }
-
-                  await this.updateRunnerHealth(
-                    runner.id,
-                    undefined,
-                    undefined,
-                    undefined,
-                    runnerInfo?.serviceHealth,
-                    runnerInfo?.metrics,
-                    runnerInfo?.appVersion,
-                  )
-                })(),
-                new Promise((_, reject) => {
-                  timeoutId = setTimeout(() => {
-                    abortController.abort()
-                    reject(new Error('Health check timeout'))
-                  }, runnerHealthTimeoutSeconds * 1000)
-                }),
-              ])
-
-              if (timeoutId) {
-                clearTimeout(timeoutId)
-              }
-              return // Success, exit retry loop
-            } catch (e) {
-              if (timeoutId) {
-                clearTimeout(timeoutId)
-              }
-
-              if (e.message === 'Health check timeout') {
-                this.logger.error(
-                  `Runner ${runner.id} health check timed out after ${runnerHealthTimeoutSeconds} seconds`,
-                )
-              } else if (e.code === 'ECONNREFUSED') {
-                this.logger.error(`Runner ${runner.id} not reachable`)
-              } else if (e.name === 'AbortError') {
-                this.logger.error(`Runner ${runner.id} health check was aborted due to timeout`)
-              } else {
-                this.logger.error(`Error checking runner ${runner.id}`, e)
-              }
-
-              // If last attempt, mark as unresponsive
-              if (attempt === retryDelays.length) {
-                await this.updateRunnerState(runner.id, RunnerState.UNRESPONSIVE)
-              }
-            }
-          }
+          await this.checkRunnerV2Health(runner)
         }),
       )
     } finally {
@@ -1229,7 +1085,7 @@ export class RunnerService {
 }
 
 export class GetRunnerParams {
-  regions: string[]
+  targets: string[]
   sandboxClass: SandboxClass
   snapshotRef?: string
   excludedRunnerIds?: string[]

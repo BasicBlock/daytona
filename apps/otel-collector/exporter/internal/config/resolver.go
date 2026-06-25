@@ -5,32 +5,46 @@ package config
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	common_cache "github.com/daytonaio/common-go/pkg/cache"
-	apiclient "github.com/daytonaio/daytona/libs/api-client-go"
 	"go.uber.org/zap"
 )
 
+type OtelConfig struct {
+	Endpoint string            `json:"endpoint"`
+	Headers  map[string]string `json:"headers,omitempty"`
+}
+
 // Resolver handles retrieving and caching endpoint configurations.
 type Resolver struct {
-	cache     common_cache.ICache[apiclient.OtelConfig]
-	logger    *zap.Logger
-	apiclient *apiclient.APIClient
-	cacheTTL  time.Duration
+	cache      common_cache.ICache[OtelConfig]
+	logger     *zap.Logger
+	apiURL     string
+	httpClient *http.Client
+	cacheTTL   time.Duration
 }
 
 // NewResolver creates a new configuration resolver.
-func NewResolver(cache common_cache.ICache[apiclient.OtelConfig], logger *zap.Logger, apiClient *apiclient.APIClient, cacheTTL time.Duration) *Resolver {
+func NewResolver(cache common_cache.ICache[OtelConfig], logger *zap.Logger, apiURL string, httpClient *http.Client, cacheTTL time.Duration) *Resolver {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+
 	return &Resolver{
-		cache:     cache,
-		logger:    logger,
-		apiclient: apiClient,
-		cacheTTL:  cacheTTL,
+		cache:      cache,
+		logger:     logger,
+		apiURL:     strings.TrimRight(apiURL, "/"),
+		httpClient: httpClient,
+		cacheTTL:   cacheTTL,
 	}
 }
 
-func (r *Resolver) GetOrganizationOtelConfig(ctx context.Context, authToken string) (*apiclient.OtelConfig, error) {
+func (r *Resolver) GetSandboxOtelConfig(ctx context.Context, authToken string) (*OtelConfig, error) {
 	otelConfig, err := r.cache.Get(ctx, authToken)
 	if err == nil {
 		if otelConfig.Endpoint == "(none)" {
@@ -39,18 +53,17 @@ func (r *Resolver) GetOrganizationOtelConfig(ctx context.Context, authToken stri
 		return otelConfig, nil
 	}
 
-	otelConfig, res, err := r.apiclient.OrganizationsAPI.GetOrganizationOtelConfigBySandboxAuthToken(context.Background(), authToken).Execute()
-	if err != nil && res != nil && res.StatusCode != 404 {
-		return nil, err
-	}
-
-	// Store this in cache to prevent repeated api calls for orgs that don't have otel endpoints
-	config := &apiclient.OtelConfig{
+	config := &OtelConfig{
 		Endpoint: "(none)",
 	}
 
+	otelConfig, err = r.fetchSandboxOtelConfig(ctx, authToken)
+	if err != nil {
+		return nil, err
+	}
+
 	if otelConfig != nil {
-		config = &apiclient.OtelConfig{
+		config = &OtelConfig{
 			Endpoint: otelConfig.Endpoint,
 			Headers:  otelConfig.Headers,
 		}
@@ -67,41 +80,34 @@ func (r *Resolver) GetOrganizationOtelConfig(ctx context.Context, authToken stri
 	return config, nil
 }
 
-func (r *Resolver) GetOrganizationOtelConfigByOrgId(ctx context.Context, orgId string) (*apiclient.OtelConfig, error) {
-	cacheKey := "org:" + orgId
-	otelConfig, err := r.cache.Get(ctx, cacheKey)
-	if err == nil {
-		if otelConfig.Endpoint == "(none)" {
-			return nil, nil
-		}
-		return otelConfig, nil
+func (r *Resolver) fetchSandboxOtelConfig(ctx context.Context, authToken string) (*OtelConfig, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", r.apiURL+"/sandbox/telemetry/otel-config", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create otel config request: %w", err)
 	}
 
-	otelConfig, res, err := r.apiclient.OrganizationsAPI.GetOrganizationOtelConfig(ctx, orgId).Execute()
-	if err != nil && res != nil && res.StatusCode != 404 {
-		return nil, err
-	}
+	req.Header.Set("sandbox-auth-token", authToken)
 
-	config := &apiclient.OtelConfig{
-		Endpoint: "(none)",
+	res, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch otel config: %w", err)
 	}
+	defer res.Body.Close()
 
-	if otelConfig != nil {
-		config = &apiclient.OtelConfig{
-			Endpoint: otelConfig.Endpoint,
-			Headers:  otelConfig.Headers,
-		}
-	}
-
-	if err := r.cache.Set(ctx, cacheKey, *config, r.cacheTTL); err != nil {
-		return nil, err
-	}
-
-	if config.Endpoint == "(none)" {
+	if res.StatusCode == http.StatusNotFound {
 		return nil, nil
 	}
 
-	return config, nil
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("failed to fetch otel config: status %d", res.StatusCode)
+	}
+
+	var config OtelConfig
+	if err := json.NewDecoder(res.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode otel config: %w", err)
+	}
+
+	return &config, nil
 }
 
 // InvalidateCache removes a specific sandbox configuration from the cache.

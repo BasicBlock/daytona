@@ -1,8 +1,8 @@
 # E2E Sandbox Lifecycle Tests — PR (Built from Source)
 #
 # Runs automatically when nx affected detects changes to E2E-relevant projects
-# (apps, SDKs, API clients). Builds from source, starts infrastructure + services,
-# and runs daytona-e2e suite plus SDK E2E tests.
+# (apps and API clients). Builds from source, starts infrastructure + services,
+# and runs the daytona-e2e suite.
 
 name: '[E2E] PR Sandbox Tests'
 
@@ -59,16 +59,11 @@ jobs:
             exit 1
           fi
           echo "Affected projects: $AFFECTED"
-          if echo "$AFFECTED" | grep -qE 'daytona-e2e|^api$|^runner$|^proxy$|^daemon$|^dashboard$|sdk-typescript|sdk-python|sdk-go|sdk-ruby|sdk-java|api-client|toolbox-api-client'; then
+          if echo "$AFFECTED" | grep -qE 'daytona-e2e|^api$|^runner$|^proxy$|^daemon$|api-client|toolbox-api-client'; then
             echo "affected=true" >> $GITHUB_OUTPUT
           else
             echo "affected=false" >> $GITHUB_OUTPUT
             echo "No E2E-relevant projects affected — skipping"
-          fi
-          if echo "$AFFECTED" | grep -qE '(^|,| )sdk-typescript($|,| )|(^|,| )api-client($|,| )|(^|,| )toolbox-api-client($|,| )'; then
-            echo "sdk_ts_affected=true" >> $GITHUB_OUTPUT
-          else
-            echo "sdk_ts_affected=false" >> $GITHUB_OUTPUT
           fi
 
       - uses: ./.github/actions/setup-toolchain
@@ -81,7 +76,7 @@ jobs:
           sudo systemctl restart docker
           sudo systemctl is-active docker
 
-      - name: Start infrastructure (postgres, redis, dex, registry)
+      - name: Start infrastructure (postgres, redis, registry)
         if: steps.affected.outputs.affected == 'true'
         run: |
           docker compose -f apps/daytona-e2e/docker-compose.e2e.yaml up -d --wait
@@ -89,9 +84,7 @@ jobs:
 
       - name: Build services needed for E2E
         if: steps.affected.outputs.affected == 'true'
-        run: |
-          source "$(poetry env info --path)/bin/activate"
-          VERSION=v0.0.0-dev yarn nx run-many --target=build --projects=api,runner,proxy,dashboard
+        run: VERSION=v0.0.0-dev yarn nx run-many --target=build --projects=api,runner,proxy
 
       - name: Copy E2E env to API
         if: steps.affected.outputs.affected == 'true'
@@ -137,7 +130,7 @@ jobs:
           tail -50 /tmp/runner.log 2>/dev/null || echo "No runner logs found"
           exit 1
 
-      - name: Start proxy and dashboard
+      - name: Start proxy
         if: steps.affected.outputs.affected == 'true'
         run: |
           set -a
@@ -147,8 +140,34 @@ jobs:
           npx nx serve proxy --configuration=development > /tmp/proxy.log 2>&1 &
           echo $! > /tmp/proxy.pid
 
-          npx nx serve dashboard --configuration=development > /tmp/dashboard.log 2>&1 &
-          echo $! > /tmp/dashboard.pid
+      - name: Ensure default snapshot exists
+        if: steps.affected.outputs.affected == 'true'
+        run: |
+          echo "Ensuring default snapshot (daytonaio/sandbox:0.6.0-slim) exists..."
+          for i in $(seq 1 150); do
+            BODY=$(curl -s -X POST "http://localhost:3001/api/snapshots" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"daytonaio/sandbox:0.6.0-slim","imageName":"daytonaio/sandbox:0.6.0-slim","cpu":1,"memory":1,"disk":3,"sandboxClass":"container"}' \
+              2>/dev/null || echo "")
+            STATUS=$(echo "$BODY" | jq -r '.statusCode // empty' 2>/dev/null || echo "")
+            STATE=$(echo "$BODY" | jq -r '.state // empty' 2>/dev/null || echo "")
+            MESSAGE=$(echo "$BODY" | jq -r '.message // empty' 2>/dev/null || echo "")
+
+            if [ "$STATE" = "active" ] || echo "$MESSAGE" | grep -q "already exists"; then
+              echo "Default snapshot is present (attempt $i, elapsed ~$((i*2))s)"
+              exit 0
+            fi
+
+            if [ "$((i % 10))" = "0" ]; then
+              echo "Attempt $i: create snapshot returned status='${STATUS:-unknown}' message='${MESSAGE:-none}'"
+            fi
+            sleep 2
+          done
+
+          echo "Failed to ensure default snapshot after 300s"
+          echo "Last response:"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+          exit 1
 
       - name: Wait for default snapshot to be available
         if: steps.affected.outputs.affected == 'true'
@@ -156,9 +175,7 @@ jobs:
           echo "Waiting for default snapshot (daytonaio/sandbox:0.6.0-slim) to become active..."
           echo "Runner must boot, API creates snapshot (pending), cron job transitions it to active"
           for i in $(seq 1 150); do
-            BODY=$(curl -s \
-              -H "Authorization: Bearer e2e_admin_api_key" \
-              "http://localhost:3001/api/snapshots/daytonaio%2Fsandbox%3A0.6.0-slim" 2>/dev/null || echo "")
+            BODY=$(curl -s "http://localhost:3001/api/snapshots/daytonaio%2Fsandbox%3A0.6.0-slim" 2>/dev/null || echo "")
             STATE=$(echo "$BODY" | jq -r '.state // empty' 2>/dev/null || echo "")
             if [ "$STATE" = "active" ]; then
               echo "Default snapshot is active (attempt $i, elapsed ~$((i*2))s)"
@@ -176,7 +193,7 @@ jobs:
           echo "=== Runner DB entry (state inspection) ==="
           docker compose -f apps/daytona-e2e/docker-compose.e2e.yaml exec -T db \
             psql -U user -d application_ctx -x -c \
-            'SELECT id, domain, "apiUrl", "proxyUrl", region, name, state, "appVersion", "apiVersion", "lastChecked", unschedulable, draining, "availabilityScore", "currentSnapshotCount", "serviceHealth", "createdAt", "updatedAt" FROM runner;' \
+            'SELECT id, domain, "apiUrl", "proxyUrl", target, name, state, "appVersion", "apiVersion", "lastChecked", unschedulable, draining, "availabilityScore", "currentSnapshotCount", "serviceHealth", "createdAt", "updatedAt" FROM runner;' \
             || echo "Failed to query runner table"
           echo ""
           echo "=== Runner logs (full) ==="
@@ -190,66 +207,18 @@ jobs:
         if: steps.affected.outputs.affected == 'true'
         env:
           DAYTONA_API_URL: http://localhost:3001/api
-          DAYTONA_API_KEY: e2e_admin_api_key
         run: yarn nx e2e daytona-e2e
-
-      - name: Install Python test dependencies
-        if: steps.affected.outputs.affected == 'true'
-        run: |
-          source "$(poetry env info --path)/bin/activate"
-          pip install pytest pytest-asyncio pytest-timeout
-
-      - name: Publish Java API clients to Maven local
-        if: steps.affected.outputs.affected == 'true'
-        run: |
-          (cd libs/api-client-java && ./gradlew publishToMavenLocal -x test)
-          (cd libs/toolbox-api-client-java && ./gradlew publishToMavenLocal -x test)
-
-      - name: Run SDK E2E tests
-        if: steps.affected.outputs.affected == 'true'
-        env:
-          DAYTONA_API_URL: http://localhost:3001/api
-          DAYTONA_API_KEY: e2e_admin_api_key
-        run: yarn test:e2e
-
-      - name: Install Bun
-        if: steps.affected.outputs.sdk_ts_affected == 'true'
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: latest
-
-      - name: Install Deno
-        if: steps.affected.outputs.sdk_ts_affected == 'true'
-        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
-        with:
-          deno-version: v2.x
-
-      - name: Install Azure Functions Core Tools
-        if: steps.affected.outputs.sdk_ts_affected == 'true'
-        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
-
-      - name: Install Playwright Chromium (for vite-browser test)
-        if: steps.affected.outputs.sdk_ts_affected == 'true'
-        run: npx --yes playwright@1.48 install --with-deps chromium
-
-      - name: Run TypeScript SDK runtime compatibility tests
-        if: steps.affected.outputs.sdk_ts_affected == 'true'
-        env:
-          DAYTONA_API_URL: http://localhost:3001/api
-          DAYTONA_API_KEY: e2e_admin_api_key
-        run: yarn nx run sdk-typescript:test:runtime
 
       - name: Cleanup stale E2E sandboxes
         if: always() && steps.affected.outputs.affected == 'true'
         env:
           DAYTONA_API_URL: http://localhost:3001/api
-          DAYTONA_API_KEY: e2e_admin_api_key
         run: yarn nx e2e:cleanup daytona-e2e
 
       - name: Dump service logs
         if: always() && steps.affected.outputs.affected == 'true'
         run: |
-          for svc in api runner proxy dashboard; do
+          for svc in api runner proxy; do
             echo "=== ${svc} logs (last 200 lines) ==="
             tail -200 /tmp/${svc}.log 2>/dev/null || echo "No ${svc} logs found"
           done
@@ -257,7 +226,7 @@ jobs:
       - name: Stop services
         if: always() && steps.affected.outputs.affected == 'true'
         run: |
-          for svc in api runner proxy dashboard; do
+          for svc in api runner proxy; do
             if [ -f /tmp/${svc}.pid ]; then
               kill $(cat /tmp/${svc}.pid) 2>/dev/null || true
             fi

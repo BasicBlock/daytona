@@ -28,14 +28,13 @@ import { SandboxLastActivity } from './sandbox-last-activity.entity'
 import { isApiRecoverableError } from '../constants/errors-for-recovery'
 
 @Entity()
-@Unique(['organizationId', 'name'])
+@Unique(['name'])
 @Index('sandbox_state_idx', ['state'])
 @Index('sandbox_desiredstate_idx', ['desiredState'])
 @Index('sandbox_snapshot_idx', ['snapshot'])
 @Index('sandbox_runnerid_idx', ['runnerId'])
 @Index('sandbox_runner_state_idx', ['runnerId', 'state'])
-@Index('sandbox_organizationid_idx', ['organizationId'])
-@Index('sandbox_region_idx', ['region'])
+@Index('sandbox_target_idx', ['target'])
 @Index('sandbox_resources_idx', ['cpu', 'mem', 'disk', 'gpu'])
 @Index('sandbox_backupstate_idx', ['backupState'])
 @Index('sandbox_runner_state_desired_idx', ['runnerId', 'state', 'desiredState'], {
@@ -59,16 +58,11 @@ export class Sandbox {
   @PrimaryColumn({ default: () => 'uuid_generate_v4()' })
   id: string
 
-  @Column({
-    type: 'uuid',
-  })
-  organizationId: string
-
   @Column()
   name: string
 
   @Column()
-  region: string
+  target: string
 
   @Column({
     type: 'uuid',
@@ -121,9 +115,6 @@ export class Sandbox {
     default: {},
   })
   env: { [key: string]: string } = {}
-
-  @Column({ default: false, type: 'boolean' })
-  public = false
 
   @Column({ default: false, type: 'boolean' })
   networkBlockAll = false
@@ -243,11 +234,11 @@ export class Sandbox {
   @Column({ nullable: true })
   linkedSandboxId?: string | null
 
-  constructor(params?: { region: string; name?: string }) {
+  constructor(params?: { target: string; name?: string }) {
     if (!params) return
     this.id = uuidv4()
     this.name = params.name || this.id
-    this.region = params.region
+    this.target = params.target
   }
 
   /**

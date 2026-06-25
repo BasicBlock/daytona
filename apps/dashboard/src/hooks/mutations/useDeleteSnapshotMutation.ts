@@ -9,7 +9,6 @@ import { useApi } from '../useApi'
 
 export interface DeleteSnapshotMutationVariables {
   snapshotId: string
-  organizationId?: string
 }
 
 interface UseDeleteSnapshotMutationOptions {
@@ -21,16 +20,13 @@ export const useDeleteSnapshotMutation = ({ invalidateOnSuccess = true }: UseDel
   const queryClient = useQueryClient()
 
   return useMutation<void, unknown, DeleteSnapshotMutationVariables>({
-    mutationFn: async ({ snapshotId, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-      await snapshotApi.removeSnapshot(snapshotId, organizationId)
+    mutationFn: async ({ snapshotId }) => {
+      await snapshotApi.removeSnapshot(snapshotId)
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (invalidateOnSuccess && organizationId) {
+    onSuccess: async () => {
+      if (invalidateOnSuccess) {
         await queryClient.invalidateQueries({
-          queryKey: queryKeys.snapshots.list(organizationId),
+          queryKey: queryKeys.snapshots.list(),
         })
       }
     },

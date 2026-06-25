@@ -51,17 +51,17 @@ type PreviewAPI interface {
 	HasSandboxAccessExecute(r PreviewAPIHasSandboxAccessRequest) (bool, *http.Response, error)
 
 	/*
-	IsSandboxPublic Check if sandbox is public
+	IsSandboxPreviewOpen Check if sandbox preview is open
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param sandboxId ID of the sandbox
-	@return PreviewAPIIsSandboxPublicRequest
+	@return PreviewAPIIsSandboxPreviewOpenRequest
 	*/
-	IsSandboxPublic(ctx context.Context, sandboxId string) PreviewAPIIsSandboxPublicRequest
+	IsSandboxPreviewOpen(ctx context.Context, sandboxId string) PreviewAPIIsSandboxPreviewOpenRequest
 
-	// IsSandboxPublicExecute executes the request
+	// IsSandboxPreviewOpenExecute executes the request
 	//  @return bool
-	IsSandboxPublicExecute(r PreviewAPIIsSandboxPublicRequest) (bool, *http.Response, error)
+	IsSandboxPreviewOpenExecute(r PreviewAPIIsSandboxPreviewOpenRequest) (bool, *http.Response, error)
 
 	/*
 	IsValidAuthToken Check if sandbox auth token is valid
@@ -287,25 +287,25 @@ func (a *PreviewAPIService) HasSandboxAccessExecute(r PreviewAPIHasSandboxAccess
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type PreviewAPIIsSandboxPublicRequest struct {
+type PreviewAPIIsSandboxPreviewOpenRequest struct {
 	ctx context.Context
 	ApiService PreviewAPI
 	sandboxId string
 }
 
-func (r PreviewAPIIsSandboxPublicRequest) Execute() (bool, *http.Response, error) {
-	return r.ApiService.IsSandboxPublicExecute(r)
+func (r PreviewAPIIsSandboxPreviewOpenRequest) Execute() (bool, *http.Response, error) {
+	return r.ApiService.IsSandboxPreviewOpenExecute(r)
 }
 
 /*
-IsSandboxPublic Check if sandbox is public
+IsSandboxPreviewOpen Check if sandbox preview is open
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param sandboxId ID of the sandbox
- @return PreviewAPIIsSandboxPublicRequest
+ @return PreviewAPIIsSandboxPreviewOpenRequest
 */
-func (a *PreviewAPIService) IsSandboxPublic(ctx context.Context, sandboxId string) PreviewAPIIsSandboxPublicRequest {
-	return PreviewAPIIsSandboxPublicRequest{
+func (a *PreviewAPIService) IsSandboxPreviewOpen(ctx context.Context, sandboxId string) PreviewAPIIsSandboxPreviewOpenRequest {
+	return PreviewAPIIsSandboxPreviewOpenRequest{
 		ApiService: a,
 		ctx: ctx,
 		sandboxId: sandboxId,
@@ -314,7 +314,7 @@ func (a *PreviewAPIService) IsSandboxPublic(ctx context.Context, sandboxId strin
 
 // Execute executes the request
 //  @return bool
-func (a *PreviewAPIService) IsSandboxPublicExecute(r PreviewAPIIsSandboxPublicRequest) (bool, *http.Response, error) {
+func (a *PreviewAPIService) IsSandboxPreviewOpenExecute(r PreviewAPIIsSandboxPreviewOpenRequest) (bool, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
@@ -322,12 +322,12 @@ func (a *PreviewAPIService) IsSandboxPublicExecute(r PreviewAPIIsSandboxPublicRe
 		localVarReturnValue  bool
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "PreviewAPIService.IsSandboxPublic")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "PreviewAPIService.IsSandboxPreviewOpen")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/preview/{sandboxId}/public"
+	localVarPath := localBasePath + "/preview/{sandboxId}/open"
 	localVarPath = strings.Replace(localVarPath, "{"+"sandboxId"+"}", url.PathEscape(parameterValueToString(r.sandboxId, "sandboxId")), -1)
 
 	localVarHeaderParams := make(map[string]string)

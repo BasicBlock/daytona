@@ -5,6 +5,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,7 +16,6 @@ import (
 
 	common_errors "github.com/daytonaio/common-go/pkg/errors"
 	"github.com/daytonaio/common-go/pkg/utils"
-	apiclient "github.com/daytonaio/daytona/libs/api-client-go"
 	"github.com/gin-gonic/gin"
 
 	log "github.com/sirupsen/logrus"
@@ -57,13 +57,13 @@ func (p *Proxy) GetProxyTarget(ctx *gin.Context) (*url.URL, map[string]string, e
 
 	sandboxId := sandboxIdOrSignedToken
 
-	isPublic, err := p.getSandboxPublic(ctx, sandboxIdOrSignedToken)
+	isOpen, err := p.getSandboxOpen(ctx, sandboxIdOrSignedToken)
 	if err != nil {
-		ctx.Error(common_errors.NewBadRequestError(fmt.Errorf("failed to get sandbox public status: %w", err)))
-		return nil, nil, fmt.Errorf("failed to get sandbox public status: %w", err)
+		ctx.Error(common_errors.NewBadRequestError(fmt.Errorf("failed to get sandbox open status: %w", err)))
+		return nil, nil, fmt.Errorf("failed to get sandbox open status: %w", err)
 	}
 
-	if !*isPublic || targetPort == TERMINAL_PORT || targetPort == TOOLBOX_PORT || targetPort == RECORDING_DASHBOARD_PORT {
+	if !*isOpen || targetPort == TERMINAL_PORT || targetPort == TOOLBOX_PORT || targetPort == RECORDING_DASHBOARD_PORT {
 		portFloat, err := strconv.ParseFloat(targetPort, 64)
 		if err != nil {
 			ctx.Error(common_errors.NewBadRequestError(fmt.Errorf("failed to parse target port: %w", err)))
@@ -116,9 +116,13 @@ func (p *Proxy) GetProxyTarget(ctx *gin.Context) (*url.URL, map[string]string, e
 	}
 
 	return target, map[string]string{
-		"X-Daytona-Authorization": fmt.Sprintf("Bearer %s", runnerInfo.ApiKey),
-		"X-Forwarded-Host":        ctx.Request.Host,
+		"X-Forwarded-Host": ctx.Request.Host,
 	}, nil
+}
+
+type sandboxRunnerInfoResponse struct {
+	ApiUrl   *string `json:"apiUrl"`
+	ProxyUrl *string `json:"proxyUrl"`
 }
 
 func (p *Proxy) getSandboxRunnerInfo(ctx context.Context, sandboxId string) (*RunnerInfo, error) {
@@ -127,29 +131,49 @@ func (p *Proxy) getSandboxRunnerInfo(ctx context.Context, sandboxId string) (*Ru
 		return runnerInfo, nil
 	}
 
-	var runner *apiclient.RunnerFull
+	var runner sandboxRunnerInfoResponse
 	err = utils.RetryWithExponentialBackoff(ctx, "getSandboxRunnerInfo", proxyMaxRetries, proxyBaseDelay, proxyMaxDelay, func() error {
-		r, _, e := p.apiclient.RunnersAPI.GetRunnerBySandboxId(context.Background(), sandboxId).Execute()
-		runner = r
-		openapiErr := common_errors.ConvertOpenAPIError(e)
-
-		if openapiErr != nil && !common_errors.IsRetryableOpenAPIError(openapiErr) {
-			return &utils.NonRetryableError{Err: openapiErr}
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodGet,
+			strings.TrimRight(p.config.DaytonaApiUrl, "/")+"/runners/by-sandbox/"+url.PathEscape(sandboxId),
+			nil,
+		)
+		if err != nil {
+			return err
 		}
 
-		return openapiErr
+		res, err := p.userAPIHTTPClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode >= http.StatusBadRequest {
+			err := fmt.Errorf("GET /runners/by-sandbox/%s returned %d", sandboxId, res.StatusCode)
+			if res.StatusCode < http.StatusInternalServerError &&
+				res.StatusCode != http.StatusRequestTimeout && res.StatusCode != http.StatusTooManyRequests {
+				return &utils.NonRetryableError{Err: err}
+			}
+			return err
+		}
+
+		return json.NewDecoder(res.Body).Decode(&runner)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if runner.ProxyUrl == nil {
-		return nil, errors.New("runner proxy URL not found")
+	runnerUrl := runner.ProxyUrl
+	if runnerUrl == nil || *runnerUrl == "" {
+		runnerUrl = runner.ApiUrl
+	}
+	if runnerUrl == nil || *runnerUrl == "" {
+		return nil, errors.New("runner URL not found")
 	}
 
 	info := RunnerInfo{
-		ApiUrl: *runner.ProxyUrl,
-		ApiKey: runner.ApiKey,
+		ApiUrl: *runnerUrl,
 	}
 
 	err = p.sandboxRunnerCache.Set(ctx, sandboxId, info, 2*time.Minute)
@@ -160,44 +184,49 @@ func (p *Proxy) getSandboxRunnerInfo(ctx context.Context, sandboxId string) (*Ru
 	return &info, nil
 }
 
-func (p *Proxy) getSandboxPublic(ctx context.Context, sandboxId string) (*bool, error) {
+func (p *Proxy) getSandboxOpen(ctx context.Context, sandboxId string) (*bool, error) {
 	isPublicCache, err := p.sandboxPublicCache.Get(ctx, sandboxId)
 	if err == nil {
 		return isPublicCache, nil
 	}
 
-	var isPublic bool
-	err = utils.RetryWithExponentialBackoff(ctx, "getSandboxPublic", proxyMaxRetries, proxyBaseDelay, proxyMaxDelay, func() error {
-		_, res, err := p.apiclient.PreviewAPI.IsSandboxPublic(context.Background(), sandboxId).Execute()
-		if res != nil && res.StatusCode == http.StatusOK {
-			isPublic = true
+	var isOpen bool
+	err = utils.RetryWithExponentialBackoff(ctx, "getSandboxOpen", proxyMaxRetries, proxyBaseDelay, proxyMaxDelay, func() error {
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodGet,
+			strings.TrimRight(p.config.DaytonaApiUrl, "/")+"/preview/"+url.PathEscape(sandboxId)+"/open",
+			nil,
+		)
+		if err != nil {
+			return err
+		}
+		res, err := p.userAPIHTTPClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode == http.StatusOK {
+			isOpen = true
 			return nil
 		}
-		openapiErr := common_errors.ConvertOpenAPIError(err)
-
-		if openapiErr != nil {
-			if res != nil && res.StatusCode >= 400 && res.StatusCode < 500 &&
-				res.StatusCode != http.StatusRequestTimeout && res.StatusCode != http.StatusTooManyRequests {
-				isPublic = false
-				return nil
-			}
-			if !common_errors.IsRetryableOpenAPIError(openapiErr) {
-				return &utils.NonRetryableError{Err: openapiErr}
-			}
-			return openapiErr
+		if res.StatusCode >= http.StatusBadRequest && res.StatusCode < http.StatusInternalServerError &&
+			res.StatusCode != http.StatusRequestTimeout && res.StatusCode != http.StatusTooManyRequests {
+			isOpen = false
+			return nil
 		}
-		isPublic = false
-		return nil
+		return fmt.Errorf("GET /preview/%s/open returned %d", sandboxId, res.StatusCode)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if cacheErr := p.sandboxPublicCache.Set(ctx, sandboxId, isPublic, 1*time.Hour); cacheErr != nil {
-		log.Errorf("Failed to set sandbox public in cache: %v", cacheErr)
+	if cacheErr := p.sandboxPublicCache.Set(ctx, sandboxId, isOpen, 1*time.Hour); cacheErr != nil {
+		log.Errorf("Failed to set sandbox open status in cache: %v", cacheErr)
 	}
 
-	return &isPublic, nil
+	return &isOpen, nil
 }
 
 func (p *Proxy) getSandboxAuthKeyValid(ctx context.Context, sandboxId string, authKey string) (*bool, error) {
@@ -222,14 +251,6 @@ func (p *Proxy) getSandboxAuthKeyValid(ctx context.Context, sandboxId string, au
 	}
 
 	return p.validateAndCache(ctx, sandboxId, authKey, apiValidation)
-}
-
-func (p *Proxy) getSandboxBearerTokenValid(ctx context.Context, sandboxId string, bearerToken string) (*bool, error) {
-	apiValidation := func() (bool, error) {
-		return p.hasSandboxAccess(ctx, sandboxId, bearerToken)
-	}
-
-	return p.validateAndCache(ctx, sandboxId, bearerToken, apiValidation)
 }
 
 func (p *Proxy) validateAndCache(

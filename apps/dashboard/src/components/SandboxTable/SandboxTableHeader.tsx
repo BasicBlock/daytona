@@ -20,7 +20,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { DataTableConfigMenu } from '@/components/DataTableConfigMenu'
-import { useAvailableSandboxClassesForOrganization } from '@/hooks/useAvailableSandboxClasses'
+import { useAvailableSandboxClassesForDashboard } from '@/hooks/useAvailableSandboxClasses'
 import { cn } from '@/lib/utils'
 import { SearchInput } from '../SearchInput'
 import TooltipButton from '../TooltipButton'
@@ -38,7 +38,7 @@ import { BooleanFilter, BooleanFilterIndicator } from './filters/BooleanFilter'
 import { CreatedAtFilter, CreatedAtFilterIndicator } from './filters/CreatedAtFilter'
 import { LabelFilter, LabelFilterIndicator } from './filters/LabelFilter'
 import { LastEventFilter, LastEventFilterIndicator } from './filters/LastEventFilter'
-import { RegionFilter, RegionFilterIndicator } from './filters/RegionFilter'
+import { TargetFilter, TargetFilterIndicator } from './filters/TargetFilter'
 import { ResourceFilter, ResourceFilterIndicator, ResourceFilterValue } from './filters/ResourceFilter'
 import { SandboxClassFilter, SandboxClassFilterIndicator } from './filters/SandboxClassFilter'
 import { SnapshotFilter, SnapshotFilterIndicator } from './filters/SnapshotFilter'
@@ -59,7 +59,7 @@ const SANDBOX_TABLE_COLUMN_LABELS: Record<string, string> = {
   state: 'State',
   sandboxClass: 'Class',
   snapshot: 'Snapshot',
-  region: 'Region',
+  target: 'Target',
   resources: 'Resources',
   labels: 'Labels',
   lastEvent: 'Last Event',
@@ -70,8 +70,8 @@ const SANDBOX_TABLE_CONFIG_EXCLUDED_COLUMN_IDS = ['actions', 'select', 'isPublic
 
 export function SandboxTableHeader({
   table,
-  regionOptions,
-  regionsDataIsLoading,
+  targetOptions,
+  targetsDataIsLoading,
   snapshots,
   snapshotsDataIsLoading,
   snapshotsDataHasMore,
@@ -79,13 +79,13 @@ export function SandboxTableHeader({
   onRefresh,
   isRefreshing = false,
 }: SandboxTableHeaderProps) {
-  const availableSandboxClasses = useAvailableSandboxClassesForOrganization()
+  const availableSandboxClasses = useAvailableSandboxClassesForDashboard()
   const sandboxClassColumn = table.getColumn('sandboxClass')
   const showClassFilter = availableSandboxClasses.length > 1 && Boolean(sandboxClassColumn)
   const hasStateFilter = ((table.getColumn('state')?.getFilterValue() as string[]) || []).length > 0
   const hasClassFilter = ((sandboxClassColumn?.getFilterValue() as string[]) || []).length > 0
   const hasSnapshotFilter = ((table.getColumn('snapshot')?.getFilterValue() as string[]) || []).length > 0
-  const hasRegionFilter = ((table.getColumn('region')?.getFilterValue() as string[]) || []).length > 0
+  const hasTargetFilter = ((table.getColumn('target')?.getFilterValue() as string[]) || []).length > 0
   const hasLabelsFilter = ((table.getColumn('labels')?.getFilterValue() as string[]) || []).length > 0
   const hasLastEventFilter = ((table.getColumn('lastEvent')?.getFilterValue() as Date[]) || []).length > 0
   const hasCreatedAtFilter = ((table.getColumn('createdAt')?.getFilterValue() as Date[]) || []).length > 0
@@ -99,7 +99,7 @@ export function SandboxTableHeader({
     hasStateFilter ||
     hasClassFilter ||
     hasSnapshotFilter ||
-    hasRegionFilter ||
+    hasTargetFilter ||
     hasLabelsFilter ||
     hasLastEventFilter ||
     hasCreatedAtFilter ||
@@ -178,15 +178,15 @@ export function SandboxTableHeader({
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <Globe className="w-4 h-4" />
-                  Region
+                  Target
                 </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuSubContent className="p-0 w-64">
-                    <RegionFilter
-                      value={(table.getColumn('region')?.getFilterValue() as string[]) || []}
-                      onFilterChange={(value) => table.getColumn('region')?.setFilterValue(value)}
-                      options={regionOptions}
-                      isLoading={regionsDataIsLoading}
+                    <TargetFilter
+                      value={(table.getColumn('target')?.getFilterValue() as string[]) || []}
+                      onFilterChange={(value) => table.getColumn('target')?.setFilterValue(value)}
+                      options={targetOptions}
+                      isLoading={targetsDataIsLoading}
                     />
                   </DropdownMenuSubContent>
                 </DropdownMenuPortal>
@@ -328,12 +328,12 @@ export function SandboxTableHeader({
               onFilterChange={(value) => sandboxClassColumn?.setFilterValue(value)}
             />
           )}
-          {hasRegionFilter && (
-            <RegionFilterIndicator
-              value={(table.getColumn('region')?.getFilterValue() as string[]) || []}
-              onFilterChange={(value) => table.getColumn('region')?.setFilterValue(value)}
-              options={regionOptions}
-              isLoading={regionsDataIsLoading}
+          {hasTargetFilter && (
+            <TargetFilterIndicator
+              value={(table.getColumn('target')?.getFilterValue() as string[]) || []}
+              onFilterChange={(value) => table.getColumn('target')?.setFilterValue(value)}
+              options={targetOptions}
+              isLoading={targetsDataIsLoading}
             />
           )}
           {RESOURCE_FILTERS.map(({ type }) => {

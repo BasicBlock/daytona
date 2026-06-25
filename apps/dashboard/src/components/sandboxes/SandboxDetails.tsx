@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { OrganizationSuspendedError } from '@/api/errors'
 import { PageHeader, PageLayout, PageTitle } from '@/components/PageLayout'
 import {
   AlertDialog,
@@ -26,16 +25,13 @@ import { useStartSandboxMutation } from '@/hooks/mutations/useStartSandboxMutati
 import { useStopSandboxMutation } from '@/hooks/mutations/useStopSandboxMutation'
 import { usePauseSandboxMutation } from '@/hooks/mutations/usePauseSandboxMutation'
 import { useSandboxQuery } from '@/hooks/queries/useSandboxQuery'
-import { useRegionLookup } from '@/hooks/queries/useRegionsQuery'
+import { useTargetLookup } from '@/hooks/queries/useTargetsQuery'
 import { useApi } from '@/hooks/useApi'
-import { useConfig } from '@/hooks/useConfig'
 import { useMatchMedia } from '@/hooks/useMatchMedia'
 import { useSandboxDetailsWsSync } from '@/hooks/useSandboxWsSync'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { handleApiError } from '@/lib/error-handling'
 import { isStoppable, isTransitioning } from '@/lib/utils/sandbox'
 import { SandboxSessionProvider } from '@/providers/SandboxSessionProvider'
-import { OrganizationRolePermissionsEnum, OrganizationUserRoleEnum } from '@daytona/api-client'
 import { isAxiosError } from 'axios'
 import { Container, GripVertical, RefreshCw } from 'lucide-react'
 import { useQueryState } from 'nuqs'
@@ -53,13 +49,8 @@ import { tabParser } from './SearchParams'
 export default function SandboxDetails() {
   const { sandboxId } = useParams<{ sandboxId: string }>()
   const navigate = useNavigate()
-  const config = useConfig()
   const { sandboxApi } = useApi()
-  const { authenticatedUserOrganizationMember, selectedOrganization, authenticatedUserHasPermission } =
-    useSelectedOrganization()
-  const { getRegionName } = useRegionLookup(selectedOrganization?.id)
-
-  const spendingTabAvailable = !!config.analyticsApiUrl
+  const { getTargetName } = useTargetLookup()
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [createSshDialogOpen, setCreateSshDialogOpen] = useState(false)
@@ -75,10 +66,10 @@ export default function SandboxDetails() {
   }, [isDesktop, tab, setTab])
 
   useEffect(() => {
-    if (!spendingTabAvailable && tab === 'spending') {
+    if (tab === 'spending') {
       setTab('terminal')
     }
-  }, [spendingTabAvailable, tab, setTab])
+  }, [tab, setTab])
 
   const { data: sandbox, isLoading, isError, error, refetch, isFetching } = useSandboxQuery(sandboxId ?? '')
   const isNotFound = isError && isAxiosError(error.cause) && error.cause?.status === 404
@@ -92,8 +83,8 @@ export default function SandboxDetails() {
   const recoverMutation = useRecoverSandboxMutation({ invalidate: false })
   const deleteMutation = useDeleteSandboxMutation()
 
-  const writePermitted = authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_SANDBOXES)
-  const deletePermitted = authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_SANDBOXES)
+  const writePermitted = true
+  const deletePermitted = true
   const transitioning = sandbox ? isTransitioning(sandbox) : false
   const anyMutating =
     startMutation.isPending ||
@@ -110,16 +101,7 @@ export default function SandboxDetails() {
       await startMutation.mutateAsync({ sandboxId: sandbox.id })
       toast.success('Sandbox started')
     } catch (error) {
-      handleApiError(error, 'Failed to start sandbox', {
-        action:
-          error instanceof OrganizationSuspendedError &&
-          config.billingApiUrl &&
-          authenticatedUserOrganizationMember?.role === OrganizationUserRoleEnum.OWNER ? (
-            <Button variant="secondary" onClick={() => navigate(RoutePath.BILLING_WALLET)}>
-              Go to billing
-            </Button>
-          ) : null,
-      })
+      handleApiError(error, 'Failed to start sandbox')
     }
   }
 
@@ -181,7 +163,7 @@ export default function SandboxDetails() {
       return
     }
     try {
-      const response = await sandboxApi.getSignedPortPreviewUrl(sandbox.id, 33333, selectedOrganization?.id)
+      const response = await sandboxApi.getSignedPortPreviewUrl(sandbox.id, 33333)
       window.open(response.data.url, '_blank', 'noopener,noreferrer')
       toast.success('Opening Screen Recordings dashboard...')
     } catch (error) {
@@ -224,7 +206,7 @@ export default function SandboxDetails() {
                   <Container className="size-4" />
                 </EmptyMedia>
                 <EmptyTitle>Sandbox not found</EmptyTitle>
-                <EmptyDescription>Are you sure you're in the right organization?</EmptyDescription>
+                <EmptyDescription>Are you sure you're in the right workspace?</EmptyDescription>
               </EmptyHeader>
               <Button variant="outline" size="sm" onClick={() => navigate(RoutePath.SANDBOXES)}>
                 Back to Sandboxes
@@ -259,7 +241,7 @@ export default function SandboxDetails() {
                     ) : (
                       <SandboxInfoPanel
                         sandbox={sandbox}
-                        getRegionName={getRegionName}
+                        getTargetName={getTargetName}
                         actionsDisabled={actionsDisabled}
                         writePermitted={writePermitted}
                         onCreateSshAccess={() => setCreateSshDialogOpen(true)}
@@ -276,7 +258,7 @@ export default function SandboxDetails() {
               <SandboxContentTabs
                 sandbox={sandbox}
                 isLoading={isLoading}
-                spendingTabAvailable={!!spendingTabAvailable}
+                spendingTabAvailable={false}
                 tab={tab}
                 onTabChange={setTab}
               />

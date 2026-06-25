@@ -15,7 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  POETRY_VIRTUALENVS_IN_PROJECT: true
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
 jobs:
@@ -37,40 +36,13 @@ jobs:
           GONOSUMDB=github.com/daytonaio/daytona go work sync
           git diff --exit-code -- 'go.work*' '*/go.mod' '*/go.sum' || (echo "Go workspace files are not up to date! Please run 'go work sync' and commit the changes." && exit 1)
 
-  cli-docs:
-    if: github.repository == 'daytonaio/daytona'
-    name: CLI docs
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 22
-      - run: corepack enable
-      - name: Get yarn cache directory
-        id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ steps.yarn-cache.outputs.dir }}
-          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: yarn-${{ runner.os }}-${{ runner.arch }}-
-      - run: yarn install --immutable
-      - name: Check CLI reference docs are up to date
-        run: |
-          cd apps/docs
-          node tools/update-cli-reference.js --local
-          git diff --exit-code -- src/content/docs/en/tools/cli.mdx || (echo "CLI reference docs on the docs site are out of sync! Please run 'cd apps/docs && node tools/update-cli-reference.js --local' and commit the changes." && exit 1)
-
   golangci:
     if: github.repository == 'daytonaio/daytona'
     name: Go lint
     runs-on: blacksmith-4vcpu-ubuntu-2404
     strategy:
       matrix:
-        working-directory: [apps/daemon, apps/runner, apps/cli, apps/proxy, libs/sdk-go, apps/otel-collector/exporter]
+        working-directory: [apps/daemon, apps/runner, apps/proxy, apps/otel-collector/exporter]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -118,37 +90,6 @@ jobs:
           working-directory: libs/computer-use
           args: --timeout=5m ./...
 
-  lint-python:
-    if: github.repository == 'daytonaio/daytona'
-    name: Python lint
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: '3.12'
-      - name: Install Dependencies
-        run: |
-          corepack enable
-          python -m pip install --upgrade pip
-          pip install "poetry==2.1.3"
-          poetry install
-      - name: Get yarn cache directory
-        id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ steps.yarn-cache.outputs.dir }}
-          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: yarn-${{ runner.os }}-${{ runner.arch }}-
-      - run: yarn install --immutable
-      - name: Lint Python Code
-        run: |
-          source "$(poetry env info --path)/bin/activate"
-          yarn lint:py
-
   format-lint-api-clients:
     if: github.repository == 'daytonaio/daytona'
     name: Format, lint and generate API clients
@@ -162,46 +103,16 @@ jobs:
           run-go-work-sync: 'false'
       - name: generate-api-clients
         run: |
-          source "$(poetry env info --path)/bin/activate"
           go install github.com/princjef/gomarkdoc/cmd/gomarkdoc@v1.1.0
-          echo -e 'DEFAULT_PACKAGE_VERSION=0.0.0-dev\nDEFAULT_GEM_VERSION=0.0.0.pre.dev\n\nPYPI_PKG_VERSION=\nNPM_PKG_VERSION=\nNPM_TAG=\nPYPI_TOKEN=\nNPM_TOKEN=' > .env
+          echo -e 'DEFAULT_PACKAGE_VERSION=0.0.0-dev\nNPM_PKG_VERSION=\nNPM_TAG=\nNPM_TOKEN=' > .env
           mkdir -p dist/apps/api
           openapi_version="$(node -e "console.log(require('./openapitools.json')['generator-cli'].version)")"
           yarn openapi-generator-cli version-manager set "$openapi_version"
           yarn generate:api-client
           yarn lint:fix
           yarn format
-          poetry lock
-          yarn docs
           GONOSUMDB=github.com/daytonaio/daytona go work sync
-          git diff --exit-code || (echo "Code not formatted or linting errors! Hint: 'yarn generate:api-client', 'yarn lint:fix', 'yarn docs' and commit" && exit 1)
-
-  typecheck-sdk-typescript:
-    if: github.repository == 'daytonaio/daytona'
-    name: TypeScript SDK type check
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 22
-      - run: corepack enable
-      - name: Get yarn cache directory
-        id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ${{ steps.yarn-cache.outputs.dir }}
-          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: yarn-${{ runner.os }}-${{ runner.arch }}-
-      - run: yarn install --immutable
-      - name: Check type-only imports (verbatimModuleSyntax)
-        run: |
-          npx tsc -p ./libs/sdk-typescript/tsconfig.json \
-            --noEmit --verbatimModuleSyntax \
-            --module preserve --moduleResolution bundler
+          git diff --exit-code || (echo "Code not formatted or linting errors! Hint: 'yarn generate:api-client', 'yarn lint:fix' and commit" && exit 1)
 
   test:
     if: github.repository == 'daytonaio/daytona'
@@ -211,14 +122,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-toolchain
-      - name: Install Python test dependencies
-        run: |
-          source "$(poetry env info --path)/bin/activate"
-          pip install pytest pytest-asyncio
-      - name: Publish Java API clients to Maven local
-        run: |
-          (cd libs/api-client-java && ./gradlew publishToMavenLocal -x test)
-          (cd libs/toolbox-api-client-java && ./gradlew publishToMavenLocal -x test)
       - name: Run tests
         run: yarn test
 
@@ -231,9 +134,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-toolchain
       - name: Build all
-        run: |
-          source "$(poetry env info --path)/bin/activate"
-          VERSION=v0.0.0-dev yarn build --nxBail=true
+        run: VERSION=v0.0.0-dev yarn build --nxBail=true
 
   license-check:
     if: github.repository == 'daytonaio/daytona'

@@ -8,10 +8,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Spinner } from '@/components/ui/spinner'
-import { useRegionLookup } from '@/hooks/queries/useRegionsQuery'
+import { useTargetLookup } from '@/hooks/queries/useTargetsQuery'
 import { useSnapshotsQuery } from '@/hooks/queries/useSnapshotsQuery'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { cn } from '@/lib/utils'
 import { SnapshotState, type SnapshotDto } from '@daytona/api-client'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -54,28 +53,28 @@ function CommandInputStatusIcon({ fetching }: { fetching: boolean }) {
   )
 }
 
-function SnapshotRegionInline({
-  regionIds,
-  getRegionName,
+function SnapshotTargetInline({
+  targets,
+  getTargetName,
 }: {
-  regionIds?: string[]
-  getRegionName: (regionId: string) => string | undefined
+  targets?: string[]
+  getTargetName: (target: string) => string | undefined
 }) {
-  if (!regionIds?.length) {
+  if (!targets?.length) {
     return <span className="ml-auto shrink-0 text-xs text-muted-foreground">-</span>
   }
 
-  const regionNames = regionIds.map((regionId) => getRegionName(regionId) ?? regionId)
-  const firstRegion = regionNames[0]
-  const remainingCount = regionNames.length - 1
+  const targetNames = targets.map((target) => getTargetName(target) ?? target)
+  const firstTarget = targetNames[0]
+  const remainingCount = targetNames.length - 1
 
   if (remainingCount === 0) {
     return (
       <span
         className="ml-auto block max-w-[150px] shrink-0 truncate text-right text-xs text-muted-foreground"
-        title={firstRegion}
+        title={firstTarget}
       >
-        {firstRegion}
+        {firstTarget}
       </span>
     )
   }
@@ -84,7 +83,7 @@ function SnapshotRegionInline({
     <Tooltip
       label={
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          <span className="max-w-[150px] truncate text-xs text-muted-foreground">{firstRegion}</span>
+          <span className="max-w-[150px] truncate text-xs text-muted-foreground">{firstTarget}</span>
           <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
             +{remainingCount}
           </Badge>
@@ -92,8 +91,8 @@ function SnapshotRegionInline({
       }
       content={
         <div className="flex flex-col gap-1">
-          {regionNames.map((regionName, index) => (
-            <span key={`${regionName}-${index}`}>{regionName}</span>
+          {targetNames.map((targetName, index) => (
+            <span key={`${targetName}-${index}`}>{targetName}</span>
           ))}
         </div>
       }
@@ -101,9 +100,9 @@ function SnapshotRegionInline({
   )
 }
 
-function getSnapshotSearchValue(snapshot: SnapshotDto, getRegionName: (regionId: string) => string | undefined) {
-  const regions = (snapshot.regionIds ?? []).map((regionId) => getRegionName(regionId) ?? regionId).join(' ')
-  return `${snapshot.name} ${regions}`
+function getSnapshotSearchValue(snapshot: SnapshotDto, getTargetName: (target: string) => string | undefined) {
+  const targets = (snapshot.targets ?? []).map((target) => getTargetName(target) ?? target).join(' ')
+  return `${snapshot.name} ${targets}`
 }
 
 export interface SnapshotSelectProps {
@@ -144,8 +143,7 @@ export function SnapshotSelect({
   const inputRef = useRef<HTMLInputElement>(null)
   const debouncedSearchValue = useDebouncedValue(searchValue, 300)
   const searchTerm = debouncedSearchValue.trim()
-  const { selectedOrganization } = useSelectedOrganization()
-  const { getRegionName } = useRegionLookup(selectedOrganization?.id)
+  const { getTargetName } = useTargetLookup()
 
   const {
     data: snapshotsData,
@@ -300,7 +298,7 @@ export function SnapshotSelect({
                   {snapshots.map((snapshot) => (
                     <CommandItem
                       key={snapshot.id}
-                      value={getSnapshotSearchValue(snapshot, getRegionName)}
+                      value={getSnapshotSearchValue(snapshot, getTargetName)}
                       onSelect={() => handleChange(snapshot)}
                       className="cursor-pointer gap-2"
                     >
@@ -318,7 +316,7 @@ export function SnapshotSelect({
                           </Badge>
                         )}
                       </div>
-                      <SnapshotRegionInline regionIds={snapshot.regionIds} getRegionName={getRegionName} />
+                      <SnapshotTargetInline targets={snapshot.targets} getTargetName={getTargetName} />
                     </CommandItem>
                   ))}
                 </CommandGroup>

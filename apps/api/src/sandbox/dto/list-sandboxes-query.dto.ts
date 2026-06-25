@@ -120,18 +120,6 @@ export class ListSandboxesQueryDto {
   snapshots?: string[]
 
   @ApiProperty({
-    name: 'regionIds',
-    description: 'List of regions IDs to filter by',
-    required: false,
-    type: [String],
-  })
-  @IsOptional()
-  @ToArray()
-  @IsArray()
-  @IsString({ each: true })
-  regionIds?: string[]
-
-  @ApiProperty({
     name: 'sandboxClasses',
     description: 'List of sandbox classes to filter by',
     required: false,
@@ -222,18 +210,6 @@ export class ListSandboxesQueryDto {
   @IsInt()
   @Min(1)
   maxDiskGiB?: number
-
-  @ApiProperty({
-    name: 'isPublic',
-    description: 'Filter by public status',
-    required: false,
-    type: Boolean,
-    default: undefined,
-  })
-  @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  @IsBoolean()
-  isPublic?: boolean
 
   @ApiProperty({
     name: 'isRecoverable',

@@ -109,7 +109,7 @@ export const REGISTRY_PROVIDER_SPECS: Record<RegistryProvider, ProviderFormSpec>
       required: true,
       label: 'Registry URL',
       placeholder: 'https://us-central1-docker.pkg.dev',
-      helper: 'Base URL for your region.',
+      helper: 'Base URL for your target.',
     },
     // Always _json_key for service-account auth — auto-filled, no input.
     username: { hidden: true, label: 'Username', defaultValue: '_json_key' },

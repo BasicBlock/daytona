@@ -5,6 +5,10 @@ package netrules
 
 // AssignNetworkRules assigns network rules to a container by inserting a rule in DOCKER-USER chain
 func (manager *NetRulesManager) AssignNetworkRules(name string, sourceIp string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	// Add prefix to chain name
 	chainName := formatChainName(name)
 

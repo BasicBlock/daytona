@@ -40,7 +40,7 @@ func execInSandbox(t *testing.T, cfg Config, toolboxBaseURL, command string, com
 
 	req, err := http.NewRequest(http.MethodPost, toolboxBaseURL+"/process/execute", bytes.NewReader(body))
 	require.NoError(t, err, "new exec request")
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	setToolboxAuthorizationHeader(req, cfg)
 	req.Header.Set("Content-Type", "application/json")
 
 	// Allow the HTTP round-trip a bit more time than the in-sandbox command

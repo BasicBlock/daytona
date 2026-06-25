@@ -25,7 +25,7 @@ func TestHealthAPI(t *testing.T) {
 	t.Logf("GET /health response: %s", string(body))
 }
 
-// TestSandboxListReachable verifies the sandbox API is reachable and auth works.
+// TestSandboxListReachable verifies the sandbox API is reachable.
 // Uses a label filter that won't match anything to avoid listing real sandboxes.
 func TestSandboxListReachable(t *testing.T) {
 	cfg := LoadConfig(t)

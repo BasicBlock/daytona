@@ -224,7 +224,7 @@ func (d *DockerClient) clearBridgePortIsolation(ctx context.Context, bridgeName 
 		if attrs.MasterIndex != bridgeIdx {
 			continue
 		}
-		if err := netlink.LinkSetIsolated(link, false); err != nil {
+		if err := clearLinkIsolation(link); err != nil {
 			d.logger.WarnContext(ctx, "Failed to clear isolation on bridge port",
 				"bridge", bridgeName, "port", attrs.Name, "error", err)
 			continue

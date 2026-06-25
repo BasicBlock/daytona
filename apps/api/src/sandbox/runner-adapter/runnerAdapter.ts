@@ -3,18 +3,17 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Runner } from '../entities/runner.entity'
 import { ModuleRef } from '@nestjs/core'
-import { RunnerAdapterV0 } from './runnerAdapter.v0'
 import { RunnerAdapterV2 } from './runnerAdapter.v2'
-import { BuildInfo } from '../entities/build-info.entity'
 import { DockerRegistry } from '../../docker-registry/entities/docker-registry.entity'
 import { Sandbox } from '../entities/sandbox.entity'
 import { SandboxState } from '../enums/sandbox-state.enum'
 import { SandboxClass } from '../enums/sandbox-class.enum'
 import { BackupState } from '../enums/backup-state.enum'
 import { RunnerServiceInfo } from '../common/runner-service-info'
+import { BuildInfo } from '../entities/build-info.entity'
 
 export interface RunnerSandboxInfo {
   state: SandboxState
@@ -97,14 +96,13 @@ export interface RunnerAdapter {
   destroySandbox(sandboxId: string): Promise<void>
   createBackup(sandbox: Sandbox, backupSnapshotName: string, registry?: DockerRegistry): Promise<void>
 
-  removeSnapshot(snapshotName: string): Promise<void>
   buildSnapshot(
     buildInfo: BuildInfo,
-    organizationId?: string,
     sourceRegistries?: DockerRegistry[],
     registry?: DockerRegistry,
     pushToInternalRegistry?: boolean,
   ): Promise<void>
+  removeSnapshot(snapshotName: string): Promise<void>
   pullSnapshot(
     snapshotName: string,
     registry?: DockerRegistry,
@@ -132,7 +130,7 @@ export interface RunnerAdapter {
   createSnapshotFromSandbox(
     sandboxId: string,
     snapshotName: string,
-    organizationId: string,
+    snapshotSource: string,
     registry?: DockerRegistry,
     includeMemory?: boolean,
   ): Promise<CreateSandboxSnapshotResult | undefined>
@@ -150,17 +148,10 @@ export interface RunnerAdapter {
 
 @Injectable()
 export class RunnerAdapterFactory {
-  private readonly logger = new Logger(RunnerAdapterFactory.name)
-
   constructor(private moduleRef: ModuleRef) {}
 
   async create(runner: Runner): Promise<RunnerAdapter> {
     switch (runner.apiVersion) {
-      case '0': {
-        const adapter = await this.moduleRef.create(RunnerAdapterV0)
-        await adapter.init(runner)
-        return adapter
-      }
       case '2': {
         const adapter = await this.moduleRef.create(RunnerAdapterV2)
         await adapter.init(runner)

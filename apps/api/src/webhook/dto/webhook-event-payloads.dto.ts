@@ -4,25 +4,25 @@
  */
 
 import { ApiProperty, ApiSchema } from '@nestjs/swagger'
-import { WebhookEvent } from '../constants/webhook-events.constants'
-import { SandboxState } from '../../sandbox/enums/sandbox-state.enum'
 import { SandboxClass } from '../../sandbox/enums/sandbox-class.enum'
+import { SandboxState } from '../../sandbox/enums/sandbox-state.enum'
 import { SnapshotState } from '../../sandbox/enums/snapshot-state.enum'
 import { VolumeState } from '../../sandbox/enums/volume-state.enum'
 import { SandboxCreatedEvent } from '../../sandbox/events/sandbox-create.event'
 import { SandboxStateUpdatedEvent } from '../../sandbox/events/sandbox-state-updated.event'
 import { SnapshotCreatedEvent } from '../../sandbox/events/snapshot-created.event'
-import { SnapshotStateUpdatedEvent } from '../../sandbox/events/snapshot-state-updated.event'
 import { SnapshotRemovedEvent } from '../../sandbox/events/snapshot-removed.event'
+import { SnapshotStateUpdatedEvent } from '../../sandbox/events/snapshot-state-updated.event'
 import { VolumeCreatedEvent } from '../../sandbox/events/volume-created.event'
 import { VolumeStateUpdatedEvent } from '../../sandbox/events/volume-state-updated.event'
+import { WebhookEvent } from '../constants/webhook-events.constants'
 
 export abstract class BaseWebhookEventDto {
   @ApiProperty({
     description: 'Event type identifier',
     enum: WebhookEvent,
     enumName: 'WebhookEvent',
-    example: 'sandbox.created',
+    example: WebhookEvent.SANDBOX_CREATED,
   })
   event: string
 
@@ -41,12 +41,6 @@ export class SandboxCreatedWebhookDto extends BaseWebhookEventDto {
     example: 'sandbox123',
   })
   id: string
-
-  @ApiProperty({
-    description: 'Organization ID',
-    example: 'org123',
-  })
-  organizationId: string
 
   @ApiProperty({
     description: 'Sandbox state',
@@ -75,7 +69,6 @@ export class SandboxCreatedWebhookDto extends BaseWebhookEventDto {
       event: eventType,
       timestamp: new Date().toISOString(),
       id: event.sandbox.id,
-      organizationId: event.sandbox.organizationId,
       state: event.sandbox.state,
       sandboxClass: event.sandbox.sandboxClass,
       createdAt: event.sandbox.createdAt.toISOString(),
@@ -90,12 +83,6 @@ export class SandboxStateUpdatedWebhookDto extends BaseWebhookEventDto {
     example: 'sandbox123',
   })
   id: string
-
-  @ApiProperty({
-    description: 'Organization ID',
-    example: 'org123',
-  })
-  organizationId: string
 
   @ApiProperty({
     description: 'Previous state',
@@ -123,7 +110,6 @@ export class SandboxStateUpdatedWebhookDto extends BaseWebhookEventDto {
       event: eventType,
       timestamp: new Date().toISOString(),
       id: event.sandbox.id,
-      organizationId: event.sandbox.organizationId,
       oldState: event.oldState,
       newState: event.newState,
       updatedAt: event.sandbox.updatedAt.toISOString(),
@@ -146,12 +132,6 @@ export class SnapshotCreatedWebhookDto extends BaseWebhookEventDto {
   name: string
 
   @ApiProperty({
-    description: 'Organization ID',
-    example: 'org123',
-  })
-  organizationId: string
-
-  @ApiProperty({
     description: 'Snapshot state',
     enum: SnapshotState,
     enumName: 'SnapshotState',
@@ -171,7 +151,6 @@ export class SnapshotCreatedWebhookDto extends BaseWebhookEventDto {
       timestamp: new Date().toISOString(),
       id: event.snapshot.id,
       name: event.snapshot.name,
-      organizationId: event.snapshot.organizationId,
       state: event.snapshot.state,
       createdAt: event.snapshot.createdAt.toISOString(),
     }
@@ -191,12 +170,6 @@ export class SnapshotStateUpdatedWebhookDto extends BaseWebhookEventDto {
     example: 'my-snapshot',
   })
   name: string
-
-  @ApiProperty({
-    description: 'Organization ID',
-    example: 'org123',
-  })
-  organizationId: string
 
   @ApiProperty({
     description: 'Previous state',
@@ -225,7 +198,6 @@ export class SnapshotStateUpdatedWebhookDto extends BaseWebhookEventDto {
       timestamp: new Date().toISOString(),
       id: event.snapshot.id,
       name: event.snapshot.name,
-      organizationId: event.snapshot.organizationId,
       oldState: event.oldState,
       newState: event.newState,
       updatedAt: event.snapshot.updatedAt.toISOString(),
@@ -248,12 +220,6 @@ export class SnapshotRemovedWebhookDto extends BaseWebhookEventDto {
   name: string
 
   @ApiProperty({
-    description: 'Organization ID',
-    example: 'org123',
-  })
-  organizationId: string
-
-  @ApiProperty({
     description: 'When the snapshot was removed',
     example: '2025-12-19T10:30:00.000Z',
     format: 'date-time',
@@ -266,7 +232,6 @@ export class SnapshotRemovedWebhookDto extends BaseWebhookEventDto {
       timestamp: new Date().toISOString(),
       id: event.snapshot.id,
       name: event.snapshot.name,
-      organizationId: event.snapshot.organizationId,
       removedAt: new Date().toISOString(),
     }
   }
@@ -285,12 +250,6 @@ export class VolumeCreatedWebhookDto extends BaseWebhookEventDto {
     example: 'my-volume',
   })
   name: string
-
-  @ApiProperty({
-    description: 'Organization ID',
-    example: 'org123',
-  })
-  organizationId: string
 
   @ApiProperty({
     description: 'Volume state',
@@ -312,7 +271,6 @@ export class VolumeCreatedWebhookDto extends BaseWebhookEventDto {
       timestamp: new Date().toISOString(),
       id: event.volume.id,
       name: event.volume.name,
-      organizationId: event.volume.organizationId,
       state: event.volume.state,
       createdAt: event.volume.createdAt.toISOString(),
     }
@@ -332,12 +290,6 @@ export class VolumeStateUpdatedWebhookDto extends BaseWebhookEventDto {
     example: 'my-volume',
   })
   name: string
-
-  @ApiProperty({
-    description: 'Organization ID',
-    example: 'org123',
-  })
-  organizationId: string
 
   @ApiProperty({
     description: 'Previous state',
@@ -366,7 +318,6 @@ export class VolumeStateUpdatedWebhookDto extends BaseWebhookEventDto {
       timestamp: new Date().toISOString(),
       id: event.volume.id,
       name: event.volume.name,
-      organizationId: event.volume.organizationId,
       oldState: event.oldState,
       newState: event.newState,
       updatedAt: event.volume.updatedAt.toISOString(),

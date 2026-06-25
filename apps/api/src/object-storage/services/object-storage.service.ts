@@ -20,17 +20,18 @@ interface S3Config {
   region: string
   accountId?: string
   roleName?: string
-  organizationId: string
+  storagePrefix: string
   policy: any
 }
 
 @Injectable()
 export class ObjectStorageService {
   private readonly logger = new Logger(ObjectStorageService.name)
+  private static readonly STORAGE_PREFIX = 'objects'
 
   constructor(private readonly configService: TypedConfigService) {}
 
-  async getPushAccess(organizationId: string): Promise<StorageAccessDto> {
+  async getPushAccess(): Promise<StorageAccessDto> {
     if (!this.configService.get('s3.endpoint')) {
       throw new ServiceUnavailableException('Object storage is not configured')
     }
@@ -46,26 +47,22 @@ export class ObjectStorageService {
         region: this.configService.getOrThrow('s3.region'),
         accountId: this.configService.getOrThrow('s3.accountId'),
         roleName: this.configService.getOrThrow('s3.roleName'),
-        organizationId,
+        storagePrefix: ObjectStorageService.STORAGE_PREFIX,
         policy: {
           Version: '2012-10-17',
           Statement: [
             {
               Effect: 'Allow',
               Action: ['s3:PutObject', 's3:GetObject'],
-              Resource: [`arn:aws:s3:::${bucket}/${organizationId}/*`],
+              Resource: [`arn:aws:s3:::${bucket}/${ObjectStorageService.STORAGE_PREFIX}/*`],
             },
-            // ListBucket only shows object keys and some metadata, not the actual objects.
-            // Scope it to the organization's own prefix so a caller cannot enumerate object
-            // keys across other tenants. The CLI lists with prefix=<organizationId> (no trailing
-            // slash), so both the bare org id and the nested prefix must be permitted.
             {
               Effect: 'Allow',
               Action: ['s3:ListBucket'],
               Resource: [`arn:aws:s3:::${bucket}`],
               Condition: {
                 StringLike: {
-                  's3:prefix': [`${organizationId}`, `${organizationId}/*`],
+                  's3:prefix': [ObjectStorageService.STORAGE_PREFIX, `${ObjectStorageService.STORAGE_PREFIX}/*`],
                 },
               },
             },
@@ -128,7 +125,7 @@ export class ObjectStorageService {
       secret: creds.SecretAccessKey,
       sessionToken: creds.SessionToken,
       storageUrl: config.endpoint,
-      organizationId: config.organizationId,
+      storagePrefix: config.storagePrefix,
       bucket: config.bucket,
     }
   }
@@ -147,7 +144,7 @@ export class ObjectStorageService {
 
       const command = new AssumeRoleCommand({
         RoleArn: `arn:aws:iam::${config.accountId}:role/${config.roleName}`,
-        RoleSessionName: `daytona-${config.organizationId}-${Date.now()}`,
+        RoleSessionName: `daytona-storage-${Date.now()}`,
         DurationSeconds: 3600, // One hour
         Policy: JSON.stringify(config.policy),
       })
@@ -164,7 +161,7 @@ export class ObjectStorageService {
           secret: response.Credentials.SecretAccessKey,
           sessionToken: response.Credentials.SessionToken,
           storageUrl: config.endpoint,
-          organizationId: config.organizationId,
+          storagePrefix: config.storagePrefix,
           bucket: config.bucket,
         }
       } catch (error: any) {

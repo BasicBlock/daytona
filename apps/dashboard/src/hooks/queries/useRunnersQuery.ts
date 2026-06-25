@@ -6,34 +6,28 @@
 import { Runner } from '@daytona/api-client'
 import { useQuery, UseQueryOptions } from '@tanstack/react-query'
 import { useApi } from '../useApi'
-import { useSelectedOrganization } from '../useSelectedOrganization'
 import { queryKeys } from './queryKeys'
 
 type RunnersQueryOptions = Omit<UseQueryOptions<Runner[]>, 'queryKey' | 'queryFn' | 'enabled'> & {
   enabled?: boolean
-  regionId?: string
+  target?: string
 }
 
 export function useRunnersQuery(options?: RunnersQueryOptions) {
   const { runnersApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
-  const { enabled = true, regionId, ...queryOptions } = options ?? {}
-  const normalizedRegionId = regionId || undefined
+  const { enabled = true, target, ...queryOptions } = options ?? {}
+  const normalizedTarget = target || undefined
 
   return useQuery<Runner[]>({
-    queryKey: queryKeys.runners.list(selectedOrganization?.id ?? '', normalizedRegionId),
+    queryKey: queryKeys.runners.list(normalizedTarget),
     meta: {
       errorMessage: 'Failed to fetch runners',
     },
     queryFn: async () => {
-      if (!selectedOrganization) {
-        throw new Error('No organization selected')
-      }
-
-      const response = await runnersApi.listRunners(normalizedRegionId, selectedOrganization.id)
+      const response = await runnersApi.listRunners(normalizedTarget)
       return response.data ?? []
     },
-    enabled: enabled && !!selectedOrganization,
+    enabled,
     staleTime: 1000 * 10,
     gcTime: 1000 * 60 * 5,
     ...queryOptions,

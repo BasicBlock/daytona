@@ -13,7 +13,6 @@ import { GpuType } from '../enums/gpu-type.enum'
 
 interface SandboxListItemDtoFields {
   id: string
-  organizationId: string
   name: string
   target: string
   runnerId?: string
@@ -21,10 +20,9 @@ interface SandboxListItemDtoFields {
   state: SandboxState
   desiredState?: SandboxDesiredState
   snapshot?: string
-  user: string
+  osUser: string
   errorReason?: string
   recoverable?: boolean
-  public: boolean
   cpu: number
   gpu: number
   gpuType?: GpuType
@@ -48,12 +46,6 @@ export class SandboxListItemDto {
     example: 'sandbox123',
   })
   id: string
-
-  @ApiProperty({
-    description: 'The organization ID of the sandbox',
-    example: 'organization123',
-  })
-  organizationId: string
 
   @ApiProperty({
     description: 'The name of the sandbox',
@@ -115,10 +107,10 @@ export class SandboxListItemDto {
   snapshot?: string
 
   @ApiProperty({
-    description: 'The user associated with the project',
+    description: 'The OS user used inside the sandbox',
     example: 'daytona',
   })
-  user: string
+  osUser: string
 
   @ApiPropertyOptional({
     description: 'The error reason of the sandbox',
@@ -135,12 +127,6 @@ export class SandboxListItemDto {
   })
   @IsOptional()
   recoverable?: boolean
-
-  @ApiProperty({
-    description: 'Whether the sandbox http preview is public',
-    example: false,
-  })
-  public: boolean
 
   @ApiProperty({
     description: 'The CPU quota for the sandbox',
@@ -180,7 +166,7 @@ export class SandboxListItemDto {
     description: 'Labels for the sandbox',
     type: 'object',
     additionalProperties: { type: 'string' },
-    example: { 'daytona.io/public': 'true' },
+    example: { app: 'api' },
   })
   labels: { [key: string]: string }
 
@@ -259,7 +245,6 @@ export class SandboxListItemDto {
 
   constructor({
     id,
-    organizationId,
     name,
     target,
     runnerId,
@@ -267,10 +252,9 @@ export class SandboxListItemDto {
     state,
     desiredState,
     snapshot,
-    user,
+    osUser,
     errorReason,
     recoverable,
-    public: isPublic,
     cpu,
     gpu,
     gpuType,
@@ -287,7 +271,6 @@ export class SandboxListItemDto {
     daemonVersion,
   }: SandboxListItemDtoFields) {
     this.id = id
-    this.organizationId = organizationId
     this.name = name
     this.target = target
     this.runnerId = runnerId
@@ -295,10 +278,9 @@ export class SandboxListItemDto {
     this.state = SandboxListItemDto.deriveState(state, desiredState)
     this.desiredState = desiredState
     this.snapshot = snapshot
-    this.user = user
+    this.osUser = osUser
     this.errorReason = errorReason
     this.recoverable = recoverable
-    this.public = isPublic
     this.cpu = cpu
     this.gpu = gpu
     this.gpuType = gpuType

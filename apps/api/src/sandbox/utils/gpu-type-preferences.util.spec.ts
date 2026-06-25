@@ -40,11 +40,15 @@ describe('resolveGpuTypePreferences', () => {
   describe('empty allowlist (block all)', () => {
     it('throws when no preferences are given', () => {
       expect(() => resolveGpuTypePreferences(1, undefined, [])).toThrow(BadRequestError)
-      expect(() => resolveGpuTypePreferences(1, undefined, [])).toThrow('No GPU types are allowed in this region.')
+      expect(() => resolveGpuTypePreferences(1, undefined, [])).toThrow(
+        'No GPU types are allowed for this runner target.',
+      )
     })
 
     it('throws when any specific type is requested', () => {
-      expect(() => resolveGpuTypePreferences(1, [GpuType.H100], [])).toThrow('No GPU types are allowed in this region.')
+      expect(() => resolveGpuTypePreferences(1, [GpuType.H100], [])).toThrow(
+        'No GPU types are allowed for this runner target.',
+      )
     })
   })
 
@@ -75,7 +79,7 @@ describe('resolveGpuTypePreferences', () => {
     it('throws when intersection is empty', () => {
       expect(() => resolveGpuTypePreferences(1, [GpuType.RTX_PRO_6000], [GpuType.H100])).toThrow(BadRequestError)
       expect(() => resolveGpuTypePreferences(1, [GpuType.RTX_PRO_6000], [GpuType.H100])).toThrow(
-        'Requested GPU type(s) RTX-PRO-6000 not permitted in this region. Allowed: H100.',
+        'Requested GPU type(s) RTX-PRO-6000 not permitted for this runner target. Allowed: H100.',
       )
     })
   })

@@ -16,8 +16,6 @@ import { RunnerService } from '../services/runner.service'
 
 import { RedisLockProvider, LockCode } from '../common/redis-lock.provider'
 
-import { SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION } from '../constants/sandbox.constants'
-
 import { SandboxEvents } from '../constants/sandbox-events.constants'
 import { SandboxStoppedEvent } from '../events/sandbox-stopped.event'
 import { SandboxStartedEvent } from '../events/sandbox-started.event'
@@ -47,8 +45,6 @@ import { Sandbox } from '../entities/sandbox.entity'
 import { Runner } from '../entities/runner.entity'
 import { RunnerAdapterFactory } from '../runner-adapter/runnerAdapter'
 import { DockerRegistryService } from '../../docker-registry/services/docker-registry.service'
-import { OrganizationService } from '../../organization/services/organization.service'
-import { OrganizationUsageService } from '../../organization/services/organization-usage.service'
 import { TypedConfigService } from '../../config/typed-config.service'
 import { BackupManager } from './backup.manager'
 import { InjectRedis } from '@nestjs-modules/ioredis'
@@ -74,8 +70,6 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
     private readonly sandboxArchiveAction: SandboxArchiveAction,
     private readonly configService: TypedConfigService,
     private readonly dockerRegistryService: DockerRegistryService,
-    private readonly organizationService: OrganizationService,
-    private readonly organizationUsageService: OrganizationUsageService,
     private readonly runnerAdapterFactory: RunnerAdapterFactory,
     private readonly backupManager: BackupManager,
     @InjectRedis() private readonly redis: Redis,
@@ -116,9 +110,6 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
             .createQueryBuilder('sandbox')
             .innerJoin('sandbox_last_activity', 'activity', 'activity."sandboxId" = sandbox.id')
             .where('sandbox."runnerId" = :runnerId', { runnerId: runner.id })
-            .andWhere('sandbox."organizationId" != :warmPoolOrg', {
-              warmPoolOrg: SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION,
-            })
             .andWhere('sandbox.state = :state', { state: SandboxState.STARTED })
             .andWhere('sandbox."desiredState" = :desiredState', {
               desiredState: SandboxDesiredState.STARTED,
@@ -185,10 +176,7 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
       const sandboxes = await this.sandboxRepository
         .createQueryBuilder('sandbox')
         .innerJoin('sandbox_last_activity', 'activity', 'activity."sandboxId" = sandbox.id')
-        .where('sandbox."organizationId" != :warmPoolOrg', {
-          warmPoolOrg: SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION,
-        })
-        .andWhere('sandbox.state = :state', { state: SandboxState.STOPPED })
+        .where('sandbox.state = :state', { state: SandboxState.STOPPED })
         .andWhere('sandbox."desiredState" = :desiredState', {
           desiredState: SandboxDesiredState.STOPPED,
         })
@@ -251,9 +239,6 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
             .createQueryBuilder('sandbox')
             .innerJoin('sandbox_last_activity', 'activity', 'activity."sandboxId" = sandbox.id')
             .where('sandbox."runnerId" = :runnerId', { runnerId: runner.id })
-            .andWhere('sandbox."organizationId" != :warmPoolOrg', {
-              warmPoolOrg: SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION,
-            })
             .andWhere('sandbox.state = :state', { state: SandboxState.STOPPED })
             .andWhere('sandbox."desiredState" = :desiredState', {
               desiredState: SandboxDesiredState.STOPPED,
@@ -387,7 +372,7 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
           const targetRunner = await this.runnerService.getRandomAvailableRunner({
             snapshotRef: sandbox.backupSnapshot,
             sandboxClass: sandbox.sandboxClass,
-            regions: [sandbox.region],
+            targets: [sandbox.target],
             excludedRunnerIds: [runner.id],
             availabilityScoreThreshold: startScoreThreshold,
             gpu: sandbox.gpu,
@@ -646,22 +631,7 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
           return
         }
 
-        let diskIncremented = false
         try {
-          // Reserve disk for the ERROR → STOPPED transition. GPU is not reserved here:
-          // the recover path does not transition to STARTED, so no GPU is consumed.
-          const result = await this.organizationUsageService.incrementPendingSandboxUsage(
-            sandbox.organizationId,
-            sandbox.region,
-            sandbox.sandboxClass,
-            0,
-            0,
-            sandbox.disk,
-            0,
-            sandbox.id,
-          )
-          diskIncremented = result.diskIncremented
-
           // Normalize desiredState upfront so the v2 job handler can detect mid-job intent changes.
           if (runner.apiVersion === '2') {
             await this.sandboxRepository.updateWhere(sandbox.id, {
@@ -694,18 +664,6 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
 
           this.logger.log(`Recovered sandbox ${sandbox.id} on draining runner ${runnerId}`)
         } catch (e) {
-          if (diskIncremented) {
-            await this.organizationUsageService
-              .decrementPendingSandboxUsage(
-                sandbox.organizationId,
-                sandbox.region,
-                sandbox.sandboxClass,
-                undefined,
-                undefined,
-                sandbox.disk,
-              )
-              .catch(() => undefined)
-          }
           await this.redis.set(redisKey, '1', 'EX', SandboxManager.DRAINING_RECOVER_TTL_SECONDS)
           this.logger.error(`Failed to recover sandbox ${sandbox.id} on draining runner ${runnerId}`, e)
         } finally {
@@ -737,10 +695,7 @@ export class SandboxManager implements TrackableJobExecutions, OnApplicationShut
       throw new Error(`Registry ${sandbox.backupRegistryId} not found for sandbox ${sandbox.id}`)
     }
 
-    const organization = await this.organizationService.findOne(sandbox.organizationId)
-
     const metadata = {
-      ...organization?.sandboxMetadata,
       sandboxName: sandbox.name,
     }
 

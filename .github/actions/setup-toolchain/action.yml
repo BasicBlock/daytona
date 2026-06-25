@@ -1,5 +1,5 @@
 name: Setup Toolchain
-description: Shared setup for Go, Node, Python, Ruby, Java and project dependencies
+description: Shared setup for Go, Node, Java and project dependencies
 
 inputs:
   install-go:
@@ -11,26 +11,14 @@ inputs:
   install-node:
     description: Install Node.js
     default: 'true'
-  install-python:
-    description: Install Python
-    default: 'true'
-  install-ruby:
-    description: Install Ruby
-    default: 'true'
   install-java:
     description: Install Java
-    default: 'true'
-  install-poetry:
-    description: Install Poetry
     default: 'true'
   install-swag:
     description: Install swag CLI
     default: 'true'
   run-yarn-install:
     description: Run yarn install --immutable
-    default: 'true'
-  run-poetry-install:
-    description: Run poetry lock && poetry install
     default: 'true'
   run-go-work-sync:
     description: Run go work sync
@@ -42,10 +30,6 @@ runs:
     - name: Validate toolchain inputs
       shell: bash
       run: |
-        if [ "${{ inputs.install-poetry }}" = "true" ] && [ "${{ inputs.install-python }}" != "true" ]; then
-          echo "Error: install-poetry is 'true' but install-python is not 'true'. Please enable install-python when using install-poetry." >&2
-          exit 1
-        fi
         if [ "${{ inputs.install-swag }}" = "true" ] && [ "${{ inputs.install-go }}" != "true" ]; then
           echo "Error: install-swag is 'true' but install-go is not 'true'. Please enable install-go when using install-swag." >&2
           exit 1
@@ -64,23 +48,6 @@ runs:
         java-version: 21
         distribution: 'temurin'
 
-    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-      if: inputs.install-python == 'true'
-      with:
-        python-version: '3.12'
-
-    - uses: ruby/setup-ruby@97ecb7b512899eb71ab1bf2310a624c6f1589ac6 # v1.308.0
-      if: inputs.install-ruby == 'true'
-      with:
-        ruby-version: '3.4.5'
-        bundler-cache: false
-
-    - name: Bundle install
-      if: inputs.install-ruby == 'true'
-      shell: bash
-      run: |
-        bundle install
-
     - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       if: inputs.install-node == 'true'
       with:
@@ -93,13 +60,6 @@ runs:
         if [[ "${{ inputs.install-node }}" == 'true' || "${{ inputs.run-yarn-install }}" == 'true' ]]; then
           corepack enable
         fi
-
-    - name: Install Poetry
-      if: inputs.install-poetry == 'true' && inputs.install-python == 'true'
-      shell: bash
-      run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install "poetry==2.1.3"
 
     - name: Install swag
       if: inputs.install-swag == 'true' && inputs.install-go == 'true'
@@ -123,21 +83,6 @@ runs:
       if: inputs.run-yarn-install == 'true'
       shell: bash
       run: yarn install --immutable
-
-    - name: Cache Poetry virtualenv
-      if: inputs.run-poetry-install == 'true'
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-      with:
-        path: .venv
-        key: poetry-venv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('poetry.lock') }}
-        restore-keys: poetry-venv-${{ runner.os }}-${{ runner.arch }}-
-
-    - name: Poetry install
-      if: inputs.run-poetry-install == 'true'
-      shell: bash
-      run: |
-        poetry lock
-        poetry install
 
     - name: Go work sync
       if: inputs.run-go-work-sync == 'true'

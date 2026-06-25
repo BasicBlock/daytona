@@ -19,9 +19,8 @@ import {
 import { UpsertRegistrySheet } from '@/components/UpsertRegistrySheet'
 import { useDeleteRegistryMutation } from '@/hooks/mutations/useDeleteRegistryMutation'
 import { useRegistriesQuery } from '@/hooks/queries/useRegistriesQuery'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import { handleApiError } from '@/lib/error-handling'
-import { OrganizationRolePermissionsEnum, type DockerRegistry } from '@daytona/api-client'
+import { type DockerRegistry } from '@daytona/api-client'
 import { PlusIcon } from 'lucide-react'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -32,7 +31,6 @@ const Registries: React.FC = () => {
   const [showEditSheet, setShowEditSheet] = useState(false)
   const addRegistrySheetRef = useRef<{ open: () => void }>(null)
 
-  const { selectedOrganization, authenticatedUserHasPermission } = useSelectedOrganization()
   const { data: registries = [], isLoading: loading, error: registriesError } = useRegistriesQuery()
   const deleteRegistryMutation = useDeleteRegistryMutation()
   const deleteInProgress = deleteRegistryMutation.isPending
@@ -47,7 +45,6 @@ const Registries: React.FC = () => {
     try {
       await deleteRegistryMutation.mutateAsync({
         registryId: id,
-        organizationId: selectedOrganization?.id,
       })
       toast.success('Registry deleted successfully')
       setRegistryToDelete(null)
@@ -56,10 +53,7 @@ const Registries: React.FC = () => {
     }
   }
 
-  const writePermitted = useMemo(
-    () => authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_REGISTRIES),
-    [authenticatedUserHasPermission],
-  )
+  const writePermitted = true
 
   const rootCommands: CommandConfig[] = useMemo(() => {
     if (!writePermitted) {

@@ -11,7 +11,7 @@ import {
   getColumnSizeStyles,
   getTableSizeStyles,
 } from '@/lib/utils/table'
-import { Region, Runner, RunnerState } from '@daytona/api-client'
+import { Target, Runner, RunnerState } from '@daytona/api-client'
 import {
   ColumnDef,
   flexRender,
@@ -50,7 +50,7 @@ import {
 
 type RunnerTableMeta = {
   deletePermitted: boolean
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   isLoadingRunner: (runner: Runner) => boolean
   onDelete: (runner: Runner) => void
   onToggleEnabled: (runner: Runner) => void
@@ -69,7 +69,7 @@ const getMeta = (table: ReactTable<Runner>) => {
 
 interface RunnerTableProps {
   data: Runner[]
-  regions: Region[]
+  targets: Target[]
   loading: boolean
   activeRunnerId?: string
   isLoadingRunner: (runner: Runner) => boolean
@@ -77,7 +77,7 @@ interface RunnerTableProps {
   deletePermitted: boolean
   onToggleEnabled: (runner: Runner) => void
   onDelete: (runner: Runner) => void
-  getRegionName: (regionId: string) => string | undefined
+  getTargetName: (target: string) => string | undefined
   onRowClick?: (runner: Runner) => void
   refreshInterval?: RefreshIntervalValue
   onRefreshIntervalChange?: (value: RefreshIntervalValue) => void
@@ -88,7 +88,7 @@ interface RunnerTableProps {
 
 export function RunnerTable({
   data,
-  regions,
+  targets,
   loading,
   activeRunnerId,
   isLoadingRunner,
@@ -96,7 +96,7 @@ export function RunnerTable({
   deletePermitted,
   onToggleEnabled,
   onDelete,
-  getRegionName,
+  getTargetName,
   onRowClick,
   refreshInterval = false,
   onRefreshIntervalChange,
@@ -114,7 +114,7 @@ export function RunnerTable({
     meta: {
       runner: {
         deletePermitted,
-        getRegionName,
+        getTargetName,
         isLoadingRunner,
         onDelete,
         onToggleEnabled,
@@ -130,11 +130,11 @@ export function RunnerTable({
     globalFilterFn: (row, columnId, filterValue) => {
       const runner = row.original as Runner
       const searchValue = filterValue.toLowerCase()
-      const regionName = getRegionName(runner.region) ?? runner.region
+      const targetName = getTargetName(runner.target) ?? runner.target
       return (
         runner.id.toLowerCase().includes(searchValue) ||
         runner.name.toLowerCase().includes(searchValue) ||
-        regionName.toLowerCase().includes(searchValue)
+        targetName.toLowerCase().includes(searchValue)
       )
     },
     state: {
@@ -166,7 +166,7 @@ export function RunnerTable({
           debounced
           value={globalFilter ?? ''}
           onValueChange={handleChangeFilter}
-          placeholder="Search by ID, Name, or Region"
+          placeholder="Search by ID, Name, or Target"
           containerClassName="min-w-0 flex-1 sm:max-w-sm"
         />
         {onRefreshIntervalChange && onRefresh && (
@@ -203,8 +203,8 @@ export function RunnerTable({
                 hasSearch ? null : (
                   <div className="space-y-2">
                     <p>Runners are the machines that run your sandboxes.</p>
-                    {regions.length === 0 && (
-                      <p>There must be at least one region in your organization before runners can be created.</p>
+                    {targets.length === 0 && (
+                      <p>There must be at least one target in your workspace before runners can be created.</p>
                     )}
                   </div>
                 )
@@ -349,17 +349,17 @@ const runnerColumns: ColumnDef<Runner>[] = [
     },
   },
   {
-    accessorKey: 'regionId',
-    header: 'Region',
+    accessorKey: 'target',
+    header: 'Target',
     size: 180,
     cell: ({ row, table }) => {
-      const { getRegionName } = getMeta(table)
-      const regionName = getRegionName(row.original.region) ?? row.original.region
+      const { getTargetName } = getMeta(table)
+      const targetName = getTargetName(row.original.target) ?? row.original.target
 
       return (
         <div className="w-full truncate flex items-center gap-1 group/copy-button">
-          <span className="truncate block text-sm">{regionName}</span>
-          <CopyButton value={regionName} size="icon-xs" autoHide tooltipText="Copy Region" />
+          <span className="truncate block text-sm">{targetName}</span>
+          <CopyButton value={targetName} size="icon-xs" autoHide tooltipText="Copy Target" />
         </div>
       )
     },

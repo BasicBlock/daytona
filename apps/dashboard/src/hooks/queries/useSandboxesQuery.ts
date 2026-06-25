@@ -6,7 +6,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { QueryKey } from '@tanstack/react-query'
 import { useApi } from '@/hooks/useApi'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
 import {
   type SandboxListItem,
   SandboxClass,
@@ -25,7 +24,7 @@ export interface SandboxFilters {
   includeErroredDeleted?: boolean
   states?: SandboxState[]
   snapshots?: string[]
-  regions?: string[]
+  targets?: string[]
   sandboxClasses?: SandboxClass[]
   minCpu?: number
   maxCpu?: number
@@ -58,8 +57,8 @@ export interface SandboxQueryParams {
   sorting?: SandboxSorting
 }
 
-export const getSandboxesQueryKey = (organizationId: string | undefined, params?: SandboxQueryParams): QueryKey => {
-  return queryKeys.sandboxes.list(organizationId ?? '', params)
+export const getSandboxesQueryKey = (params?: SandboxQueryParams): QueryKey => {
+  return queryKeys.sandboxes.list(params)
 }
 
 function normalizeListSandboxesResponse(data: ListSandboxesQueryResponse): ListSandboxesResponse {
@@ -78,19 +77,13 @@ function normalizeListSandboxesResponse(data: ListSandboxesQueryResponse): ListS
 
 export function useSandboxesQuery(params: SandboxQueryParams) {
   const { sandboxApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<ListSandboxesResponse>({
-    queryKey: queryKeys.sandboxes.list(selectedOrganization?.id ?? '', params),
+    queryKey: queryKeys.sandboxes.list(params),
     queryFn: async () => {
-      if (!selectedOrganization) {
-        throw new Error('No organization selected')
-      }
-
       const { cursor, limit, filters = {}, sorting = {} } = params
 
       const listResponse = await sandboxApi.listSandboxes(
-        selectedOrganization.id,
         cursor,
         limit,
         undefined,
@@ -99,7 +92,7 @@ export function useSandboxesQuery(params: SandboxQueryParams) {
         filters.includeErroredDeleted,
         filters.states,
         filters.snapshots,
-        filters.regions,
+        filters.targets,
         filters.sandboxClasses,
         filters.minCpu,
         filters.maxCpu,
@@ -119,7 +112,6 @@ export function useSandboxesQuery(params: SandboxQueryParams) {
 
       return normalizeListSandboxesResponse(listResponse.data)
     },
-    enabled: !!selectedOrganization,
     placeholderData: keepPreviousData,
     staleTime: 1000 * 10, // 10 seconds
     gcTime: 1000 * 60 * 5, // 5 minutes,

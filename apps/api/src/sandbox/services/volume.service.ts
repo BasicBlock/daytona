@@ -12,12 +12,9 @@ import { CreateVolumeDto } from '../dto/create-volume.dto'
 import { v4 as uuidv4 } from 'uuid'
 import { BadRequestError } from '../../exceptions/bad-request.exception'
 import { isValidUuid } from '../../common/utils/uuid'
-import { Organization } from '../../organization/entities/organization.entity'
 import { OnEvent } from '@nestjs/event-emitter'
 import { SandboxEvents } from '../constants/sandbox-events.constants'
 import { SandboxCreatedEvent } from '../events/sandbox-create.event'
-import { OrganizationService } from '../../organization/services/organization.service'
-import { OrganizationUsageService } from '../../organization/services/organization-usage.service'
 import { TypedConfigService } from '../../config/typed-config.service'
 import { RedisLockProvider } from '../common/redis-lock.provider'
 import { SandboxRepository } from '../repositories/sandbox.repository'
@@ -31,98 +28,35 @@ export class VolumeService {
     @InjectRepository(Volume)
     private readonly volumeRepository: Repository<Volume>,
     private readonly sandboxRepository: SandboxRepository,
-    private readonly organizationService: OrganizationService,
-    private readonly organizationUsageService: OrganizationUsageService,
     private readonly configService: TypedConfigService,
     private readonly redisLockProvider: RedisLockProvider,
   ) {}
 
-  private async validateOrganizationQuotas(
-    organization: Organization,
-    addedVolumeCount: number,
-  ): Promise<{
-    pendingVolumeCountIncremented: boolean
-  }> {
-    // validate usage quotas
-    await this.organizationUsageService.incrementPendingVolumeUsage(organization.id, addedVolumeCount)
-
-    const usageOverview = await this.organizationUsageService.getVolumeUsageOverview(organization.id)
-
-    try {
-      if (usageOverview.currentVolumeUsage + usageOverview.pendingVolumeUsage > organization.volumeQuota) {
-        throw new BadRequestError(`Volume quota exceeded. Maximum allowed: ${organization.volumeQuota}`)
-      }
-    } catch (error) {
-      await this.rollbackPendingUsage(organization.id, addedVolumeCount)
-      throw error
-    }
-
-    return {
-      pendingVolumeCountIncremented: true,
-    }
-  }
-
-  async rollbackPendingUsage(organizationId: string, pendingVolumeCountIncrement?: number): Promise<void> {
-    if (!pendingVolumeCountIncrement) {
-      return
-    }
-
-    try {
-      await this.organizationUsageService.decrementPendingVolumeUsage(organizationId, pendingVolumeCountIncrement)
-    } catch (error) {
-      this.logger.error(`Error rolling back pending volume usage: ${error}`)
-    }
-  }
-
-  async create(organization: Organization, createVolumeDto: CreateVolumeDto): Promise<Volume> {
+  async create(createVolumeDto: CreateVolumeDto): Promise<Volume> {
     if (!this.configService.get('s3.endpoint')) {
       throw new ServiceUnavailableException('Object storage is not configured')
     }
 
-    let pendingVolumeCountIncrement: number | undefined
+    const volume = new Volume()
+    volume.id = uuidv4()
+    volume.name = createVolumeDto.name || volume.id
 
-    try {
-      this.organizationService.assertOrganizationIsNotSuspended(organization)
+    const existingVolume = await this.volumeRepository.findOne({
+      where: {
+        name: volume.name,
+        state: Not(VolumeState.DELETED),
+      },
+    })
 
-      const newVolumeCount = 1
-
-      const { pendingVolumeCountIncremented } = await this.validateOrganizationQuotas(organization, newVolumeCount)
-
-      if (pendingVolumeCountIncremented) {
-        pendingVolumeCountIncrement = newVolumeCount
-      }
-
-      const volume = new Volume()
-
-      // Generate ID
-      volume.id = uuidv4()
-
-      // Set name from DTO or use ID as default
-      volume.name = createVolumeDto.name || volume.id
-
-      // Check if volume with same name already exists for organization
-      const existingVolume = await this.volumeRepository.findOne({
-        where: {
-          organizationId: organization.id,
-          name: volume.name,
-          state: Not(VolumeState.DELETED),
-        },
-      })
-
-      if (existingVolume) {
-        throw new BadRequestError(`Volume with name ${volume.name} already exists`)
-      }
-
-      volume.organizationId = organization.id
-      volume.state = VolumeState.PENDING_CREATE
-
-      const savedVolume = await this.volumeRepository.save(volume)
-      this.logger.debug(`Created volume ${savedVolume.id} for organization ${organization.id}`)
-      return savedVolume
-    } catch (error) {
-      await this.rollbackPendingUsage(organization.id, pendingVolumeCountIncrement)
-      throw error
+    if (existingVolume) {
+      throw new BadRequestError(`Volume with name ${volume.name} already exists`)
     }
+
+    volume.state = VolumeState.PENDING_CREATE
+
+    const savedVolume = await this.volumeRepository.save(volume)
+    this.logger.debug(`Created volume ${savedVolume.id}`)
+    return savedVolume
   }
 
   async delete(volumeId: string): Promise<void> {
@@ -145,10 +79,7 @@ export class VolumeService {
     // Check if any non-destroyed sandboxes are using this volume
     const sandboxUsingVolume = await this.sandboxRepository
       .createQueryBuilder('sandbox')
-      .where('sandbox.organizationId = :organizationId', {
-        organizationId: volume.organizationId,
-      })
-      .andWhere('sandbox.volumes @> :volFilter::jsonb', {
+      .where('sandbox.volumes @> :volFilter::jsonb', {
         volFilter: JSON.stringify([{ volumeId }]),
       })
       .andWhere('sandbox.desiredState != :destroyed', {
@@ -181,10 +112,9 @@ export class VolumeService {
     return volume
   }
 
-  async findAll(organizationId: string, includeDeleted = false): Promise<Volume[]> {
+  async findAll(includeDeleted = false): Promise<Volume[]> {
     return this.volumeRepository.find({
       where: {
-        organizationId,
         ...(includeDeleted ? {} : { state: Not(VolumeState.DELETED) }),
       },
       order: {
@@ -197,10 +127,9 @@ export class VolumeService {
     })
   }
 
-  async findByName(organizationId: string, name: string): Promise<Volume> {
+  async findByName(name: string): Promise<Volume> {
     const volume = await this.volumeRepository.findOne({
       where: {
-        organizationId,
         name,
         state: Not(VolumeState.DELETED),
       },
@@ -216,7 +145,7 @@ export class VolumeService {
   // Looks up volumes where each reference may be a volume ID or a volume name, and
   // returns them keyed by the requested reference. Throws when a reference is unknown,
   // ambiguous, or points at a volume that is not ready.
-  async getVolumesByIdOrName(organizationId: string, volumeIdOrNames: string[]): Promise<Map<string, Volume>> {
+  async getVolumesByIdOrName(volumeIdOrNames: string[]): Promise<Map<string, Volume>> {
     if (!volumeIdOrNames.length) {
       return new Map()
     }
@@ -229,11 +158,9 @@ export class VolumeService {
     const uuidRefs = volumeIdOrNames
       .filter((idOrName) => isValidUuid(idOrName))
       .map((idOrName) => idOrName.toLowerCase())
-    const where: FindOptionsWhere<Volume>[] = [
-      { name: In(volumeIdOrNames), organizationId, state: Not(VolumeState.DELETED) },
-    ]
+    const where: FindOptionsWhere<Volume>[] = [{ name: In(volumeIdOrNames), state: Not(VolumeState.DELETED) }]
     if (uuidRefs.length > 0) {
-      where.push({ id: In(uuidRefs), organizationId, state: Not(VolumeState.DELETED) })
+      where.push({ id: In(uuidRefs), state: Not(VolumeState.DELETED) })
     }
 
     const foundVolumes = await this.volumeRepository.find({ where })
@@ -278,30 +205,6 @@ export class VolumeService {
     }
 
     return volumes
-  }
-
-  async getOrganizationId(params: { id: string } | { name: string; organizationId: string }): Promise<string> {
-    if ('id' in params) {
-      const volume = await this.volumeRepository.findOneOrFail({
-        where: {
-          id: params.id,
-        },
-        select: ['organizationId'],
-        loadEagerRelations: false,
-      })
-      return volume.organizationId
-    }
-
-    const volume = await this.volumeRepository.findOneOrFail({
-      where: {
-        name: params.name,
-        organizationId: params.organizationId,
-      },
-      select: ['organizationId'],
-      loadEagerRelations: false,
-    })
-
-    return volume.organizationId
   }
 
   @OnEvent(SandboxEvents.CREATED)

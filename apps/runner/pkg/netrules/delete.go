@@ -7,6 +7,10 @@ import "strings"
 
 // DeleteNetworkRules completely removes network rules for a container
 func (manager *NetRulesManager) DeleteNetworkRules(name string) error {
+	if manager.disabled() {
+		return nil
+	}
+
 	// Add prefix to chain name
 	chainName := formatChainName(name)
 

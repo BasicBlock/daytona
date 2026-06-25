@@ -11,7 +11,6 @@ import { mutationKeys } from './mutationKeys'
 
 export interface UpdateRunnerSchedulingMutationVariables {
   runnerId: string
-  organizationId?: string
   unschedulable: boolean
 }
 
@@ -27,22 +26,14 @@ export const useUpdateRunnerSchedulingMutation = ({
 
   return useMutation<Runner, unknown, UpdateRunnerSchedulingMutationVariables>({
     mutationKey: mutationKeys.runners.updateScheduling(),
-    mutationFn: async ({ runnerId, organizationId, unschedulable }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-
-      const response = await runnersApi.updateRunnerScheduling(runnerId, organizationId, {
+    mutationFn: async ({ runnerId, unschedulable }) => {
+      const response = await runnersApi.updateRunnerScheduling(runnerId, {
         data: { unschedulable },
       })
       return response.data
     },
-    onSuccess: async (runner, { organizationId }) => {
-      if (!organizationId) {
-        return
-      }
-
-      const queryKey = queryKeys.runners.list(organizationId)
+    onSuccess: async (runner) => {
+      const queryKey = queryKeys.runners.list()
       queryClient.setQueriesData<Runner[]>({ queryKey }, (previousRunners) => {
         if (!previousRunners) return previousRunners
 

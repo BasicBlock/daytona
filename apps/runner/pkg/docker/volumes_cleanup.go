@@ -154,6 +154,9 @@ func (d *DockerClient) isRecentlyCreated(path string, exclusionPeriod time.Durat
 		// Fallback to mtime if syscall.Stat_t is not available
 		return time.Since(info.ModTime()) < exclusionPeriod
 	}
-	ctime := time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)
+	ctime, ok := ctimeFromStat(stat)
+	if !ok {
+		return time.Since(info.ModTime()) < exclusionPeriod
+	}
 	return time.Since(ctime) < exclusionPeriod
 }

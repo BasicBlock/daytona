@@ -4,10 +4,8 @@
  */
 
 import { DEFAULT_PAGE_SIZE } from '@/constants/Pagination'
-import { RoutePath } from '@/enums/RoutePath'
 import { useCommandPaletteAnalytics } from '@/hooks/useCommandPaletteAnalytics'
-import { useSelectedOrganization } from '@/hooks/useSelectedOrganization'
-import { cn, getRegionFullDisplayName } from '@/lib/utils'
+import { cn, getTargetFullDisplayName } from '@/lib/utils'
 import {
   filterArchivable,
   filterDeletable,
@@ -17,7 +15,7 @@ import {
   isTransitioning,
 } from '@/lib/utils/sandbox'
 import { DEFAULT_TABLE_COLUMN, getColumnSizeStyles, getTableSizeStyles } from '@/lib/utils/table'
-import { OrganizationRolePermissionsEnum, SandboxListItem, SandboxState } from '@daytona/api-client'
+import { SandboxListItem, SandboxState } from '@daytona/api-client'
 import {
   type ColumnPinningState,
   flexRender,
@@ -31,7 +29,6 @@ import {
 import { Container } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useCallback, useImperativeHandle, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { useCommandPaletteActions } from '../CommandPalette'
 import { SelectionToast } from '../SelectionToast'
 import { Button } from '../ui/button'
@@ -90,9 +87,9 @@ export function SandboxTable({
   snapshotsDataIsLoading,
   snapshotsDataHasMore,
   onChangeSnapshotSearchValue,
-  regionsData,
-  regionsDataIsLoading,
-  getRegionName,
+  targetsData,
+  targetsDataIsLoading,
+  getTargetName,
   handleStart,
   handleStop,
   handleDelete,
@@ -119,10 +116,8 @@ export function SandboxTable({
   onFiltersChange,
   handleOpenTerminal,
 }: SandboxTableProps) {
-  const navigate = useNavigate()
-  const { authenticatedUserHasPermission } = useSelectedOrganization()
-  const writePermitted = authenticatedUserHasPermission(OrganizationRolePermissionsEnum.WRITE_SANDBOXES)
-  const deletePermitted = authenticatedUserHasPermission(OrganizationRolePermissionsEnum.DELETE_SANDBOXES)
+  const writePermitted = true
+  const deletePermitted = true
 
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(DEFAULT_SANDBOX_TABLE_COLUMN_VISIBILITY)
@@ -138,12 +133,12 @@ export function SandboxTable({
   const tableSorting = useMemo(() => convertApiSortingToTableSorting(sorting), [sorting])
   const tableFilters = useMemo(() => convertApiFiltersToTableFilters(filters), [filters])
 
-  const regionOptions: FacetedFilterOption[] = useMemo(() => {
-    return regionsData.map((region) => ({
-      label: getRegionFullDisplayName(region),
-      value: region.id,
+  const targetOptions: FacetedFilterOption[] = useMemo(() => {
+    return targetsData.map((target) => ({
+      label: getTargetFullDisplayName(target),
+      value: target.id,
     }))
-  }, [regionsData])
+  }, [targetsData])
 
   const selectableCount = useMemo(() => {
     return data.filter((sandbox) => !sandboxIsLoading[sandbox.id] && sandbox.state !== SandboxState.DESTROYED).length
@@ -194,7 +189,7 @@ export function SandboxTable({
         handleCreateSshAccess,
         handleRevokeSshAccess,
         handleRecover,
-        getRegionName,
+        getTargetName,
         handleScreenRecordings,
         handleCreateSnapshot,
         handleFork,
@@ -280,8 +275,8 @@ export function SandboxTable({
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <SandboxTableHeader
         table={table}
-        regionOptions={regionOptions}
-        regionsDataIsLoading={regionsDataIsLoading}
+        targetOptions={targetOptions}
+        targetsDataIsLoading={targetsDataIsLoading}
         snapshots={snapshots}
         snapshotsDataIsLoading={snapshotsDataIsLoading}
         snapshotsDataHasMore={snapshotsDataHasMore}
@@ -305,16 +300,7 @@ export function SandboxTable({
                 hasFilters ? null : (
                   <div className="space-y-2">
                     <p>Spin up a Sandbox to run code in an isolated environment.</p>
-                    <p>Use the Daytona SDK or CLI to create one.</p>
-                    <p>
-                      <button
-                        onClick={() => navigate(RoutePath.ONBOARDING)}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        Check out the Onboarding guide
-                      </button>{' '}
-                      to learn more.
-                    </p>
+                    <p>Use the create action to start one.</p>
                   </div>
                 )
               }

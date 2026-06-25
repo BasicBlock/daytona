@@ -6,23 +6,16 @@
 import { VolumeDto } from '@daytona/api-client'
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../useApi'
-import { useSelectedOrganization } from '../useSelectedOrganization'
 import { queryKeys } from './queryKeys'
 
 export function useVolumesQuery() {
   const { volumeApi } = useApi()
-  const { selectedOrganization } = useSelectedOrganization()
 
   return useQuery<VolumeDto[]>({
-    queryKey: queryKeys.volumes.list(selectedOrganization?.id ?? ''),
+    queryKey: queryKeys.volumes.list(),
     queryFn: async () => {
-      if (!selectedOrganization) {
-        throw new Error('No organization selected')
-      }
-
-      const response = await volumeApi.listVolumes(selectedOrganization.id)
+      const response = await volumeApi.listVolumes()
       return response.data
     },
-    enabled: !!selectedOrganization,
   })
 }

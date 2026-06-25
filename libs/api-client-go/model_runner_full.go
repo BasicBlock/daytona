@@ -59,8 +59,8 @@ type RunnerFull struct {
 	CurrentStartedSandboxes *float32 `json:"currentStartedSandboxes,omitempty"`
 	// Runner availability score
 	AvailabilityScore *float32 `json:"availabilityScore,omitempty"`
-	// The region of the runner
-	Region string `json:"region"`
+	// The target of the runner
+	Target string `json:"target"`
 	// The name of the runner
 	Name string `json:"name"`
 	// The state of the runner
@@ -87,10 +87,6 @@ type RunnerFull struct {
 	// The app version of the runner
 	// Deprecated
 	AppVersion *string `json:"appVersion,omitempty"`
-	// The API key for the runner
-	ApiKey string `json:"apiKey"`
-	// The region type of the runner
-	RegionType *RegionType `json:"regionType,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -100,13 +96,13 @@ type _RunnerFull RunnerFull
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewRunnerFull(id string, cpu float32, memory float32, disk float32, region string, name string, state RunnerState, unschedulable bool, tags []string, createdAt string, updatedAt string, version string, apiVersion string, runnerClass RunnerClass, apiKey string) *RunnerFull {
+func NewRunnerFull(id string, cpu float32, memory float32, disk float32, target string, name string, state RunnerState, unschedulable bool, tags []string, createdAt string, updatedAt string, version string, apiVersion string, runnerClass RunnerClass) *RunnerFull {
 	this := RunnerFull{}
 	this.Id = id
 	this.Cpu = cpu
 	this.Memory = memory
 	this.Disk = disk
-	this.Region = region
+	this.Target = target
 	this.Name = name
 	this.State = state
 	this.Unschedulable = unschedulable
@@ -116,7 +112,6 @@ func NewRunnerFull(id string, cpu float32, memory float32, disk float32, region 
 	this.Version = version
 	this.ApiVersion = apiVersion
 	this.RunnerClass = runnerClass
-	this.ApiKey = apiKey
 	return &this
 }
 
@@ -704,28 +699,28 @@ func (o *RunnerFull) SetAvailabilityScore(v float32) {
 	o.AvailabilityScore = &v
 }
 
-// GetRegion returns the Region field value
-func (o *RunnerFull) GetRegion() string {
+// GetTarget returns the Target field value
+func (o *RunnerFull) GetTarget() string {
 	if o == nil {
 		var ret string
 		return ret
 	}
 
-	return o.Region
+	return o.Target
 }
 
-// GetRegionOk returns a tuple with the Region field value
+// GetTargetOk returns a tuple with the Target field value
 // and a boolean to check if the value has been set.
-func (o *RunnerFull) GetRegionOk() (*string, bool) {
+func (o *RunnerFull) GetTargetOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.Region, true
+	return &o.Target, true
 }
 
-// SetRegion sets field value
-func (o *RunnerFull) SetRegion(v string) {
-	o.Region = v
+// SetTarget sets field value
+func (o *RunnerFull) SetTarget(v string) {
+	o.Target = v
 }
 
 // GetName returns the Name field value
@@ -1020,62 +1015,6 @@ func (o *RunnerFull) SetAppVersion(v string) {
 	o.AppVersion = &v
 }
 
-// GetApiKey returns the ApiKey field value
-func (o *RunnerFull) GetApiKey() string {
-	if o == nil {
-		var ret string
-		return ret
-	}
-
-	return o.ApiKey
-}
-
-// GetApiKeyOk returns a tuple with the ApiKey field value
-// and a boolean to check if the value has been set.
-func (o *RunnerFull) GetApiKeyOk() (*string, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.ApiKey, true
-}
-
-// SetApiKey sets field value
-func (o *RunnerFull) SetApiKey(v string) {
-	o.ApiKey = v
-}
-
-// GetRegionType returns the RegionType field value if set, zero value otherwise.
-func (o *RunnerFull) GetRegionType() RegionType {
-	if o == nil || IsNil(o.RegionType) {
-		var ret RegionType
-		return ret
-	}
-	return *o.RegionType
-}
-
-// GetRegionTypeOk returns a tuple with the RegionType field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RunnerFull) GetRegionTypeOk() (*RegionType, bool) {
-	if o == nil || IsNil(o.RegionType) {
-		return nil, false
-	}
-	return o.RegionType, true
-}
-
-// HasRegionType returns a boolean if a field has been set.
-func (o *RunnerFull) HasRegionType() bool {
-	if o != nil && !IsNil(o.RegionType) {
-		return true
-	}
-
-	return false
-}
-
-// SetRegionType gets a reference to the given RegionType and assigns it to the RegionType field.
-func (o *RunnerFull) SetRegionType(v RegionType) {
-	o.RegionType = &v
-}
-
 func (o RunnerFull) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -1135,7 +1074,7 @@ func (o RunnerFull) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AvailabilityScore) {
 		toSerialize["availabilityScore"] = o.AvailabilityScore
 	}
-	toSerialize["region"] = o.Region
+	toSerialize["target"] = o.Target
 	toSerialize["name"] = o.Name
 	toSerialize["state"] = o.State
 	if !IsNil(o.LastChecked) {
@@ -1150,10 +1089,6 @@ func (o RunnerFull) ToMap() (map[string]interface{}, error) {
 	toSerialize["runnerClass"] = o.RunnerClass
 	if !IsNil(o.AppVersion) {
 		toSerialize["appVersion"] = o.AppVersion
-	}
-	toSerialize["apiKey"] = o.ApiKey
-	if !IsNil(o.RegionType) {
-		toSerialize["regionType"] = o.RegionType
 	}
 
 	for key, value := range o.AdditionalProperties {
@@ -1172,7 +1107,7 @@ func (o *RunnerFull) UnmarshalJSON(data []byte) (err error) {
 		"cpu",
 		"memory",
 		"disk",
-		"region",
+		"target",
 		"name",
 		"state",
 		"unschedulable",
@@ -1182,7 +1117,6 @@ func (o *RunnerFull) UnmarshalJSON(data []byte) (err error) {
 		"version",
 		"apiVersion",
 		"runnerClass",
-		"apiKey",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -1231,7 +1165,7 @@ func (o *RunnerFull) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "currentSnapshotCount")
 		delete(additionalProperties, "currentStartedSandboxes")
 		delete(additionalProperties, "availabilityScore")
-		delete(additionalProperties, "region")
+		delete(additionalProperties, "target")
 		delete(additionalProperties, "name")
 		delete(additionalProperties, "state")
 		delete(additionalProperties, "lastChecked")
@@ -1243,8 +1177,6 @@ func (o *RunnerFull) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "apiVersion")
 		delete(additionalProperties, "runnerClass")
 		delete(additionalProperties, "appVersion")
-		delete(additionalProperties, "apiKey")
-		delete(additionalProperties, "regionType")
 		o.AdditionalProperties = additionalProperties
 	}
 

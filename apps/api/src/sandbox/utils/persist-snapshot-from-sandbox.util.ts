@@ -24,11 +24,9 @@ export interface PersistSnapshotFromSandboxDeps {
 }
 
 export interface PersistSnapshotFromSandboxParams {
-  organizationId: string
   name: string
   ref: string
   runnerId?: string | null
-  regionId: string
   sandboxClass: SandboxClass
   cpu: number
   gpu: number
@@ -60,7 +58,6 @@ export async function persistSnapshotFromSandbox(
   // We should set to active only after a number of snapshot runners had been propagated, leaving as is for now
   const snapshot = snapshotRepository.create({
     id: snapshotId,
-    organizationId: params.organizationId,
     name: params.name,
     ref: params.ref,
     state: SnapshotState.ACTIVE,
@@ -73,7 +70,6 @@ export async function persistSnapshotFromSandbox(
     size,
     initialRunnerId: runnerId,
     lastUsedAt: new Date(),
-    snapshotRegions: [{ snapshotId, regionId: params.regionId }],
   })
 
   let inserted: Snapshot
@@ -81,7 +77,7 @@ export async function persistSnapshotFromSandbox(
     inserted = await snapshotRepository.insert(snapshot)
   } catch (error) {
     if ((error as { code?: string }).code === '23505') {
-      throw new ConflictException(`Snapshot with name "${params.name}" already exists for this organization`)
+      throw new ConflictException(`Snapshot with name "${params.name}" already exists`)
     }
     throw error
   }

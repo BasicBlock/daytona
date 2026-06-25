@@ -11,7 +11,6 @@ import { useApi } from '../useApi'
 export interface UpdateRegistryMutationVariables {
   registryId: string
   registry: UpdateDockerRegistry
-  organizationId?: string
 }
 
 export const useUpdateRegistryMutation = () => {
@@ -19,17 +18,12 @@ export const useUpdateRegistryMutation = () => {
   const queryClient = useQueryClient()
 
   return useMutation<DockerRegistry, unknown, UpdateRegistryMutationVariables>({
-    mutationFn: async ({ registryId, registry, organizationId }) => {
-      if (!organizationId) {
-        throw new Error('No organization selected')
-      }
-      const response = await dockerRegistryApi.updateRegistry(registryId, registry, organizationId)
+    mutationFn: async ({ registryId, registry }) => {
+      const response = await dockerRegistryApi.updateRegistry(registryId, registry)
       return response.data
     },
-    onSuccess: async (_data, { organizationId }) => {
-      if (organizationId) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.registries.list(organizationId) })
-      }
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.registries.list() })
     },
   })
 }

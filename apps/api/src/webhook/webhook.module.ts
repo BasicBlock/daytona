@@ -5,16 +5,14 @@
 
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { WebhookService } from './services/webhook.service'
-import { WebhookController } from './controllers/webhook.controller'
-import { WebhookEventHandlerService } from './services/webhook-event-handler.service'
-import { WebhookInitialization } from './entities/webhook-initialization.entity'
-import { OrganizationModule } from '../organization/organization.module'
 import { TypedConfigModule } from '../config/typed-config.module'
-import { AuthModule } from '../auth/auth.module'
+import { WebhookController } from './controllers/webhook.controller'
+import { WebhookInitialization } from './entities/webhook-initialization.entity'
+import { WebhookEventHandlerService } from './services/webhook-event-handler.service'
+import { WebhookService } from './services/webhook.service'
 
 @Module({
-  imports: [OrganizationModule, TypedConfigModule, TypeOrmModule.forFeature([WebhookInitialization]), AuthModule],
+  imports: [TypedConfigModule, TypeOrmModule.forFeature([WebhookInitialization])],
   controllers: [WebhookController],
   providers: [WebhookService, WebhookEventHandlerService],
   exports: [WebhookService],

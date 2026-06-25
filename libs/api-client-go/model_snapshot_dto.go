@@ -23,8 +23,6 @@ var _ MappedNullable = &SnapshotDto{}
 // SnapshotDto struct for SnapshotDto
 type SnapshotDto struct {
 	Id string `json:"id"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	General bool `json:"general"`
 	Name string `json:"name"`
 	ImageName *string `json:"imageName,omitempty"`
 	State SnapshotState `json:"state"`
@@ -42,8 +40,6 @@ type SnapshotDto struct {
 	LastUsedAt NullableTime `json:"lastUsedAt"`
 	// Build information for the snapshot
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
-	// IDs of regions where the snapshot is available
-	RegionIds []string `json:"regionIds,omitempty"`
 	// The initial runner ID of the snapshot
 	InitialRunnerId *string `json:"initialRunnerId,omitempty"`
 	// The snapshot reference
@@ -59,10 +55,9 @@ type _SnapshotDto SnapshotDto
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSnapshotDto(id string, general bool, name string, state SnapshotState, size NullableFloat32, entrypoint []string, cpu float32, gpu float32, mem float32, disk float32, errorReason NullableString, createdAt time.Time, updatedAt time.Time, lastUsedAt NullableTime) *SnapshotDto {
+func NewSnapshotDto(id string, name string, state SnapshotState, size NullableFloat32, entrypoint []string, cpu float32, gpu float32, mem float32, disk float32, errorReason NullableString, createdAt time.Time, updatedAt time.Time, lastUsedAt NullableTime) *SnapshotDto {
 	this := SnapshotDto{}
 	this.Id = id
-	this.General = general
 	this.Name = name
 	this.State = state
 	this.Size = size
@@ -108,62 +103,6 @@ func (o *SnapshotDto) GetIdOk() (*string, bool) {
 // SetId sets field value
 func (o *SnapshotDto) SetId(v string) {
 	o.Id = v
-}
-
-// GetOrganizationId returns the OrganizationId field value if set, zero value otherwise.
-func (o *SnapshotDto) GetOrganizationId() string {
-	if o == nil || IsNil(o.OrganizationId) {
-		var ret string
-		return ret
-	}
-	return *o.OrganizationId
-}
-
-// GetOrganizationIdOk returns a tuple with the OrganizationId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SnapshotDto) GetOrganizationIdOk() (*string, bool) {
-	if o == nil || IsNil(o.OrganizationId) {
-		return nil, false
-	}
-	return o.OrganizationId, true
-}
-
-// HasOrganizationId returns a boolean if a field has been set.
-func (o *SnapshotDto) HasOrganizationId() bool {
-	if o != nil && !IsNil(o.OrganizationId) {
-		return true
-	}
-
-	return false
-}
-
-// SetOrganizationId gets a reference to the given string and assigns it to the OrganizationId field.
-func (o *SnapshotDto) SetOrganizationId(v string) {
-	o.OrganizationId = &v
-}
-
-// GetGeneral returns the General field value
-func (o *SnapshotDto) GetGeneral() bool {
-	if o == nil {
-		var ret bool
-		return ret
-	}
-
-	return o.General
-}
-
-// GetGeneralOk returns a tuple with the General field value
-// and a boolean to check if the value has been set.
-func (o *SnapshotDto) GetGeneralOk() (*bool, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.General, true
-}
-
-// SetGeneral sets field value
-func (o *SnapshotDto) SetGeneral(v bool) {
-	o.General = v
 }
 
 // GetName returns the Name field value
@@ -558,38 +497,6 @@ func (o *SnapshotDto) SetBuildInfo(v BuildInfo) {
 	o.BuildInfo = &v
 }
 
-// GetRegionIds returns the RegionIds field value if set, zero value otherwise.
-func (o *SnapshotDto) GetRegionIds() []string {
-	if o == nil || IsNil(o.RegionIds) {
-		var ret []string
-		return ret
-	}
-	return o.RegionIds
-}
-
-// GetRegionIdsOk returns a tuple with the RegionIds field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SnapshotDto) GetRegionIdsOk() ([]string, bool) {
-	if o == nil || IsNil(o.RegionIds) {
-		return nil, false
-	}
-	return o.RegionIds, true
-}
-
-// HasRegionIds returns a boolean if a field has been set.
-func (o *SnapshotDto) HasRegionIds() bool {
-	if o != nil && !IsNil(o.RegionIds) {
-		return true
-	}
-
-	return false
-}
-
-// SetRegionIds gets a reference to the given []string and assigns it to the RegionIds field.
-func (o *SnapshotDto) SetRegionIds(v []string) {
-	o.RegionIds = v
-}
-
 // GetInitialRunnerId returns the InitialRunnerId field value if set, zero value otherwise.
 func (o *SnapshotDto) GetInitialRunnerId() string {
 	if o == nil || IsNil(o.InitialRunnerId) {
@@ -697,10 +604,6 @@ func (o SnapshotDto) MarshalJSON() ([]byte, error) {
 func (o SnapshotDto) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["id"] = o.Id
-	if !IsNil(o.OrganizationId) {
-		toSerialize["organizationId"] = o.OrganizationId
-	}
-	toSerialize["general"] = o.General
 	toSerialize["name"] = o.Name
 	if !IsNil(o.ImageName) {
 		toSerialize["imageName"] = o.ImageName
@@ -723,9 +626,6 @@ func (o SnapshotDto) ToMap() (map[string]interface{}, error) {
 	toSerialize["lastUsedAt"] = o.LastUsedAt.Get()
 	if !IsNil(o.BuildInfo) {
 		toSerialize["buildInfo"] = o.BuildInfo
-	}
-	if !IsNil(o.RegionIds) {
-		toSerialize["regionIds"] = o.RegionIds
 	}
 	if !IsNil(o.InitialRunnerId) {
 		toSerialize["initialRunnerId"] = o.InitialRunnerId
@@ -750,7 +650,6 @@ func (o *SnapshotDto) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"id",
-		"general",
 		"name",
 		"state",
 		"size",
@@ -793,8 +692,6 @@ func (o *SnapshotDto) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "id")
-		delete(additionalProperties, "organizationId")
-		delete(additionalProperties, "general")
 		delete(additionalProperties, "name")
 		delete(additionalProperties, "imageName")
 		delete(additionalProperties, "state")
@@ -810,7 +707,6 @@ func (o *SnapshotDto) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "updatedAt")
 		delete(additionalProperties, "lastUsedAt")
 		delete(additionalProperties, "buildInfo")
-		delete(additionalProperties, "regionIds")
 		delete(additionalProperties, "initialRunnerId")
 		delete(additionalProperties, "ref")
 		delete(additionalProperties, "sandboxClass")

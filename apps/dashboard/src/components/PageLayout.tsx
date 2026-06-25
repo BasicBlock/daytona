@@ -5,36 +5,12 @@
 
 import { DAYTONA_DOCS_URL } from '@/constants/ExternalLinks'
 import { useTheme } from '@/contexts/ThemeContext'
-import { RoutePath } from '@/enums/RoutePath'
-import { useUserOrganizationInvitations } from '@/hooks/useUserOrganizationInvitations'
 import { cn } from '@/lib/utils'
-import { usePylon } from '@/vendor/pylon'
-import {
-  BookOpen,
-  ChevronsUpDown,
-  LifeBuoyIcon,
-  ListChecks,
-  LogOut,
-  Mail,
-  MoonIcon,
-  Settings,
-  SquareUserRound,
-  SunIcon,
-} from 'lucide-react'
-import { usePostHog } from 'posthog-js/react'
+import { BookOpen, MoonIcon, SunIcon } from 'lucide-react'
 import { type ComponentProps, type ReactNode, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useAuth } from 'react-oidc-context'
-import { Link } from 'react-router'
 import { BannerStack } from './Banner'
 import { Button } from './ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu'
 import { SidebarTrigger } from './ui/sidebar'
 
 function PageLayout({ className, contained = false, ...props }: ComponentProps<'div'> & { contained?: boolean }) {
@@ -79,8 +55,7 @@ function PageHeader(props: ComponentProps<'header'>) {
             icon={<BookOpen className="size-4" />}
             variant="link"
           />
-          <PageHeaderSupportAction />
-          <PageHeaderProfileMenu />
+          <PageHeaderThemeAction />
         </>
       }
     />
@@ -110,12 +85,8 @@ function PageHeaderExternalAction({
   )
 }
 
-function PageHeaderSupportAction() {
-  const { isEnabled, toggle, unreadCount } = usePylon()
-
-  if (!isEnabled) {
-    return null
-  }
+function PageHeaderThemeAction() {
+  const { theme, setTheme } = useTheme()
 
   return (
     <Button
@@ -123,98 +94,12 @@ function PageHeaderSupportAction() {
       variant="link"
       size="sm"
       className="text-muted-foreground hover:text-foreground"
-      aria-label="Support"
-      onClick={toggle}
+      aria-label="Toggle theme"
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
     >
-      <LifeBuoyIcon className="size-4" />
-      <span className="hidden md:inline">Support</span>
-      {unreadCount > 0 ? (
-        <span className="relative ml-0.5 flex size-2">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-500 opacity-75" />
-          <span className="relative inline-flex size-2 rounded-full bg-green-500" />
-        </span>
-      ) : null}
+      {theme === 'dark' ? <SunIcon className="size-4" /> : <MoonIcon className="size-4" />}
+      <span className="hidden md:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
     </Button>
-  )
-}
-
-function PageHeaderProfileMenu() {
-  const posthog = usePostHog()
-  const { theme, setTheme } = useTheme()
-  const { user, signoutRedirect } = useAuth()
-  const { count: organizationInvitationsCount } = useUserOrganizationInvitations()
-
-  const handleSignOut = () => {
-    posthog?.reset()
-    signoutRedirect()
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="ml-1 h-8 max-w-44 gap-2 bg-input/50 px-2 text-muted-foreground hover:text-foreground md:px-2.5"
-          aria-label="Profile"
-        >
-          {user?.profile.picture ? (
-            <img
-              src={user.profile.picture}
-              alt={user.profile.name || 'Profile picture'}
-              className="size-4 shrink-0 rounded-sm"
-            />
-          ) : (
-            <SquareUserRound className="size-4 shrink-0" />
-          )}
-          <span className="hidden min-w-0 truncate md:block">
-            {user?.profile.name || user?.profile.email || 'Profile'}
-          </span>
-          <ChevronsUpDown className="hidden size-4 shrink-0 opacity-50 md:block" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="end" className="w-64">
-        <div className="px-2 py-1.5">
-          <div className="truncate text-sm font-medium">{user?.profile.name || 'Profile'}</div>
-          <div className="truncate text-xs text-muted-foreground">{user?.profile.email || ''}</div>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to={RoutePath.ACCOUNT_SETTINGS}>
-            <Settings className="size-4" />
-            Account Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-          {theme === 'dark' ? <SunIcon className="size-4" /> : <MoonIcon className="size-4" />}
-          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to={RoutePath.USER_INVITATIONS}>
-            <Mail className="size-4" />
-            Invitations
-            {organizationInvitationsCount > 0 && (
-              <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">
-                {organizationInvitationsCount}
-              </span>
-            )}
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to={RoutePath.ONBOARDING}>
-            <ListChecks className="size-4" />
-            Onboarding
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut}>
-          <LogOut className="size-4" />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
 

@@ -5,7 +5,7 @@
 
 import { DEFAULT_SANDBOX_SORTING, SandboxFilters, SandboxSorting } from '@/hooks/queries/useSandboxesQuery'
 import {
-  Region,
+  Target,
   SandboxClass,
   SandboxListItem,
   SandboxListSortDirection,
@@ -32,9 +32,9 @@ export interface SandboxTableProps {
   snapshotsDataIsLoading: boolean
   snapshotsDataHasMore?: boolean
   onChangeSnapshotSearchValue?: (name?: string) => void
-  regionsData: Region[]
-  regionsDataIsLoading: boolean
-  getRegionName: (regionId: string) => string | undefined
+  targetsData: Target[]
+  targetsDataIsLoading: boolean
+  getTargetName: (target: string) => string | undefined
   handleStart: (id: string) => void
   handleStop: (id: string) => void
   handleDelete: (id: string) => void
@@ -85,8 +85,8 @@ export interface SandboxTableActionsProps {
 
 export interface SandboxTableHeaderProps {
   table: Table<SandboxListItem>
-  regionOptions: FacetedFilterOption[]
-  regionsDataIsLoading: boolean
+  targetOptions: FacetedFilterOption[]
+  targetsDataIsLoading: boolean
   snapshots: SnapshotDto[]
   snapshotsDataIsLoading: boolean
   snapshotsDataHasMore?: boolean
@@ -146,8 +146,8 @@ export function convertApiFiltersToTableFilters(filters: SandboxFilters): Column
   if (filters.snapshots?.length) {
     columnFilters.push({ id: 'snapshot', value: filters.snapshots })
   }
-  if (filters.regions?.length) {
-    columnFilters.push({ id: 'region', value: filters.regions })
+  if (filters.targets?.length) {
+    columnFilters.push({ id: 'target', value: filters.targets })
   }
   if (filters.sandboxClasses?.length) {
     columnFilters.push({ id: 'sandboxClass', value: filters.sandboxClasses })
@@ -207,9 +207,9 @@ export function convertTableFiltersToApiFilters(tableFilters: ColumnFiltersState
           filters.snapshots = filter.value as string[]
         }
         break
-      case 'region':
+      case 'target':
         if (Array.isArray(filter.value) && filter.value.length > 0) {
-          filters.regions = filter.value as string[]
+          filters.targets = filter.value as string[]
         }
         break
       case 'sandboxClass':

@@ -5,7 +5,7 @@
 
 export enum RegistryType {
   INTERNAL = 'internal', // Used for internal snapshots
-  ORGANIZATION = 'organization',
+  CUSTOM = 'custom',
   TRANSIENT = 'transient',
   BACKUP = 'backup',
 }

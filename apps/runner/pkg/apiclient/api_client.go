@@ -32,8 +32,6 @@ func GetApiClient() (*apiclient.APIClient, error) {
 		},
 	}
 
-	clientConfig.AddDefaultHeader("Authorization", "Bearer "+c.ApiToken)
-
 	clientConfig.AddDefaultHeader(DaytonaSourceHeader, "runner")
 
 	newApiClient = apiclient.NewAPIClient(clientConfig)

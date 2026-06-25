@@ -29,8 +29,8 @@ type StorageAccessDto struct {
 	SessionToken string `json:"sessionToken"`
 	// Storage URL
 	StorageUrl string `json:"storageUrl"`
-	// Organization ID
-	OrganizationId string `json:"organizationId"`
+	// Shared object storage prefix
+	StoragePrefix string `json:"storagePrefix"`
 	// S3 bucket name
 	Bucket string `json:"bucket"`
 	AdditionalProperties map[string]interface{}
@@ -42,13 +42,13 @@ type _StorageAccessDto StorageAccessDto
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewStorageAccessDto(accessKey string, secret string, sessionToken string, storageUrl string, organizationId string, bucket string) *StorageAccessDto {
+func NewStorageAccessDto(accessKey string, secret string, sessionToken string, storageUrl string, storagePrefix string, bucket string) *StorageAccessDto {
 	this := StorageAccessDto{}
 	this.AccessKey = accessKey
 	this.Secret = secret
 	this.SessionToken = sessionToken
 	this.StorageUrl = storageUrl
-	this.OrganizationId = organizationId
+	this.StoragePrefix = storagePrefix
 	this.Bucket = bucket
 	return &this
 }
@@ -157,28 +157,28 @@ func (o *StorageAccessDto) SetStorageUrl(v string) {
 	o.StorageUrl = v
 }
 
-// GetOrganizationId returns the OrganizationId field value
-func (o *StorageAccessDto) GetOrganizationId() string {
+// GetStoragePrefix returns the StoragePrefix field value
+func (o *StorageAccessDto) GetStoragePrefix() string {
 	if o == nil {
 		var ret string
 		return ret
 	}
 
-	return o.OrganizationId
+	return o.StoragePrefix
 }
 
-// GetOrganizationIdOk returns a tuple with the OrganizationId field value
+// GetStoragePrefixOk returns a tuple with the StoragePrefix field value
 // and a boolean to check if the value has been set.
-func (o *StorageAccessDto) GetOrganizationIdOk() (*string, bool) {
+func (o *StorageAccessDto) GetStoragePrefixOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.OrganizationId, true
+	return &o.StoragePrefix, true
 }
 
-// SetOrganizationId sets field value
-func (o *StorageAccessDto) SetOrganizationId(v string) {
-	o.OrganizationId = v
+// SetStoragePrefix sets field value
+func (o *StorageAccessDto) SetStoragePrefix(v string) {
+	o.StoragePrefix = v
 }
 
 // GetBucket returns the Bucket field value
@@ -219,7 +219,7 @@ func (o StorageAccessDto) ToMap() (map[string]interface{}, error) {
 	toSerialize["secret"] = o.Secret
 	toSerialize["sessionToken"] = o.SessionToken
 	toSerialize["storageUrl"] = o.StorageUrl
-	toSerialize["organizationId"] = o.OrganizationId
+	toSerialize["storagePrefix"] = o.StoragePrefix
 	toSerialize["bucket"] = o.Bucket
 
 	for key, value := range o.AdditionalProperties {
@@ -238,7 +238,7 @@ func (o *StorageAccessDto) UnmarshalJSON(data []byte) (err error) {
 		"secret",
 		"sessionToken",
 		"storageUrl",
-		"organizationId",
+		"storagePrefix",
 		"bucket",
 	}
 
@@ -273,7 +273,7 @@ func (o *StorageAccessDto) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "secret")
 		delete(additionalProperties, "sessionToken")
 		delete(additionalProperties, "storageUrl")
-		delete(additionalProperties, "organizationId")
+		delete(additionalProperties, "storagePrefix")
 		delete(additionalProperties, "bucket")
 		o.AdditionalProperties = additionalProperties
 	}

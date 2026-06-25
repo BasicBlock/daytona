@@ -25,12 +25,12 @@ func (d *DockerClient) GetDaemonVersion(ctx context.Context, sandboxId string) (
 		return "", err
 	}
 
-	containerIP := GetContainerIpAddress(ctx, c)
-	if containerIP == "" {
-		return "", errors.New("sandbox IP not found? Is the sandbox started?")
+	daemonAddress := GetContainerDaemonAddress(ctx, c)
+	if daemonAddress == "" {
+		return "", errors.New("sandbox daemon address not found? Is the sandbox started?")
 	}
 
-	targetUrl := fmt.Sprintf("http://%s:2280/version", containerIP)
+	targetUrl := fmt.Sprintf("http://%s/version", daemonAddress)
 	target, err := url.Parse(targetUrl)
 	if err != nil {
 		return "", err

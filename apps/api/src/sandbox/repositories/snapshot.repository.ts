@@ -5,7 +5,6 @@
 
 import { DataSource } from 'typeorm'
 import { Snapshot } from '../entities/snapshot.entity'
-import { SnapshotRegion } from '../entities/snapshot-region.entity'
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectDataSource } from '@nestjs/typeorm'
 import { EventEmitter2 } from '@nestjs/event-emitter'
@@ -34,9 +33,6 @@ export class SnapshotRepository extends BaseRepository<Snapshot> {
 
     await this.dataSource.transaction(async (entityManager) => {
       await entityManager.insert(Snapshot, snapshot)
-      if (snapshot.snapshotRegions?.length) {
-        await entityManager.insert(SnapshotRegion, snapshot.snapshotRegions)
-      }
     })
 
     return snapshot
@@ -99,16 +95,6 @@ export class SnapshotRepository extends BaseRepository<Snapshot> {
 
   private async emitUpdateEvents(updatedSnapshot: Snapshot, previousSnapshot: Pick<Snapshot, 'state'>): Promise<void> {
     if (previousSnapshot.state !== updatedSnapshot.state) {
-      if (!updatedSnapshot.snapshotRegions) {
-        try {
-          updatedSnapshot.snapshotRegions = await this.dataSource
-            .getRepository(SnapshotRegion)
-            .find({ where: { snapshotId: updatedSnapshot.id } })
-        } catch (error) {
-          this.logger.error(`Failed to load snapshot regions for event, snapshot ID ${updatedSnapshot.id}: ${error}`)
-        }
-      }
-
       this.eventEmitter.emit(
         SnapshotEvents.STATE_UPDATED,
         new SnapshotStateUpdatedEvent(updatedSnapshot, previousSnapshot.state, updatedSnapshot.state),

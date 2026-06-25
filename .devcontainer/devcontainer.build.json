@@ -78,7 +78,7 @@
   },
   "postStartCommand": "yarn && poetry lock && poetry install && bundle install",
   "postAttachCommand": "",
-  "forwardPorts": [5556, "pgadmin:80", "registry-ui:5100", "maildev:1080", "minio:9000", "minio:9001", "jaeger:16686"],
+  "forwardPorts": ["pgadmin:80", "registry-ui:5100", "minio:9000", "minio:9001", "jaeger:16686"],
   // Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
   "remoteUser": "daytona"
 }

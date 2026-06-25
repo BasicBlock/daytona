@@ -23,8 +23,6 @@ var _ MappedNullable = &SandboxListItem{}
 type SandboxListItem struct {
 	// The ID of the sandbox
 	Id string `json:"id"`
-	// The organization ID of the sandbox
-	OrganizationId string `json:"organizationId"`
 	// The name of the sandbox
 	Name string `json:"name"`
 	// The target environment for the sandbox
@@ -39,14 +37,12 @@ type SandboxListItem struct {
 	DesiredState *SandboxDesiredState `json:"desiredState,omitempty"`
 	// The snapshot used for the sandbox
 	Snapshot *string `json:"snapshot,omitempty"`
-	// The user associated with the project
-	User string `json:"user"`
+	// The OS user used inside the sandbox
+	OsUser string `json:"osUser"`
 	// The error reason of the sandbox
 	ErrorReason *string `json:"errorReason,omitempty"`
 	// Whether the sandbox error is recoverable.
 	Recoverable *bool `json:"recoverable,omitempty"`
-	// Whether the sandbox http preview is public
-	Public bool `json:"public"`
 	// The CPU quota for the sandbox
 	Cpu float32 `json:"cpu"`
 	// The GPU quota for the sandbox
@@ -86,14 +82,12 @@ type _SandboxListItem SandboxListItem
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSandboxListItem(id string, organizationId string, name string, target string, user string, public bool, cpu float32, gpu float32, memory float32, disk float32, labels map[string]string, toolboxProxyUrl string) *SandboxListItem {
+func NewSandboxListItem(id string, name string, target string, osUser string, cpu float32, gpu float32, memory float32, disk float32, labels map[string]string, toolboxProxyUrl string) *SandboxListItem {
 	this := SandboxListItem{}
 	this.Id = id
-	this.OrganizationId = organizationId
 	this.Name = name
 	this.Target = target
-	this.User = user
-	this.Public = public
+	this.OsUser = osUser
 	this.Cpu = cpu
 	this.Gpu = gpu
 	this.Memory = memory
@@ -133,30 +127,6 @@ func (o *SandboxListItem) GetIdOk() (*string, bool) {
 // SetId sets field value
 func (o *SandboxListItem) SetId(v string) {
 	o.Id = v
-}
-
-// GetOrganizationId returns the OrganizationId field value
-func (o *SandboxListItem) GetOrganizationId() string {
-	if o == nil {
-		var ret string
-		return ret
-	}
-
-	return o.OrganizationId
-}
-
-// GetOrganizationIdOk returns a tuple with the OrganizationId field value
-// and a boolean to check if the value has been set.
-func (o *SandboxListItem) GetOrganizationIdOk() (*string, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.OrganizationId, true
-}
-
-// SetOrganizationId sets field value
-func (o *SandboxListItem) SetOrganizationId(v string) {
-	o.OrganizationId = v
 }
 
 // GetName returns the Name field value
@@ -367,28 +337,28 @@ func (o *SandboxListItem) SetSnapshot(v string) {
 	o.Snapshot = &v
 }
 
-// GetUser returns the User field value
-func (o *SandboxListItem) GetUser() string {
+// GetOsUser returns the OsUser field value
+func (o *SandboxListItem) GetOsUser() string {
 	if o == nil {
 		var ret string
 		return ret
 	}
 
-	return o.User
+	return o.OsUser
 }
 
-// GetUserOk returns a tuple with the User field value
+// GetOsUserOk returns a tuple with the OsUser field value
 // and a boolean to check if the value has been set.
-func (o *SandboxListItem) GetUserOk() (*string, bool) {
+func (o *SandboxListItem) GetOsUserOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.User, true
+	return &o.OsUser, true
 }
 
-// SetUser sets field value
-func (o *SandboxListItem) SetUser(v string) {
-	o.User = v
+// SetOsUser sets field value
+func (o *SandboxListItem) SetOsUser(v string) {
+	o.OsUser = v
 }
 
 // GetErrorReason returns the ErrorReason field value if set, zero value otherwise.
@@ -453,30 +423,6 @@ func (o *SandboxListItem) HasRecoverable() bool {
 // SetRecoverable gets a reference to the given bool and assigns it to the Recoverable field.
 func (o *SandboxListItem) SetRecoverable(v bool) {
 	o.Recoverable = &v
-}
-
-// GetPublic returns the Public field value
-func (o *SandboxListItem) GetPublic() bool {
-	if o == nil {
-		var ret bool
-		return ret
-	}
-
-	return o.Public
-}
-
-// GetPublicOk returns a tuple with the Public field value
-// and a boolean to check if the value has been set.
-func (o *SandboxListItem) GetPublicOk() (*bool, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.Public, true
-}
-
-// SetPublic sets field value
-func (o *SandboxListItem) SetPublic(v bool) {
-	o.Public = v
 }
 
 // GetCpu returns the Cpu field value
@@ -922,7 +868,6 @@ func (o SandboxListItem) MarshalJSON() ([]byte, error) {
 func (o SandboxListItem) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["id"] = o.Id
-	toSerialize["organizationId"] = o.OrganizationId
 	toSerialize["name"] = o.Name
 	toSerialize["target"] = o.Target
 	if !IsNil(o.RunnerId) {
@@ -940,14 +885,13 @@ func (o SandboxListItem) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Snapshot) {
 		toSerialize["snapshot"] = o.Snapshot
 	}
-	toSerialize["user"] = o.User
+	toSerialize["osUser"] = o.OsUser
 	if !IsNil(o.ErrorReason) {
 		toSerialize["errorReason"] = o.ErrorReason
 	}
 	if !IsNil(o.Recoverable) {
 		toSerialize["recoverable"] = o.Recoverable
 	}
-	toSerialize["public"] = o.Public
 	toSerialize["cpu"] = o.Cpu
 	toSerialize["gpu"] = o.Gpu
 	if !IsNil(o.GpuType) {
@@ -995,11 +939,9 @@ func (o *SandboxListItem) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"id",
-		"organizationId",
 		"name",
 		"target",
-		"user",
-		"public",
+		"osUser",
 		"cpu",
 		"gpu",
 		"memory",
@@ -1036,7 +978,6 @@ func (o *SandboxListItem) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "id")
-		delete(additionalProperties, "organizationId")
 		delete(additionalProperties, "name")
 		delete(additionalProperties, "target")
 		delete(additionalProperties, "runnerId")
@@ -1044,10 +985,9 @@ func (o *SandboxListItem) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "state")
 		delete(additionalProperties, "desiredState")
 		delete(additionalProperties, "snapshot")
-		delete(additionalProperties, "user")
+		delete(additionalProperties, "osUser")
 		delete(additionalProperties, "errorReason")
 		delete(additionalProperties, "recoverable")
-		delete(additionalProperties, "public")
 		delete(additionalProperties, "cpu")
 		delete(additionalProperties, "gpu")
 		delete(additionalProperties, "gpuType")

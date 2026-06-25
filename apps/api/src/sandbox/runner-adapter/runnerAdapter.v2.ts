@@ -4,13 +4,6 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common'
-import { create, toJson } from '@bufbuild/protobuf'
-import {
-  SnapshotSandboxPayloadSchema,
-  ForkSandboxPayloadSchema,
-  PauseSandboxPayloadSchema,
-  RegistrySchema,
-} from '@daytona/runner-proto'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, IsNull, Not } from 'typeorm'
 import {
@@ -33,16 +26,15 @@ import { JobStatus } from '../enums/job-status.enum'
 import { ResourceType } from '../enums/resource-type.enum'
 import { JobService } from '../services/job.service'
 import { SandboxRepository } from '../repositories/sandbox.repository'
-import {
-  CreateSandboxDTO,
-  CreateBackupDTO,
-  BuildSnapshotRequestDTO,
-  PullSnapshotRequestDTO,
-  UpdateNetworkSettingsDTO,
-  InspectSnapshotInRegistryRequest,
-  RecoverSandboxDTO,
-} from '@daytona/runner-api-client'
 import { SnapshotStateError } from '../errors/snapshot-state-error'
+
+type CreateSandboxDTO = Record<string, unknown>
+type CreateBackupDTO = Record<string, unknown>
+type BuildSnapshotRequestDTO = Record<string, unknown>
+type PullSnapshotRequestDTO = Record<string, unknown>
+type UpdateNetworkSettingsDTO = Record<string, unknown>
+type InspectSnapshotInRegistryRequest = Record<string, unknown>
+type RecoverSandboxDTO = Record<string, unknown>
 
 /**
  * RunnerAdapterV2 implements RunnerAdapter for v2 runners.
@@ -160,7 +152,6 @@ export class RunnerAdapterV2 implements RunnerAdapter {
     const payload: CreateSandboxDTO = {
       id: sandbox.id,
       name: sandbox.name,
-      userId: sandbox.organizationId,
       snapshot: snapshotRef,
       osUser: sandbox.osUser,
       cpuQuota: sandbox.cpu,
@@ -189,8 +180,6 @@ export class RunnerAdapterV2 implements RunnerAdapter {
       authToken: sandbox.authToken,
       otelEndpoint: otelEndpoint,
       skipStart: skipStart,
-      organizationId: sandbox.organizationId,
-      regionId: sandbox.region,
       linkedSandboxId: sandbox.linkedSandboxId ?? undefined,
       sandboxClass: sandbox.sandboxClass,
     }
@@ -242,7 +231,6 @@ export class RunnerAdapterV2 implements RunnerAdapter {
 
   async recoverSandbox(sandbox: Sandbox, registry?: DockerRegistry, skipStart = false): Promise<void> {
     const recoverSandboxDTO: RecoverSandboxDTO = {
-      userId: sandbox.organizationId,
       snapshot: sandbox.snapshot,
       osUser: sandbox.osUser,
       cpuQuota: sandbox.cpu,
@@ -306,7 +294,6 @@ export class RunnerAdapterV2 implements RunnerAdapter {
 
   async buildSnapshot(
     buildInfo: BuildInfo,
-    organizationId?: string,
     sourceRegistries?: DockerRegistry[],
     registry?: DockerRegistry,
     pushToInternalRegistry?: boolean,
@@ -314,9 +301,9 @@ export class RunnerAdapterV2 implements RunnerAdapter {
     const payload: BuildSnapshotRequestDTO = {
       snapshot: buildInfo.snapshotRef,
       dockerfile: buildInfo.dockerfileContent,
-      organizationId: organizationId,
       context: buildInfo.contextHashes,
-      pushToInternalRegistry: pushToInternalRegistry,
+      storagePrefix: 'objects',
+      pushToInternalRegistry,
     }
 
     if (sourceRegistries) {
@@ -555,12 +542,7 @@ export class RunnerAdapterV2 implements RunnerAdapter {
   }
 
   async pauseSandbox(sandboxId: string): Promise<void> {
-    const payload = toJson(
-      PauseSandboxPayloadSchema,
-      create(PauseSandboxPayloadSchema, {
-        sandboxId,
-      }),
-    ) as Record<string, unknown>
+    const payload = { sandboxId }
 
     await this.jobService.createJob(
       null,
@@ -575,13 +557,7 @@ export class RunnerAdapterV2 implements RunnerAdapter {
   }
 
   async forkSandbox(sourceSandboxId: string, newSandboxId: string): Promise<void> {
-    const payload = toJson(
-      ForkSandboxPayloadSchema,
-      create(ForkSandboxPayloadSchema, {
-        sourceSandboxId,
-        newSandboxId,
-      }),
-    ) as Record<string, unknown>
+    const payload = { sourceSandboxId, newSandboxId }
 
     await this.jobService.createJob(
       null,
@@ -604,27 +580,23 @@ export class RunnerAdapterV2 implements RunnerAdapter {
   async createSnapshotFromSandbox(
     sandboxId: string,
     snapshotName: string,
-    organizationId: string,
+    _snapshotSource: string,
     registry?: DockerRegistry,
     includeMemory?: boolean,
   ): Promise<undefined> {
-    const payload = toJson(
-      SnapshotSandboxPayloadSchema,
-      create(SnapshotSandboxPayloadSchema, {
-        sandboxId,
-        name: snapshotName,
-        organizationId,
-        includeMemory: includeMemory ?? false,
-        registry: registry
-          ? create(RegistrySchema, {
-              url: registry.url.replace(/^(https?:\/\/)/, ''),
-              username: registry.username ?? undefined,
-              password: registry.password ?? undefined,
-              project: registry.project ?? undefined,
-            })
-          : undefined,
-      }),
-    ) as Record<string, unknown>
+    const payload = {
+      sandboxId,
+      name: snapshotName,
+      includeMemory: includeMemory ?? false,
+      registry: registry
+        ? {
+            url: registry.url.replace(/^(https?:\/\/)/, ''),
+            username: registry.username ?? undefined,
+            password: registry.password ?? undefined,
+            project: registry.project ?? undefined,
+          }
+        : undefined,
+    }
 
     await this.jobService.createJob(
       null,

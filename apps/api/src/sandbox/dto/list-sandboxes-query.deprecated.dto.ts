@@ -16,7 +16,7 @@ export enum SandboxSortFieldDeprecated {
   NAME = 'name',
   STATE = 'state',
   SNAPSHOT = 'snapshot',
-  REGION = 'region',
+  REGION = 'target',
   UPDATED_AT = 'updatedAt',
   CREATED_AT = 'createdAt',
   LAST_ACTIVITY_AT = 'lastActivityAt',
@@ -114,8 +114,8 @@ export class ListSandboxesQueryDtoDeprecated {
   snapshots?: string[]
 
   @ApiProperty({
-    name: 'regions',
-    description: 'List of regions to filter by',
+    name: 'targets',
+    description: 'List of targets to filter by',
     required: false,
     type: [String],
   })
@@ -123,7 +123,7 @@ export class ListSandboxesQueryDtoDeprecated {
   @ToArray()
   @IsArray()
   @IsString({ each: true })
-  regions?: string[]
+  targets?: string[]
 
   @ApiProperty({
     name: 'minCpu',

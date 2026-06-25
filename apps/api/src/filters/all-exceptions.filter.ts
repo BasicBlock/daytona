@@ -14,16 +14,11 @@ import {
   Logger,
   HttpStatus,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common'
-import { ThrottlerException } from '@nestjs/throttler'
-import { FailedAuthTrackerService } from '../auth/failed-auth-tracker.service'
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name)
-
-  constructor(private readonly failedAuthTracker: FailedAuthTrackerService) {}
 
   async catch(exception: unknown, host: ArgumentsHost): Promise<void> {
     const ctx = host.switchToHttp()
@@ -44,19 +39,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
         response.sendFile(join(__dirname, '..', 'dashboard', 'index.html'))
       }
       return
-    }
-
-    // Track failed authentication attempts
-    if (exception instanceof UnauthorizedException) {
-      try {
-        await this.failedAuthTracker.incrementFailedAuth(request, response)
-      } catch (trackingError) {
-        if (trackingError instanceof ThrottlerException) {
-          exception = trackingError
-        } else {
-          this.logger.error('Failed to track authentication failure:', trackingError)
-        }
-      }
     }
 
     if (exception instanceof HttpException) {

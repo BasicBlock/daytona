@@ -4,34 +4,26 @@
  */
 
 import Redis from 'ioredis'
-import { Controller, Get, Param, Logger, NotFoundException, Req, UseGuards } from '@nestjs/common'
+import { createHash } from 'crypto'
+import { Controller, Get, Param, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { SandboxService } from '../services/sandbox.service'
-import { ApiResponse, ApiOperation, ApiParam, ApiTags, ApiOAuth2, ApiBearerAuth } from '@nestjs/swagger'
+import { ApiResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger'
 import { InjectRedis } from '@nestjs-modules/ioredis'
-import { OrganizationUserService } from '../../organization/services/organization-user.service'
-import { AuthStrategyType } from '../../auth/enums/auth-strategy-type.enum'
-import { AuthStrategy } from '../../auth/decorators/auth-strategy.decorator'
-import { AuthenticatedRateLimitGuard } from '../../common/guards/authenticated-rate-limit.guard'
-import { ProxyAuthContextGuard } from '../guards/proxy-auth-context.guard'
 
 @Controller('preview')
 @ApiTags('preview')
-@ApiOAuth2(['openid', 'profile', 'email'])
-@ApiBearerAuth()
-@UseGuards(AuthenticatedRateLimitGuard)
 export class PreviewController {
   private readonly logger = new Logger(PreviewController.name)
 
   constructor(
     @InjectRedis() private readonly redis: Redis,
     private readonly sandboxService: SandboxService,
-    private readonly organizationUserService: OrganizationUserService,
   ) {}
 
-  @Get(':sandboxId/public')
+  @Get(':sandboxId/open')
   @ApiOperation({
-    summary: 'Check if sandbox is public',
-    operationId: 'isSandboxPublic',
+    summary: 'Check if sandbox preview is open',
+    operationId: 'isSandboxPreviewOpen',
   })
   @ApiParam({
     name: 'sandboxId',
@@ -40,13 +32,11 @@ export class PreviewController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Public status of the sandbox',
+    description: 'Open preview status of the sandbox',
     type: Boolean,
   })
-  @AuthStrategy(AuthStrategyType.API_KEY)
-  @UseGuards(ProxyAuthContextGuard)
-  async isSandboxPublic(@Param('sandboxId') sandboxId: string): Promise<boolean> {
-    const cached = await this.redis.get(`preview:public:${sandboxId}`)
+  async isSandboxPreviewOpen(@Param('sandboxId') sandboxId: string): Promise<boolean> {
+    const cached = await this.redis.get(`preview:open:${sandboxId}`)
     if (cached) {
       if (cached === '1') {
         return true
@@ -55,23 +45,12 @@ export class PreviewController {
     }
 
     try {
-      const isPublic = await this.sandboxService.isSandboxPublic(sandboxId)
-      //  for private sandboxes, throw 404 as well
-      //  to prevent using the method to check if a sandbox exists
-      if (!isPublic) {
-        //  cache the result for 3 seconds to avoid unnecessary requests to the database
-        await this.redis.setex(`preview:public:${sandboxId}`, 3, '0')
-
-        throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
-      }
-      //  cache the result for 3 seconds to avoid unnecessary requests to the database
-      await this.redis.setex(`preview:public:${sandboxId}`, 3, '1')
+      await this.sandboxService.findOne(sandboxId)
+      await this.redis.setex(`preview:open:${sandboxId}`, 3, '1')
       return true
     } catch (ex) {
       if (ex instanceof NotFoundException) {
-        //  cache the not found sandbox as well
-        //  as it is the same case as for the private sandboxes
-        await this.redis.setex(`preview:public:${sandboxId}`, 3, '0')
+        await this.redis.setex(`preview:open:${sandboxId}`, 3, '0')
         throw ex
       }
       throw ex
@@ -98,30 +77,27 @@ export class PreviewController {
     description: 'Sandbox auth token validation status',
     type: Boolean,
   })
-  @AuthStrategy(AuthStrategyType.API_KEY)
-  @UseGuards(ProxyAuthContextGuard)
   async isValidAuthToken(
     @Param('sandboxId') sandboxId: string,
     @Param('authToken') authToken: string,
   ): Promise<boolean> {
-    const cached = await this.redis.get(`preview:token:${sandboxId}:${authToken}`)
+    const tokenHash = createHash('sha256').update(authToken).digest('hex')
+    const cacheKey = `preview:token:${sandboxId}:${tokenHash}`
+    const cached = await this.redis.get(cacheKey)
     if (cached) {
       if (cached === '1') {
         return true
       }
-      throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
+      throw new UnauthorizedException('Invalid sandbox auth token')
     }
+
     const sandbox = await this.sandboxService.findOne(sandboxId)
-    if (!sandbox) {
-      await this.redis.setex(`preview:token:${sandboxId}:${authToken}`, 3, '0')
-      throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
+    if (sandbox.authToken !== authToken) {
+      await this.redis.setex(cacheKey, 3, '0')
+      throw new UnauthorizedException('Invalid sandbox auth token')
     }
-    if (sandbox.authToken === authToken) {
-      await this.redis.setex(`preview:token:${sandboxId}:${authToken}`, 3, '1')
-      return true
-    }
-    await this.redis.setex(`preview:token:${sandboxId}:${authToken}`, 3, '0')
-    throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
+    await this.redis.setex(cacheKey, 3, '1')
+    return true
   }
 
   @Get(':sandboxId/access')
@@ -134,13 +110,8 @@ export class PreviewController {
     description: 'User access status to the sandbox',
     type: Boolean,
   })
-  @AuthStrategy([AuthStrategyType.API_KEY, AuthStrategyType.JWT])
-  async hasSandboxAccess(@Req() req: Request, @Param('sandboxId') sandboxId: string): Promise<boolean> {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const userId = req.user?.userId
-
-    const cached = await this.redis.get(`preview:access:${sandboxId}:${userId}`)
+  async hasSandboxAccess(@Param('sandboxId') sandboxId: string): Promise<boolean> {
+    const cached = await this.redis.get(`preview:access:${sandboxId}`)
     if (cached) {
       if (cached === '1') {
         return true
@@ -148,14 +119,8 @@ export class PreviewController {
       throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
     }
 
-    const sandbox = await this.sandboxService.findOne(sandboxId)
-    const hasAccess = await this.organizationUserService.exists(sandbox.organizationId, userId)
-    if (!hasAccess) {
-      await this.redis.setex(`preview:access:${sandboxId}:${userId}`, 3, '0')
-      throw new NotFoundException(`Sandbox with ID ${sandboxId} not found`)
-    }
-    //  if user has access, keep it in cache longer
-    await this.redis.setex(`preview:access:${sandboxId}:${userId}`, 30, '1')
+    await this.sandboxService.findOne(sandboxId)
+    await this.redis.setex(`preview:access:${sandboxId}`, 30, '1')
     return true
   }
 
@@ -179,8 +144,6 @@ export class PreviewController {
     description: 'Sandbox ID from signed preview URL token',
     type: String,
   })
-  @AuthStrategy(AuthStrategyType.API_KEY)
-  @UseGuards(ProxyAuthContextGuard)
   async getSandboxIdFromSignedPreviewUrlToken(
     @Param('signedPreviewToken') signedPreviewToken: string,
     @Param('port') port: number,

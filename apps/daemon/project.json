@@ -28,7 +28,12 @@
       ],
       "options": {
         "main": "{projectRoot}/cmd/daemon/main.go",
-        "outputPath": "dist/apps/daemon"
+        "outputPath": "dist/apps/daemon",
+        "env": {
+          "GOARCH": "amd64",
+          "GOOS": "linux",
+          "CGO_ENABLED": "0"
+        }
       },
       "configurations": {
         "production": {

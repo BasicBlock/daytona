@@ -32,7 +32,6 @@ import (
 
 type RunnerInfo struct {
 	ApiUrl string `json:"apiUrl"`
-	ApiKey string `json:"apiKey"`
 }
 
 const SANDBOX_AUTH_KEY_HEADER = "X-Daytona-Preview-Token"
@@ -81,7 +80,7 @@ func StartProxy(ctx context.Context, config *config.Config) error {
 		config: config,
 	}
 
-	proxy.secureCookie = securecookie.New([]byte(config.ProxyApiKey), nil)
+	proxy.secureCookie = securecookie.New([]byte(config.CookieSecret), nil)
 	// Reject signed cookies older than their advertised lifetime instead of the
 	// gorilla/securecookie 30-day default, so a captured cookie cannot be replayed
 	// out-of-browser long after it should have expired.
@@ -199,9 +198,6 @@ func StartProxy(ctx context.Context, config *config.Config) error {
 			case "GET":
 				{
 					switch ctx.Request.URL.Path {
-					case "/callback":
-						proxy.AuthCallback(ctx)
-						return
 					case "/health":
 						ctx.JSON(http.StatusOK, gin.H{"status": "ok", "version": internal.Version})
 						return

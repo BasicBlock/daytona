@@ -9,5 +9,5 @@ import (
 
 // ObjectStorageClient defines the interface for object storage operations
 type ObjectStorageClient interface {
-	GetObject(ctx context.Context, organizationId, hash string) ([]byte, error)
+	GetObject(ctx context.Context, storagePrefix, hash string) ([]byte, error)
 }

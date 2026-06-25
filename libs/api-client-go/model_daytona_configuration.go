@@ -23,16 +23,6 @@ var _ MappedNullable = &DaytonaConfiguration{}
 type DaytonaConfiguration struct {
 	// Daytona version
 	Version string `json:"version"`
-	// PostHog configuration
-	Posthog *PosthogConfig `json:"posthog,omitempty"`
-	// OIDC configuration
-	Oidc OidcConfig `json:"oidc"`
-	// Whether linked accounts are enabled
-	LinkedAccountsEnabled bool `json:"linkedAccountsEnabled"`
-	// System announcements
-	Announcements map[string]Announcement `json:"announcements"`
-	// Pylon application ID
-	PylonAppId *string `json:"pylonAppId,omitempty"`
 	// Proxy template URL
 	ProxyTemplateUrl string `json:"proxyTemplateUrl"`
 	// Toolbox template URL
@@ -47,16 +37,10 @@ type DaytonaConfiguration struct {
 	MaintananceMode bool `json:"maintananceMode"`
 	// Current environment
 	Environment string `json:"environment"`
-	// Billing API URL
-	BillingApiUrl *string `json:"billingApiUrl,omitempty"`
-	// Analytics API URL
-	AnalyticsApiUrl *string `json:"analyticsApiUrl,omitempty"`
 	// SSH Gateway command
 	SshGatewayCommand *string `json:"sshGatewayCommand,omitempty"`
 	// Base64 encoded SSH Gateway public key
 	SshGatewayPublicKey *string `json:"sshGatewayPublicKey,omitempty"`
-	// Rate limit configuration
-	RateLimit *RateLimitConfig `json:"rateLimit,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -66,12 +50,9 @@ type _DaytonaConfiguration DaytonaConfiguration
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewDaytonaConfiguration(version string, oidc OidcConfig, linkedAccountsEnabled bool, announcements map[string]Announcement, proxyTemplateUrl string, proxyToolboxUrl string, defaultSnapshot string, dashboardUrl string, maxAutoArchiveInterval float32, maintananceMode bool, environment string) *DaytonaConfiguration {
+func NewDaytonaConfiguration(version string, proxyTemplateUrl string, proxyToolboxUrl string, defaultSnapshot string, dashboardUrl string, maxAutoArchiveInterval float32, maintananceMode bool, environment string) *DaytonaConfiguration {
 	this := DaytonaConfiguration{}
 	this.Version = version
-	this.Oidc = oidc
-	this.LinkedAccountsEnabled = linkedAccountsEnabled
-	this.Announcements = announcements
 	this.ProxyTemplateUrl = proxyTemplateUrl
 	this.ProxyToolboxUrl = proxyToolboxUrl
 	this.DefaultSnapshot = defaultSnapshot
@@ -112,142 +93,6 @@ func (o *DaytonaConfiguration) GetVersionOk() (*string, bool) {
 // SetVersion sets field value
 func (o *DaytonaConfiguration) SetVersion(v string) {
 	o.Version = v
-}
-
-// GetPosthog returns the Posthog field value if set, zero value otherwise.
-func (o *DaytonaConfiguration) GetPosthog() PosthogConfig {
-	if o == nil || IsNil(o.Posthog) {
-		var ret PosthogConfig
-		return ret
-	}
-	return *o.Posthog
-}
-
-// GetPosthogOk returns a tuple with the Posthog field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetPosthogOk() (*PosthogConfig, bool) {
-	if o == nil || IsNil(o.Posthog) {
-		return nil, false
-	}
-	return o.Posthog, true
-}
-
-// HasPosthog returns a boolean if a field has been set.
-func (o *DaytonaConfiguration) HasPosthog() bool {
-	if o != nil && !IsNil(o.Posthog) {
-		return true
-	}
-
-	return false
-}
-
-// SetPosthog gets a reference to the given PosthogConfig and assigns it to the Posthog field.
-func (o *DaytonaConfiguration) SetPosthog(v PosthogConfig) {
-	o.Posthog = &v
-}
-
-// GetOidc returns the Oidc field value
-func (o *DaytonaConfiguration) GetOidc() OidcConfig {
-	if o == nil {
-		var ret OidcConfig
-		return ret
-	}
-
-	return o.Oidc
-}
-
-// GetOidcOk returns a tuple with the Oidc field value
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetOidcOk() (*OidcConfig, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.Oidc, true
-}
-
-// SetOidc sets field value
-func (o *DaytonaConfiguration) SetOidc(v OidcConfig) {
-	o.Oidc = v
-}
-
-// GetLinkedAccountsEnabled returns the LinkedAccountsEnabled field value
-func (o *DaytonaConfiguration) GetLinkedAccountsEnabled() bool {
-	if o == nil {
-		var ret bool
-		return ret
-	}
-
-	return o.LinkedAccountsEnabled
-}
-
-// GetLinkedAccountsEnabledOk returns a tuple with the LinkedAccountsEnabled field value
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetLinkedAccountsEnabledOk() (*bool, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.LinkedAccountsEnabled, true
-}
-
-// SetLinkedAccountsEnabled sets field value
-func (o *DaytonaConfiguration) SetLinkedAccountsEnabled(v bool) {
-	o.LinkedAccountsEnabled = v
-}
-
-// GetAnnouncements returns the Announcements field value
-func (o *DaytonaConfiguration) GetAnnouncements() map[string]Announcement {
-	if o == nil {
-		var ret map[string]Announcement
-		return ret
-	}
-
-	return o.Announcements
-}
-
-// GetAnnouncementsOk returns a tuple with the Announcements field value
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetAnnouncementsOk() (*map[string]Announcement, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.Announcements, true
-}
-
-// SetAnnouncements sets field value
-func (o *DaytonaConfiguration) SetAnnouncements(v map[string]Announcement) {
-	o.Announcements = v
-}
-
-// GetPylonAppId returns the PylonAppId field value if set, zero value otherwise.
-func (o *DaytonaConfiguration) GetPylonAppId() string {
-	if o == nil || IsNil(o.PylonAppId) {
-		var ret string
-		return ret
-	}
-	return *o.PylonAppId
-}
-
-// GetPylonAppIdOk returns a tuple with the PylonAppId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetPylonAppIdOk() (*string, bool) {
-	if o == nil || IsNil(o.PylonAppId) {
-		return nil, false
-	}
-	return o.PylonAppId, true
-}
-
-// HasPylonAppId returns a boolean if a field has been set.
-func (o *DaytonaConfiguration) HasPylonAppId() bool {
-	if o != nil && !IsNil(o.PylonAppId) {
-		return true
-	}
-
-	return false
-}
-
-// SetPylonAppId gets a reference to the given string and assigns it to the PylonAppId field.
-func (o *DaytonaConfiguration) SetPylonAppId(v string) {
-	o.PylonAppId = &v
 }
 
 // GetProxyTemplateUrl returns the ProxyTemplateUrl field value
@@ -418,70 +263,6 @@ func (o *DaytonaConfiguration) SetEnvironment(v string) {
 	o.Environment = v
 }
 
-// GetBillingApiUrl returns the BillingApiUrl field value if set, zero value otherwise.
-func (o *DaytonaConfiguration) GetBillingApiUrl() string {
-	if o == nil || IsNil(o.BillingApiUrl) {
-		var ret string
-		return ret
-	}
-	return *o.BillingApiUrl
-}
-
-// GetBillingApiUrlOk returns a tuple with the BillingApiUrl field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetBillingApiUrlOk() (*string, bool) {
-	if o == nil || IsNil(o.BillingApiUrl) {
-		return nil, false
-	}
-	return o.BillingApiUrl, true
-}
-
-// HasBillingApiUrl returns a boolean if a field has been set.
-func (o *DaytonaConfiguration) HasBillingApiUrl() bool {
-	if o != nil && !IsNil(o.BillingApiUrl) {
-		return true
-	}
-
-	return false
-}
-
-// SetBillingApiUrl gets a reference to the given string and assigns it to the BillingApiUrl field.
-func (o *DaytonaConfiguration) SetBillingApiUrl(v string) {
-	o.BillingApiUrl = &v
-}
-
-// GetAnalyticsApiUrl returns the AnalyticsApiUrl field value if set, zero value otherwise.
-func (o *DaytonaConfiguration) GetAnalyticsApiUrl() string {
-	if o == nil || IsNil(o.AnalyticsApiUrl) {
-		var ret string
-		return ret
-	}
-	return *o.AnalyticsApiUrl
-}
-
-// GetAnalyticsApiUrlOk returns a tuple with the AnalyticsApiUrl field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetAnalyticsApiUrlOk() (*string, bool) {
-	if o == nil || IsNil(o.AnalyticsApiUrl) {
-		return nil, false
-	}
-	return o.AnalyticsApiUrl, true
-}
-
-// HasAnalyticsApiUrl returns a boolean if a field has been set.
-func (o *DaytonaConfiguration) HasAnalyticsApiUrl() bool {
-	if o != nil && !IsNil(o.AnalyticsApiUrl) {
-		return true
-	}
-
-	return false
-}
-
-// SetAnalyticsApiUrl gets a reference to the given string and assigns it to the AnalyticsApiUrl field.
-func (o *DaytonaConfiguration) SetAnalyticsApiUrl(v string) {
-	o.AnalyticsApiUrl = &v
-}
-
 // GetSshGatewayCommand returns the SshGatewayCommand field value if set, zero value otherwise.
 func (o *DaytonaConfiguration) GetSshGatewayCommand() string {
 	if o == nil || IsNil(o.SshGatewayCommand) {
@@ -546,38 +327,6 @@ func (o *DaytonaConfiguration) SetSshGatewayPublicKey(v string) {
 	o.SshGatewayPublicKey = &v
 }
 
-// GetRateLimit returns the RateLimit field value if set, zero value otherwise.
-func (o *DaytonaConfiguration) GetRateLimit() RateLimitConfig {
-	if o == nil || IsNil(o.RateLimit) {
-		var ret RateLimitConfig
-		return ret
-	}
-	return *o.RateLimit
-}
-
-// GetRateLimitOk returns a tuple with the RateLimit field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *DaytonaConfiguration) GetRateLimitOk() (*RateLimitConfig, bool) {
-	if o == nil || IsNil(o.RateLimit) {
-		return nil, false
-	}
-	return o.RateLimit, true
-}
-
-// HasRateLimit returns a boolean if a field has been set.
-func (o *DaytonaConfiguration) HasRateLimit() bool {
-	if o != nil && !IsNil(o.RateLimit) {
-		return true
-	}
-
-	return false
-}
-
-// SetRateLimit gets a reference to the given RateLimitConfig and assigns it to the RateLimit field.
-func (o *DaytonaConfiguration) SetRateLimit(v RateLimitConfig) {
-	o.RateLimit = &v
-}
-
 func (o DaytonaConfiguration) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -589,15 +338,6 @@ func (o DaytonaConfiguration) MarshalJSON() ([]byte, error) {
 func (o DaytonaConfiguration) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["version"] = o.Version
-	if !IsNil(o.Posthog) {
-		toSerialize["posthog"] = o.Posthog
-	}
-	toSerialize["oidc"] = o.Oidc
-	toSerialize["linkedAccountsEnabled"] = o.LinkedAccountsEnabled
-	toSerialize["announcements"] = o.Announcements
-	if !IsNil(o.PylonAppId) {
-		toSerialize["pylonAppId"] = o.PylonAppId
-	}
 	toSerialize["proxyTemplateUrl"] = o.ProxyTemplateUrl
 	toSerialize["proxyToolboxUrl"] = o.ProxyToolboxUrl
 	toSerialize["defaultSnapshot"] = o.DefaultSnapshot
@@ -605,20 +345,11 @@ func (o DaytonaConfiguration) ToMap() (map[string]interface{}, error) {
 	toSerialize["maxAutoArchiveInterval"] = o.MaxAutoArchiveInterval
 	toSerialize["maintananceMode"] = o.MaintananceMode
 	toSerialize["environment"] = o.Environment
-	if !IsNil(o.BillingApiUrl) {
-		toSerialize["billingApiUrl"] = o.BillingApiUrl
-	}
-	if !IsNil(o.AnalyticsApiUrl) {
-		toSerialize["analyticsApiUrl"] = o.AnalyticsApiUrl
-	}
 	if !IsNil(o.SshGatewayCommand) {
 		toSerialize["sshGatewayCommand"] = o.SshGatewayCommand
 	}
 	if !IsNil(o.SshGatewayPublicKey) {
 		toSerialize["sshGatewayPublicKey"] = o.SshGatewayPublicKey
-	}
-	if !IsNil(o.RateLimit) {
-		toSerialize["rateLimit"] = o.RateLimit
 	}
 
 	for key, value := range o.AdditionalProperties {
@@ -634,9 +365,6 @@ func (o *DaytonaConfiguration) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"version",
-		"oidc",
-		"linkedAccountsEnabled",
-		"announcements",
 		"proxyTemplateUrl",
 		"proxyToolboxUrl",
 		"defaultSnapshot",
@@ -674,11 +402,6 @@ func (o *DaytonaConfiguration) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "version")
-		delete(additionalProperties, "posthog")
-		delete(additionalProperties, "oidc")
-		delete(additionalProperties, "linkedAccountsEnabled")
-		delete(additionalProperties, "announcements")
-		delete(additionalProperties, "pylonAppId")
 		delete(additionalProperties, "proxyTemplateUrl")
 		delete(additionalProperties, "proxyToolboxUrl")
 		delete(additionalProperties, "defaultSnapshot")
@@ -686,11 +409,8 @@ func (o *DaytonaConfiguration) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "maxAutoArchiveInterval")
 		delete(additionalProperties, "maintananceMode")
 		delete(additionalProperties, "environment")
-		delete(additionalProperties, "billingApiUrl")
-		delete(additionalProperties, "analyticsApiUrl")
 		delete(additionalProperties, "sshGatewayCommand")
 		delete(additionalProperties, "sshGatewayPublicKey")
-		delete(additionalProperties, "rateLimit")
 		o.AdditionalProperties = additionalProperties
 	}
 

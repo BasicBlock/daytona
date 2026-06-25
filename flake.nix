@@ -12,7 +12,7 @@
         pkgs = import nixpkgs { inherit system; };
 
         # macOS Apple SDK — provides Security, SystemConfiguration, CoreFoundation, etc.
-        # Required for CGO (Go), native gems (Ruby), and crypto libraries.
+        # Required for CGO (Go) and crypto libraries.
         # In recent nixpkgs the legacy per-framework imports (darwin.apple_sdk.frameworks.*)
         # have been removed in favor of the unified apple-sdk package.
         darwinDeps = pkgs.lib.optionals pkgs.stdenv.isDarwin [
@@ -39,8 +39,8 @@
 
         # ──────────────────────────────────────────────
         # Go toolchain
-        # Covers: apps/{cli,daemon,proxy,runner,snapshot-manager,ssh-gateway,otel-collector/exporter}
-        #         libs/{sdk-go,api-client-go,common-go,computer-use,toolbox-api-client-go}
+        # Covers: apps/{daemon,proxy,runner,snapshot-manager,ssh-gateway,otel-collector/exporter}
+        #         libs/{api-client-go,common-go,computer-use}
         # ──────────────────────────────────────────────
         goPkgs = with pkgs; [
           go # 1.25.x — matches go.work constraint
@@ -94,8 +94,7 @@
 
         # ──────────────────────────────────────────────
         # Node.js / TypeScript toolchain
-        # Covers: apps/{api,dashboard,docs}
-        #         libs/{sdk-typescript,api-client,toolbox-api-client,analytics-api-client,runner-api-client,opencode-plugin}
+        # Covers: apps/{api,dashboard}
         # ──────────────────────────────────────────────
         nodePkgs = [
           pkgs.nodejs_22
@@ -111,41 +110,10 @@
         '';
 
         # ──────────────────────────────────────────────
-        # Python toolchain
-        # Covers: libs/{sdk-python,api-client-python,api-client-python-async,toolbox-api-client-python,toolbox-api-client-python-async}
-        #         examples/python, guides/python
-        # ──────────────────────────────────────────────
-        pythonPkgs = with pkgs; [
-          python312 # compatible with requires-python ^3.9
-          poetry
-        ];
-
-        pythonShellHook = ''
-          export POETRY_VIRTUALENVS_IN_PROJECT=true
-        '';
-
-        # ──────────────────────────────────────────────
-        # Ruby toolchain
-        # Covers: libs/{sdk-ruby,api-client-ruby,toolbox-api-client-ruby}
-        # ──────────────────────────────────────────────
-        rubyPkgs = with pkgs; [
-          ruby_3_4 # matches devcontainer 3.4.5
-        ] ++ darwinDeps;
-
-        rubyShellHook = ''
-          export RUBYLIB="$PWD/libs/sdk-ruby/lib:$PWD/libs/api-client-ruby/lib:$PWD/libs/toolbox-api-client-ruby/lib"
-          export BUNDLE_GEMFILE="$PWD/Gemfile"
-          export BUNDLE_PATH="$PWD/.bundle"
-        '';
-
-        # ──────────────────────────────────────────────
-        # Java toolchain
-        # Covers: libs/{sdk-java,api-client-java,toolbox-api-client-java}
-        #         examples/java
+        # Java runtime for OpenAPI generator
         # ──────────────────────────────────────────────
         javaPkgs = [
-          pkgs.jdk17 # Gradle 8.10 requires JDK 17+; source targets Java 11
-          pkgs.gradle
+          pkgs.jdk17
         ];
 
         javaShellHook = ''
@@ -156,10 +124,10 @@
       {
         devShells = {
 
-          # Full monorepo — every language and tool
+          # Full monorepo
           default = pkgs.mkShell {
             name = "daytona";
-            packages = commonPkgs ++ goPkgs ++ nodePkgs ++ pythonPkgs ++ rubyPkgs ++ javaPkgs;
+            packages = commonPkgs ++ goPkgs ++ nodePkgs ++ javaPkgs;
             buildInputs = bpfHeaderInputs;
             # bpf2go invokes clang with `-target bpf`; the cc-wrapper's hardening
             # flags (e.g. -fzero-call-used-regs) are unsupported for that target.
@@ -167,8 +135,6 @@
             shellHook = ''
               ${goShellHook}
               ${nodeShellHook}
-              ${pythonShellHook}
-              ${rubyShellHook}
               ${javaShellHook}
             '';
           };
@@ -191,26 +157,6 @@
             shellHook = nodeShellHook;
           };
 
-          # Python SDKs and libraries only
-          python = pkgs.mkShell {
-            name = "daytona-python";
-            packages = commonPkgs ++ pythonPkgs;
-            shellHook = pythonShellHook;
-          };
-
-          # Ruby SDKs and libraries only
-          ruby = pkgs.mkShell {
-            name = "daytona-ruby";
-            packages = commonPkgs ++ rubyPkgs;
-            shellHook = rubyShellHook;
-          };
-
-          # Java SDKs and libraries only
-          java = pkgs.mkShell {
-            name = "daytona-java";
-            packages = commonPkgs ++ javaPkgs;
-            shellHook = javaShellHook;
-          };
         };
       }
     );

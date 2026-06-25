@@ -10,11 +10,8 @@ import { FindOptionsWhere, In, MoreThan, Not, Repository } from 'typeorm'
 import { RedisLockProvider } from '../common/redis-lock.provider'
 import { SandboxRepository } from '../repositories/sandbox.repository'
 import { Sandbox } from '../entities/sandbox.entity'
-import { SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION } from '../constants/sandbox.constants'
 import { WarmPool } from '../entities/warm-pool.entity'
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter'
-import { SandboxEvents } from '../constants/sandbox-events.constants'
-import { SandboxOrganizationUpdatedEvent } from '../events/sandbox-organization-updated.event'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { ConfigService } from '@nestjs/config'
 import { Snapshot } from '../entities/snapshot.entity'
 import { SnapshotState } from '../enums/snapshot-state.enum'
@@ -40,7 +37,6 @@ export type FetchWarmPoolSandboxParams = {
   gpu: number
   osUser: string
   env: { [key: string]: string }
-  organizationId: string
   state: string
 }
 
@@ -73,16 +69,10 @@ export class SandboxWarmPoolService {
     if (typeof params.snapshot === 'string') {
       const sandboxSnapshot = params.snapshot || this.configService.get<string>('DEFAULT_SNAPSHOT')
 
-      const snapshotFilter: FindOptionsWhere<Snapshot>[] = [
-        { organizationId: params.organizationId, name: sandboxSnapshot, state: SnapshotState.ACTIVE },
-        { general: true, name: sandboxSnapshot, state: SnapshotState.ACTIVE },
-      ]
+      const snapshotFilter: FindOptionsWhere<Snapshot>[] = [{ name: sandboxSnapshot, state: SnapshotState.ACTIVE }]
 
       if (isValidUuid(sandboxSnapshot)) {
-        snapshotFilter.push(
-          { organizationId: params.organizationId, id: sandboxSnapshot, state: SnapshotState.ACTIVE },
-          { general: true, id: sandboxSnapshot, state: SnapshotState.ACTIVE },
-        )
+        snapshotFilter.push({ id: sandboxSnapshot, state: SnapshotState.ACTIVE })
       }
 
       snapshot = await this.snapshotRepository.findOne({
@@ -118,7 +108,7 @@ export class SandboxWarmPoolService {
       const excludedRunnersSubquery = this.runnerRepository
         .createQueryBuilder('runner')
         .select('runner.id')
-        .where('runner.region = :region')
+        .where('runner.target = :target')
         .andWhere('(runner.unschedulable = true OR runner.availabilityScore < :scoreThreshold)')
 
       const queryBuilder = this.sandboxRepository
@@ -129,14 +119,11 @@ export class SandboxWarmPoolService {
         .andWhere('sandbox.snapshot = :snapshot', { snapshot: snapshot.name })
         .andWhere('sandbox.osUser = :osUser', { osUser: warmPoolItem.osUser })
         .andWhere('sandbox.env = :env', { env: warmPoolItem.env })
-        .andWhere('sandbox.organizationId = :organizationId', {
-          organizationId: SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION,
-        })
-        .andWhere('sandbox.region = :region', { region: warmPoolItem.target })
+        .andWhere('sandbox.target = :target', { target: warmPoolItem.target })
         .andWhere('sandbox.state = :state', { state: SandboxState.STARTED })
         .andWhere(`sandbox.runnerId NOT IN (${excludedRunnersSubquery.getQuery()})`)
         .setParameters({
-          region: warmPoolItem.target,
+          target: warmPoolItem.target,
           scoreThreshold: availabilityScoreThreshold,
         })
 
@@ -181,10 +168,9 @@ export class SandboxWarmPoolService {
         const sandboxCount = await this.sandboxRepository.count({
           where: {
             snapshot: warmPoolItem.snapshot,
-            organizationId: SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION,
             osUser: warmPoolItem.osUser,
             env: warmPoolItem.env,
-            region: warmPoolItem.target,
+            target: warmPoolItem.target,
             cpu: warmPoolItem.cpu,
             gpu: warmPoolItem.gpu,
             mem: warmPoolItem.mem,
@@ -212,52 +198,5 @@ export class SandboxWarmPoolService {
         await this.redisLockProvider.unlock(lockKey)
       }),
     )
-  }
-
-  @OnEvent(SandboxEvents.ORGANIZATION_UPDATED)
-  async handleSandboxOrganizationUpdated(event: SandboxOrganizationUpdatedEvent) {
-    if (event.newOrganizationId === SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION) {
-      return
-    }
-    const warmPoolItem = await this.warmPoolRepository.findOne({
-      where: {
-        snapshot: event.sandbox.snapshot,
-        cpu: event.sandbox.cpu,
-        mem: event.sandbox.mem,
-        disk: event.sandbox.disk,
-        target: event.sandbox.region,
-        env: event.sandbox.env,
-        gpu: event.sandbox.gpu,
-        osUser: event.sandbox.osUser,
-      },
-    })
-
-    if (!warmPoolItem) {
-      return
-    }
-
-    const sandboxCount = await this.sandboxRepository.count({
-      where: {
-        snapshot: warmPoolItem.snapshot,
-        organizationId: SANDBOX_WARM_POOL_UNASSIGNED_ORGANIZATION,
-        osUser: warmPoolItem.osUser,
-        env: warmPoolItem.env,
-        region: warmPoolItem.target,
-        cpu: warmPoolItem.cpu,
-        gpu: warmPoolItem.gpu,
-        mem: warmPoolItem.mem,
-        disk: warmPoolItem.disk,
-        desiredState: SandboxDesiredState.STARTED,
-        state: Not(In([SandboxState.ERROR, SandboxState.BUILD_FAILED])),
-      },
-    })
-
-    if (warmPoolItem.pool <= sandboxCount) {
-      return
-    }
-
-    if (warmPoolItem) {
-      this.eventEmitter.emit(WarmPoolEvents.TOPUP_REQUESTED, new WarmPoolTopUpRequested(warmPoolItem))
-    }
   }
 }

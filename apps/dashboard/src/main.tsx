@@ -10,7 +10,6 @@ import { ErrorBoundary } from 'react-error-boundary'
 import App from './App'
 import { ErrorBoundaryFallback } from './components/ErrorBoundaryFallback'
 import LoadingFallback from './components/LoadingFallback'
-import { PostHogProviderWrapper } from './components/PostHogProviderWrapper'
 import { ThemeProvider } from './contexts/ThemeContext'
 import './index.css'
 import { ConfigProvider } from './providers/ConfigProvider'
@@ -18,33 +17,20 @@ import { QueryProvider } from './providers/QueryProvider'
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 
-async function enableMocking() {
-  if (import.meta.env.VITE_ENABLE_MOCKING !== 'true') {
-    return
-  }
-
-  const { worker } = await import('./mocks/browser')
-  return worker.start()
-}
-
-enableMocking().then(() =>
-  root.render(
-    <React.StrictMode>
-      <ErrorBoundary FallbackComponent={ErrorBoundaryFallback}>
-        <QueryProvider>
-          <ThemeProvider>
-            <Suspense fallback={<LoadingFallback source="config-suspense" />}>
-              <ConfigProvider>
-                <PostHogProviderWrapper>
-                  <NuqsAdapter>
-                    <App />
-                  </NuqsAdapter>
-                </PostHogProviderWrapper>
-              </ConfigProvider>
-            </Suspense>
-          </ThemeProvider>
-        </QueryProvider>
-      </ErrorBoundary>
-    </React.StrictMode>,
-  ),
+root.render(
+  <React.StrictMode>
+    <ErrorBoundary FallbackComponent={ErrorBoundaryFallback}>
+      <QueryProvider>
+        <ThemeProvider>
+          <Suspense fallback={<LoadingFallback source="config-suspense" />}>
+            <ConfigProvider>
+              <NuqsAdapter>
+                <App />
+              </NuqsAdapter>
+            </ConfigProvider>
+          </Suspense>
+        </ThemeProvider>
+      </QueryProvider>
+    </ErrorBoundary>
+  </React.StrictMode>,
 )

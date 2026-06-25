@@ -10,8 +10,8 @@ import {
   IsOptional,
   IsString,
   IsNumber,
-  IsBoolean,
   IsArray,
+  IsBoolean,
   Max,
   Min,
   ValidateNested,
@@ -43,12 +43,12 @@ export class CreateSandboxDto {
   snapshot?: string
 
   @ApiPropertyOptional({
-    description: 'The user associated with the project',
+    description: 'The OS user used inside the sandbox',
     example: 'daytona',
   })
   @IsOptional()
   @IsString()
-  user?: string
+  osUser?: string
 
   @ApiPropertyOptional({
     description: 'Environment variables for the sandbox',
@@ -64,19 +64,11 @@ export class CreateSandboxDto {
     description: 'Labels for the sandbox',
     type: 'object',
     additionalProperties: { type: 'string' },
-    example: { 'daytona.io/public': 'true' },
+    example: { app: 'api' },
   })
   @IsOptional()
   @IsObject()
   labels?: { [key: string]: string }
-
-  @ApiPropertyOptional({
-    description: 'Whether the sandbox http preview is publicly accessible',
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  public?: boolean
 
   @ApiPropertyOptional({
     description: 'Whether to block all network access for the sandbox',
@@ -103,7 +95,7 @@ export class CreateSandboxDto {
   domainAllowList?: string
 
   @ApiPropertyOptional({
-    description: 'The target (region) where the sandbox will be created',
+    description: 'The target where the sandbox will be created',
     example: 'us',
   })
   @IsOptional()

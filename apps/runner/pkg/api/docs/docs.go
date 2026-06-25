@@ -1491,8 +1491,7 @@ const docTemplate = `{
         "BuildSnapshotRequestDTO": {
             "type": "object",
             "required": [
-                "dockerfile",
-                "organizationId"
+                "dockerfile"
             ],
             "properties": {
                 "context": {
@@ -1502,9 +1501,6 @@ const docTemplate = `{
                     }
                 },
                 "dockerfile": {
-                    "type": "string"
-                },
-                "organizationId": {
                     "type": "string"
                 },
                 "pushToInternalRegistry": {
@@ -1522,6 +1518,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/RegistryDTO"
                     }
+                },
+                "storagePrefix": {
+                    "type": "string"
                 }
             }
         },
@@ -1545,8 +1544,7 @@ const docTemplate = `{
             "required": [
                 "id",
                 "osUser",
-                "snapshot",
-                "userId"
+                "snapshot"
             ],
             "properties": {
                 "authToken": {
@@ -1605,17 +1603,10 @@ const docTemplate = `{
                 "networkBlockAll": {
                     "type": "boolean"
                 },
-                "organizationId": {
-                    "description": "Nullable for backward compatibility",
-                    "type": "string"
-                },
                 "osUser": {
                     "type": "string"
                 },
                 "otelEndpoint": {
-                    "type": "string"
-                },
-                "regionId": {
                     "type": "string"
                 },
                 "registry": {
@@ -1635,9 +1626,6 @@ const docTemplate = `{
                     "type": "integer",
                     "minimum": 1
                 },
-                "userId": {
-                    "type": "string"
-                },
                 "volumes": {
                     "type": "array",
                     "items": {
@@ -1656,9 +1644,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "my-snapshot:latest"
-                },
-                "organizationId": {
-                    "type": "string"
                 },
                 "registry": {
                     "$ref": "#/definitions/RegistryDTO"
@@ -1764,8 +1749,7 @@ const docTemplate = `{
         "RecoverSandboxDTO": {
             "type": "object",
             "required": [
-                "osUser",
-                "userId"
+                "osUser"
             ],
             "properties": {
                 "backupErrorReason": {
@@ -1814,9 +1798,6 @@ const docTemplate = `{
                 "storageQuota": {
                     "type": "integer",
                     "minimum": 1
-                },
-                "userId": {
-                    "type": "string"
                 },
                 "volumes": {
                     "type": "array",
@@ -2131,20 +2112,7 @@ const docTemplate = `{
                 "SandboxStatePullingSnapshot"
             ]
         }
-    },
-    "securityDefinitions": {
-        "Bearer": {
-            "description": "Type \"Bearer\" followed by a space and an API token.",
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
-        }
-    },
-    "security": [
-        {
-            "Bearer": []
-        }
-    ]
+    }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it

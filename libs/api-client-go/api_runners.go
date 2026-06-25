@@ -39,7 +39,7 @@ type RunnersAPI interface {
 	DeleteRunner Delete runner
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Runner ID
+	@param id
 	@return RunnersAPIDeleteRunnerRequest
 	*/
 	DeleteRunner(ctx context.Context, id string) RunnersAPIDeleteRunnerRequest
@@ -48,22 +48,22 @@ type RunnersAPI interface {
 	DeleteRunnerExecute(r RunnersAPIDeleteRunnerRequest) (*http.Response, error)
 
 	/*
-	GetInfoForAuthenticatedRunner Get info for authenticated runner
+	GetInfoForRunner Get runner info
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return RunnersAPIGetInfoForAuthenticatedRunnerRequest
+	@return RunnersAPIGetInfoForRunnerRequest
 	*/
-	GetInfoForAuthenticatedRunner(ctx context.Context) RunnersAPIGetInfoForAuthenticatedRunnerRequest
+	GetInfoForRunner(ctx context.Context) RunnersAPIGetInfoForRunnerRequest
 
-	// GetInfoForAuthenticatedRunnerExecute executes the request
+	// GetInfoForRunnerExecute executes the request
 	//  @return RunnerFull
-	GetInfoForAuthenticatedRunnerExecute(r RunnersAPIGetInfoForAuthenticatedRunnerRequest) (*RunnerFull, *http.Response, error)
+	GetInfoForRunnerExecute(r RunnersAPIGetInfoForRunnerRequest) (*RunnerFull, *http.Response, error)
 
 	/*
 	GetRunnerById Get runner by ID
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Runner ID
+	@param id
 	@return RunnersAPIGetRunnerByIdRequest
 	*/
 	GetRunnerById(ctx context.Context, id string) RunnersAPIGetRunnerByIdRequest
@@ -89,7 +89,7 @@ type RunnersAPI interface {
 	GetRunnerFullById Get runner by ID
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Runner ID
+	@param id
 	@return RunnersAPIGetRunnerFullByIdRequest
 	*/
 	GetRunnerFullById(ctx context.Context, id string) RunnersAPIGetRunnerFullByIdRequest
@@ -125,8 +125,6 @@ type RunnersAPI interface {
 	/*
 	RunnerHealthcheck Runner healthcheck
 
-	Endpoint for version 2 runners to send healthcheck and metrics. Updates lastChecked timestamp and runner metrics.
-
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return RunnersAPIRunnerHealthcheckRequest
 	*/
@@ -139,7 +137,7 @@ type RunnersAPI interface {
 	UpdateRunnerDraining Update runner draining status
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Runner ID
+	@param id
 	@return RunnersAPIUpdateRunnerDrainingRequest
 	*/
 	UpdateRunnerDraining(ctx context.Context, id string) RunnersAPIUpdateRunnerDrainingRequest
@@ -152,7 +150,7 @@ type RunnersAPI interface {
 	UpdateRunnerScheduling Update runner scheduling status
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Runner ID
+	@param id
 	@return RunnersAPIUpdateRunnerSchedulingRequest
 	*/
 	UpdateRunnerScheduling(ctx context.Context, id string) RunnersAPIUpdateRunnerSchedulingRequest
@@ -169,17 +167,10 @@ type RunnersAPICreateRunnerRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
 	createRunner *CreateRunner
-	xDaytonaOrganizationID *string
 }
 
 func (r RunnersAPICreateRunnerRequest) CreateRunner(createRunner CreateRunner) RunnersAPICreateRunnerRequest {
 	r.createRunner = &createRunner
-	return r
-}
-
-// Use with JWT to specify the organization ID
-func (r RunnersAPICreateRunnerRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) RunnersAPICreateRunnerRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
 	return r
 }
 
@@ -241,9 +232,6 @@ func (a *RunnersAPIService) CreateRunnerExecute(r RunnersAPICreateRunnerRequest)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	// body params
 	localVarPostBody = r.createRunner
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -287,13 +275,6 @@ type RunnersAPIDeleteRunnerRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r RunnersAPIDeleteRunnerRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) RunnersAPIDeleteRunnerRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r RunnersAPIDeleteRunnerRequest) Execute() (*http.Response, error) {
@@ -304,7 +285,7 @@ func (r RunnersAPIDeleteRunnerRequest) Execute() (*http.Response, error) {
 DeleteRunner Delete runner
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id Runner ID
+ @param id
  @return RunnersAPIDeleteRunnerRequest
 */
 func (a *RunnersAPIService) DeleteRunner(ctx context.Context, id string) RunnersAPIDeleteRunnerRequest {
@@ -352,9 +333,6 @@ func (a *RunnersAPIService) DeleteRunnerExecute(r RunnersAPIDeleteRunnerRequest)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return nil, err
@@ -383,23 +361,29 @@ func (a *RunnersAPIService) DeleteRunnerExecute(r RunnersAPIDeleteRunnerRequest)
 	return localVarHTTPResponse, nil
 }
 
-type RunnersAPIGetInfoForAuthenticatedRunnerRequest struct {
+type RunnersAPIGetInfoForRunnerRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
+	runnerId *string
 }
 
-func (r RunnersAPIGetInfoForAuthenticatedRunnerRequest) Execute() (*RunnerFull, *http.Response, error) {
-	return r.ApiService.GetInfoForAuthenticatedRunnerExecute(r)
+func (r RunnersAPIGetInfoForRunnerRequest) RunnerId(runnerId string) RunnersAPIGetInfoForRunnerRequest {
+	r.runnerId = &runnerId
+	return r
+}
+
+func (r RunnersAPIGetInfoForRunnerRequest) Execute() (*RunnerFull, *http.Response, error) {
+	return r.ApiService.GetInfoForRunnerExecute(r)
 }
 
 /*
-GetInfoForAuthenticatedRunner Get info for authenticated runner
+GetInfoForRunner Get runner info
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return RunnersAPIGetInfoForAuthenticatedRunnerRequest
+ @return RunnersAPIGetInfoForRunnerRequest
 */
-func (a *RunnersAPIService) GetInfoForAuthenticatedRunner(ctx context.Context) RunnersAPIGetInfoForAuthenticatedRunnerRequest {
-	return RunnersAPIGetInfoForAuthenticatedRunnerRequest{
+func (a *RunnersAPIService) GetInfoForRunner(ctx context.Context) RunnersAPIGetInfoForRunnerRequest {
+	return RunnersAPIGetInfoForRunnerRequest{
 		ApiService: a,
 		ctx: ctx,
 	}
@@ -407,7 +391,7 @@ func (a *RunnersAPIService) GetInfoForAuthenticatedRunner(ctx context.Context) R
 
 // Execute executes the request
 //  @return RunnerFull
-func (a *RunnersAPIService) GetInfoForAuthenticatedRunnerExecute(r RunnersAPIGetInfoForAuthenticatedRunnerRequest) (*RunnerFull, *http.Response, error) {
+func (a *RunnersAPIService) GetInfoForRunnerExecute(r RunnersAPIGetInfoForRunnerRequest) (*RunnerFull, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
@@ -415,7 +399,7 @@ func (a *RunnersAPIService) GetInfoForAuthenticatedRunnerExecute(r RunnersAPIGet
 		localVarReturnValue  *RunnerFull
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RunnersAPIService.GetInfoForAuthenticatedRunner")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RunnersAPIService.GetInfoForRunner")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
@@ -425,7 +409,11 @@ func (a *RunnersAPIService) GetInfoForAuthenticatedRunnerExecute(r RunnersAPIGet
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
+	if r.runnerId == nil {
+		return localVarReturnValue, nil, reportError("runnerId is required and must be specified")
+	}
 
+	parameterAddToHeaderOrQuery(localVarQueryParams, "runnerId", r.runnerId, "form", "")
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -484,13 +472,6 @@ type RunnersAPIGetRunnerByIdRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r RunnersAPIGetRunnerByIdRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) RunnersAPIGetRunnerByIdRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r RunnersAPIGetRunnerByIdRequest) Execute() (*Runner, *http.Response, error) {
@@ -501,7 +482,7 @@ func (r RunnersAPIGetRunnerByIdRequest) Execute() (*Runner, *http.Response, erro
 GetRunnerById Get runner by ID
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id Runner ID
+ @param id
  @return RunnersAPIGetRunnerByIdRequest
 */
 func (a *RunnersAPIService) GetRunnerById(ctx context.Context, id string) RunnersAPIGetRunnerByIdRequest {
@@ -550,9 +531,6 @@ func (a *RunnersAPIService) GetRunnerByIdExecute(r RunnersAPIGetRunnerByIdReques
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
@@ -706,7 +684,7 @@ func (r RunnersAPIGetRunnerFullByIdRequest) Execute() (*RunnerFull, *http.Respon
 GetRunnerFullById Get runner by ID
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id Runner ID
+ @param id
  @return RunnersAPIGetRunnerFullByIdRequest
 */
 func (a *RunnersAPIService) GetRunnerFullById(ctx context.Context, id string) RunnersAPIGetRunnerFullByIdRequest {
@@ -799,7 +777,6 @@ type RunnersAPIGetRunnersBySnapshotRefRequest struct {
 	ref *string
 }
 
-// Snapshot ref
 func (r RunnersAPIGetRunnersBySnapshotRefRequest) Ref(ref string) RunnersAPIGetRunnersBySnapshotRefRequest {
 	r.ref = &ref
 	return r
@@ -904,19 +881,11 @@ func (a *RunnersAPIService) GetRunnersBySnapshotRefExecute(r RunnersAPIGetRunner
 type RunnersAPIListRunnersRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
-	regionId *string
-	xDaytonaOrganizationID *string
+	target *string
 }
 
-// Filter runners by region ID
-func (r RunnersAPIListRunnersRequest) RegionId(regionId string) RunnersAPIListRunnersRequest {
-	r.regionId = &regionId
-	return r
-}
-
-// Use with JWT to specify the organization ID
-func (r RunnersAPIListRunnersRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) RunnersAPIListRunnersRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
+func (r RunnersAPIListRunnersRequest) Target(target string) RunnersAPIListRunnersRequest {
+	r.target = &target
 	return r
 }
 
@@ -958,8 +927,8 @@ func (a *RunnersAPIService) ListRunnersExecute(r RunnersAPIListRunnersRequest) (
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.regionId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "regionId", r.regionId, "form", "")
+	if r.target != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "target", r.target, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -977,9 +946,6 @@ func (a *RunnersAPIService) ListRunnersExecute(r RunnersAPIListRunnersRequest) (
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
@@ -1021,7 +987,13 @@ func (a *RunnersAPIService) ListRunnersExecute(r RunnersAPIListRunnersRequest) (
 type RunnersAPIRunnerHealthcheckRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
+	runnerId *string
 	runnerHealthcheck *RunnerHealthcheck
+}
+
+func (r RunnersAPIRunnerHealthcheckRequest) RunnerId(runnerId string) RunnersAPIRunnerHealthcheckRequest {
+	r.runnerId = &runnerId
+	return r
 }
 
 func (r RunnersAPIRunnerHealthcheckRequest) RunnerHealthcheck(runnerHealthcheck RunnerHealthcheck) RunnersAPIRunnerHealthcheckRequest {
@@ -1035,8 +1007,6 @@ func (r RunnersAPIRunnerHealthcheckRequest) Execute() (*http.Response, error) {
 
 /*
 RunnerHealthcheck Runner healthcheck
-
-Endpoint for version 2 runners to send healthcheck and metrics. Updates lastChecked timestamp and runner metrics.
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return RunnersAPIRunnerHealthcheckRequest
@@ -1066,10 +1036,14 @@ func (a *RunnersAPIService) RunnerHealthcheckExecute(r RunnersAPIRunnerHealthche
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
+	if r.runnerId == nil {
+		return nil, reportError("runnerId is required and must be specified")
+	}
 	if r.runnerHealthcheck == nil {
 		return nil, reportError("runnerHealthcheck is required and must be specified")
 	}
 
+	parameterAddToHeaderOrQuery(localVarQueryParams, "runnerId", r.runnerId, "form", "")
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{"application/json"}
 
@@ -1121,13 +1095,6 @@ type RunnersAPIUpdateRunnerDrainingRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r RunnersAPIUpdateRunnerDrainingRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) RunnersAPIUpdateRunnerDrainingRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r RunnersAPIUpdateRunnerDrainingRequest) Execute() (*Runner, *http.Response, error) {
@@ -1138,7 +1105,7 @@ func (r RunnersAPIUpdateRunnerDrainingRequest) Execute() (*Runner, *http.Respons
 UpdateRunnerDraining Update runner draining status
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id Runner ID
+ @param id
  @return RunnersAPIUpdateRunnerDrainingRequest
 */
 func (a *RunnersAPIService) UpdateRunnerDraining(ctx context.Context, id string) RunnersAPIUpdateRunnerDrainingRequest {
@@ -1188,9 +1155,6 @@ func (a *RunnersAPIService) UpdateRunnerDrainingExecute(r RunnersAPIUpdateRunner
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
-	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -1232,13 +1196,6 @@ type RunnersAPIUpdateRunnerSchedulingRequest struct {
 	ctx context.Context
 	ApiService RunnersAPI
 	id string
-	xDaytonaOrganizationID *string
-}
-
-// Use with JWT to specify the organization ID
-func (r RunnersAPIUpdateRunnerSchedulingRequest) XDaytonaOrganizationID(xDaytonaOrganizationID string) RunnersAPIUpdateRunnerSchedulingRequest {
-	r.xDaytonaOrganizationID = &xDaytonaOrganizationID
-	return r
 }
 
 func (r RunnersAPIUpdateRunnerSchedulingRequest) Execute() (*Runner, *http.Response, error) {
@@ -1249,7 +1206,7 @@ func (r RunnersAPIUpdateRunnerSchedulingRequest) Execute() (*Runner, *http.Respo
 UpdateRunnerScheduling Update runner scheduling status
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param id Runner ID
+ @param id
  @return RunnersAPIUpdateRunnerSchedulingRequest
 */
 func (a *RunnersAPIService) UpdateRunnerScheduling(ctx context.Context, id string) RunnersAPIUpdateRunnerSchedulingRequest {
@@ -1298,9 +1255,6 @@ func (a *RunnersAPIService) UpdateRunnerSchedulingExecute(r RunnersAPIUpdateRunn
 	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if r.xDaytonaOrganizationID != nil {
-		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Daytona-Organization-ID", r.xDaytonaOrganizationID, "simple", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {

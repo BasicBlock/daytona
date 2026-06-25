@@ -3,16 +3,20 @@
  * SPDX-License-Identifier: AGPL-3.0
  */
 
-import { Injectable, Logger, OnModuleInit, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
-import { TypedConfigService } from '../../config/typed-config.service'
-import { Svix } from 'svix'
-import { Organization } from '../../organization/entities/organization.entity'
+import { Injectable, Logger, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { WebhookInitialization } from '../entities/webhook-initialization.entity'
 import { Repository } from 'typeorm'
+import { Svix } from 'svix'
+import { TypedConfigService } from '../../config/typed-config.service'
+import { WebhookInitialization } from '../entities/webhook-initialization.entity'
+
+export const DEFAULT_WEBHOOK_APPLICATION_ID = 'default'
+const DEFAULT_WEBHOOK_APPLICATION_NAME = 'Daytona'
 
 @Injectable()
 export class WebhookService implements OnModuleInit {
+  private static readonly ENDPOINT_FLAG_TTL_MS = 60_000
+
   private readonly logger = new Logger(WebhookService.name)
   private svix: Svix | null = null
 
@@ -26,61 +30,38 @@ export class WebhookService implements OnModuleInit {
     const svixAuthToken = this.configService.get('webhook.authToken')
     if (svixAuthToken) {
       const serverUrl = this.configService.get('webhook.serverUrl')
-      if (serverUrl) {
-        this.svix = new Svix(svixAuthToken, { serverUrl })
-      } else {
-        this.svix = new Svix(svixAuthToken)
-        //this.svix.eventType.importOpenapi
-      }
+      this.svix = serverUrl ? new Svix(svixAuthToken, { serverUrl }) : new Svix(svixAuthToken)
       this.logger.log('Svix webhook service initialized')
     } else {
       this.logger.warn('SVIX_AUTH_TOKEN not configured, webhook service disabled')
     }
   }
 
-  /**
-   * Get webhook initialization status for an organization
-   */
-  async getInitializationStatus(organizationId: string): Promise<WebhookInitialization | null> {
+  async getInitializationStatus(applicationId = DEFAULT_WEBHOOK_APPLICATION_ID): Promise<WebhookInitialization | null> {
     return this.webhookInitializationRepository.findOne({
-      where: { organizationId },
+      where: { applicationId },
     })
   }
 
-  // TODO: Remove this once we decide to open webhooks to all organizations
-  // @OnEvent(OrganizationEvents.CREATED)
-  async handleOrganizationCreated(organization: Organization) {
-    if (!this.svix) {
-      this.logger.debug('Svix not configured, skipping webhook creation')
-      return
-    }
-
-    try {
-      // Create a new Svix application for this organization
-      const svixAppId = await this.createSvixApplication(organization)
-      this.logger.log(`Created Svix application for organization ${organization.id}: ${svixAppId}`)
-    } catch (error) {
-      this.logger.error(`Failed to create Svix application for organization ${organization.id}:`, error)
-    }
-  }
-
-  /**
-   * Create a Svix application for an organization
-   */
-  async createSvixApplication(organization: Organization): Promise<string> {
+  async createSvixApplication(
+    applicationId = DEFAULT_WEBHOOK_APPLICATION_ID,
+    applicationName = DEFAULT_WEBHOOK_APPLICATION_NAME,
+  ): Promise<string> {
     if (!this.svix) {
       throw new ServiceUnavailableException('Webhook service is not configured')
     }
 
-    let existingWebhookInitialization = await this.getInitializationStatus(organization.id)
-    if (existingWebhookInitialization && existingWebhookInitialization.svixApplicationId) {
+    let existingWebhookInitialization = await this.getInitializationStatus(applicationId)
+    if (existingWebhookInitialization?.svixApplicationId) {
       this.logger.warn(
-        `Svix application already exists for organization ${organization.id}: ${existingWebhookInitialization.svixApplicationId}`,
+        `Svix application already exists for ${applicationId}: ${existingWebhookInitialization.svixApplicationId}`,
       )
       return existingWebhookInitialization.svixApplicationId
-    } else {
+    }
+
+    if (!existingWebhookInitialization) {
       existingWebhookInitialization = new WebhookInitialization()
-      existingWebhookInitialization.organizationId = organization.id
+      existingWebhookInitialization.applicationId = applicationId
       existingWebhookInitialization.svixApplicationId = null
       existingWebhookInitialization.retryCount = -1
       existingWebhookInitialization.lastError = null
@@ -88,78 +69,62 @@ export class WebhookService implements OnModuleInit {
 
     try {
       const svixApp = await this.svix.application.getOrCreate({
-        name: organization.name,
-        uid: organization.id,
+        name: applicationName,
+        uid: applicationId,
       })
       existingWebhookInitialization.svixApplicationId = svixApp.id
-      existingWebhookInitialization.retryCount = existingWebhookInitialization.retryCount + 1
+      existingWebhookInitialization.retryCount += 1
       existingWebhookInitialization.lastError = null
 
       await this.webhookInitializationRepository.save(existingWebhookInitialization)
 
-      this.logger.log(`Created Svix application for organization ${organization.id}: ${svixApp.id}`)
+      this.logger.log(`Created Svix application for ${applicationId}: ${svixApp.id}`)
       return svixApp.id
     } catch (error) {
-      existingWebhookInitialization.retryCount = existingWebhookInitialization.retryCount + 1
+      existingWebhookInitialization.retryCount += 1
       existingWebhookInitialization.lastError = String(error)
       await this.webhookInitializationRepository.save(existingWebhookInitialization)
-      this.logger.error(`Failed to create Svix application for organization ${organization.id}:`, error)
+      this.logger.error(`Failed to create Svix application for ${applicationId}:`, error)
       throw error
     }
   }
 
-  private static readonly ENDPOINT_FLAG_TTL_MS = 60_000
-
-  /**
-   * Refresh hasEndpoints by counting endpoints in Svix.
-   * On error, returns the input row untouched. Callers distinguish a freshly-refreshed row
-   * from a stale one via endpointsCheckedAt and fall back to attempting delivery rather than
-   * treating a never-confirmed false as authoritative.
-   */
-  private async refreshEndpointFlag(init: WebhookInitialization): Promise<WebhookInitialization> {
+  private async refreshEndpointFlagForInitialization(init: WebhookInitialization): Promise<WebhookInitialization> {
     if (!this.svix) {
       return init
     }
 
     try {
-      const result = await this.svix.endpoint.list(init.organizationId, { limit: 1 })
+      const result = await this.svix.endpoint.list(init.applicationId, { limit: 1 })
       return await this.webhookInitializationRepository.save({
         ...init,
         hasEndpoints: result.data.length > 0,
         endpointsCheckedAt: new Date(),
       })
     } catch (error) {
-      this.logger.error(`Failed to refresh endpoint flag for organization ${init.organizationId}:`, error)
+      this.logger.error(`Failed to refresh endpoint flag for ${init.applicationId}:`, error)
       return init
     }
   }
 
-  /**
-   * Public wrapper for the refresh used by the controller ping route.
-   */
-  async refreshEndpointFlagByOrg(organizationId: string): Promise<void> {
-    const init = await this.getInitializationStatus(organizationId)
+  async refreshEndpointFlag(applicationId = DEFAULT_WEBHOOK_APPLICATION_ID): Promise<void> {
+    const init = await this.getInitializationStatus(applicationId)
     if (!init) {
       throw new NotFoundException('Webhook initialization status not found')
     }
-    await this.refreshEndpointFlag(init)
+    await this.refreshEndpointFlagForInitialization(init)
   }
 
-  /**
-   * Send a webhook message to all endpoints of an organization
-   */
-  async sendWebhook(organizationId: string, eventType: string, payload: any, eventId?: string): Promise<void> {
+  async sendWebhook(eventType: string, payload: unknown, eventId?: string): Promise<void> {
     if (!this.svix) {
       this.logger.debug('Svix not configured, skipping webhook delivery')
       return
     }
 
     try {
-      // Check if webhooks are initialized for this organization
-      let init = await this.getInitializationStatus(organizationId)
-
+      let init = await this.getInitializationStatus()
       if (!init) {
-        this.logger.debug(`Skipping webhook ${eventType} for organization ${organizationId}: webhooks not initialized`)
+        this.logger.debug(`Skipping webhook ${eventType}: webhooks not initialized`)
         return
       }
 
@@ -167,42 +132,36 @@ export class WebhookService implements OnModuleInit {
         checkedAt !== undefined &&
         checkedAt !== null &&
         Date.now() - checkedAt.getTime() <= WebhookService.ENDPOINT_FLAG_TTL_MS
+
       if (!isFresh(init.endpointsCheckedAt)) {
-        init = await this.refreshEndpointFlag(init)
+        init = await this.refreshEndpointFlagForInitialization(init)
       }
 
-      // Only treat hasEndpoints=false as authoritative when we have a recent confirmation;
-      // if the refresh failed and the flag is stale, fall through to message.create rather
-      // than silently dropping (a Svix outage should surface as a send failure, not a quiet skip).
       if (!init.hasEndpoints && isFresh(init.endpointsCheckedAt)) {
-        this.logger.debug(`Skipping webhook ${eventType} for organization ${organizationId}: no endpoints`)
+        this.logger.debug(`Skipping webhook ${eventType}: no endpoints`)
         return
       }
 
-      // Send the webhook message
-      await this.svix.message.create(organizationId, {
+      await this.svix.message.create(DEFAULT_WEBHOOK_APPLICATION_ID, {
         eventType,
         payload,
         eventId,
       })
 
-      this.logger.debug(`Sent webhook ${eventType} to organization ${organizationId}`)
+      this.logger.debug(`Sent webhook ${eventType}`)
     } catch (error) {
-      this.logger.error(`Failed to send webhook ${eventType} to organization ${organizationId}:`, error)
+      this.logger.error(`Failed to send webhook ${eventType}:`, error)
       throw error
     }
   }
 
-  /**
-   * Get webhook delivery attempts for a message
-   */
-  async getMessageAttempts(organizationId: string, messageId: string): Promise<any[]> {
+  async getMessageAttempts(messageId: string): Promise<unknown[]> {
     if (!this.svix) {
       throw new ServiceUnavailableException('Webhook service is not configured')
     }
 
     try {
-      const attempts = await this.svix.messageAttempt.listByMsg(organizationId, messageId)
+      const attempts = await this.svix.messageAttempt.listByMsg(DEFAULT_WEBHOOK_APPLICATION_ID, messageId)
       return attempts.data
     } catch (error) {
       this.logger.error(`Failed to get message attempts for message ${messageId}:`, error)
@@ -210,31 +169,26 @@ export class WebhookService implements OnModuleInit {
     }
   }
 
-  /**
-   * Check if webhook service is enabled
-   */
   isEnabled(): boolean {
     return this.svix !== null
   }
 
-  /**
-   * Get Svix Consumer App Portal access for an organization
-   */
-  async getAppPortalAccess(organizationId: string): Promise<{ token: string; url: string }> {
+  async getAppPortalAccess(): Promise<{ token: string; url: string }> {
     if (!this.svix) {
       throw new ServiceUnavailableException('Webhook service is not configured')
     }
+
     try {
-      const appPortalAccess = await this.svix.authentication.appPortalAccess(organizationId, {})
-      this.logger.debug(`Generated app portal access for organization ${organizationId}`)
+      const appPortalAccess = await this.svix.authentication.appPortalAccess(DEFAULT_WEBHOOK_APPLICATION_ID, {})
+      this.logger.debug('Generated app portal access')
       return {
         token: appPortalAccess.token,
         url: appPortalAccess.url,
       }
     } catch (error) {
-      this.logger.debug(`Failed to generate app portal access for organization ${organizationId}:`, error)
-      if (error.code === 404) {
-        throw new NotFoundException(`Organization ${organizationId} not found in Svix`)
+      this.logger.debug('Failed to generate app portal access:', error)
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 404) {
+        throw new NotFoundException('Webhook application not found in Svix')
       }
       throw error
     }

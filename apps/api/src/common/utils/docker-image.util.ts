@@ -9,7 +9,7 @@
 export interface DockerImageInfo {
   /** The full registry hostname (e.g. 'registry:5000' or 'docker.io') */
   registry?: string
-  /** The project/organization name (e.g. 'test' in 'registry:5000/test/image') */
+  /** The repository namespace (e.g. 'test' in 'registry:5000/test/image') */
   project?: string
   /** The repository/image name (e.g. 'image' in 'registry:5000/test/image') */
   repository: string
