@@ -1,4 +1,4 @@
-ARG SANDBOX_IMAGE=daytonaio/sandbox:latest
+ARG SANDBOX_IMAGE=us-central1-docker.pkg.dev/basicblock/docker-images/daytona-sandbox:latest
 FROM ${SANDBOX_IMAGE}
 USER root
 

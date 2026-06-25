@@ -162,10 +162,10 @@
       "options": {
         "context": "{workspaceRoot}",
         "file": "{projectRoot}/Dockerfile",
-        "tags": ["ghcr.io/daytonaio/daytona-{projectName}:$VERSION$ARCH"],
+        "tags": ["us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION$ARCH"],
         "build-args": ["VERSION=$VERSION"],
-        "cache-from": ["type=registry,ref=ghcr.io/daytonaio/daytona-{projectName}:buildcache$ARCH"],
-        "cache-to": ["type=registry,ref=ghcr.io/daytonaio/daytona-{projectName}:buildcache$ARCH,mode=max"]
+        "cache-from": ["type=registry,ref=us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:buildcache$ARCH"],
+        "cache-to": ["type=registry,ref=us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:buildcache$ARCH,mode=max"]
       },
       "configurations": {
         "production": {
@@ -174,9 +174,9 @@
         "production-multi-platform": {
           "push": true,
           "platforms": ["linux/amd64", "linux/arm64"],
-          "tags": ["ghcr.io/daytonaio/daytona-{projectName}:$VERSION"],
-          "cache-from": ["type=registry,ref=ghcr.io/daytonaio/daytona-{projectName}:buildcache"],
-          "cache-to": ["type=registry,ref=ghcr.io/daytonaio/daytona-{projectName}:buildcache,mode=max"]
+          "tags": ["us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION"],
+          "cache-from": ["type=registry,ref=us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:buildcache"],
+          "cache-to": ["type=registry,ref=us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:buildcache,mode=max"]
         },
         "local-registry": {
           "push": true,
@@ -193,7 +193,7 @@
           "push": false,
           "load": false,
           "platforms": ["linux/amd64"],
-          "tags": ["ghcr.io/daytonaio/daytona-{projectName}:$VERSION"],
+          "tags": ["us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION"],
           "cache-from": ["type=gha,scope=docker-{projectName}"],
           "cache-to": ["type=gha,scope=docker-{projectName},mode=max"]
         }
@@ -205,10 +205,10 @@
       "options": {
         "parallel": false,
         "commands": [
-          "docker manifest create ghcr.io/daytonaio/daytona-{projectName}:$VERSION ghcr.io/daytonaio/daytona-{projectName}:$VERSION-amd64 ghcr.io/daytonaio/daytona-{projectName}:$VERSION-arm64",
-          "docker manifest push ghcr.io/daytonaio/daytona-{projectName}:$VERSION",
-          "docker manifest create ghcr.io/daytonaio/daytona-{projectName}:latest ghcr.io/daytonaio/daytona-{projectName}:$VERSION-amd64 ghcr.io/daytonaio/daytona-{projectName}:$VERSION-arm64",
-          "docker manifest push ghcr.io/daytonaio/daytona-{projectName}:latest"
+          "docker manifest create us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION-amd64 us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION-arm64",
+          "docker manifest push us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION",
+          "docker manifest create us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:latest us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION-amd64 us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:$VERSION-arm64",
+          "docker manifest push us-central1-docker.pkg.dev/basicblock/docker-images/daytona-{projectName}:latest"
         ]
       }
     },

@@ -8,13 +8,13 @@
     "docker": {
       "options": {
         "platforms": ["linux/amd64"],
-        "tags": ["daytonaio/sandbox-gpu:$VERSION"],
-        "cache-from": ["type=registry,ref=daytonaio/sandbox-gpu:buildcache-linux-amd64"],
-        "cache-to": ["type=registry,ref=daytonaio/sandbox-gpu:buildcache-linux-amd64,mode=max"]
+        "tags": ["us-central1-docker.pkg.dev/basicblock/docker-images/daytona-sandbox-gpu:$VERSION"],
+        "cache-from": ["type=registry,ref=us-central1-docker.pkg.dev/basicblock/docker-images/daytona-sandbox-gpu:buildcache-linux-amd64"],
+        "cache-to": ["type=registry,ref=us-central1-docker.pkg.dev/basicblock/docker-images/daytona-sandbox-gpu:buildcache-linux-amd64,mode=max"]
       },
       "configurations": {
         "pr-build": {
-          "tags": ["daytonaio/sandbox-gpu:$VERSION"]
+          "tags": ["us-central1-docker.pkg.dev/basicblock/docker-images/daytona-sandbox-gpu:$VERSION"]
         }
       }
     }
