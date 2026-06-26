@@ -276,6 +276,10 @@ func (r *Runtime) Create(ctx context.Context, sandbox dto.CreateSandboxDTO) (str
 		return sandbox.Id, "", nil
 	}
 
+	if err := r.deleteRunscContainerIfExists(ctx, sandbox.Id); err != nil {
+		return "", "", err
+	}
+
 	if bundle != nil {
 		if err := r.client.Restore(ctx, sandbox.Id, bundleDir, bundle.CheckpointDir, bundle.FilesystemDir); err != nil {
 			return "", "", err
@@ -307,6 +311,9 @@ func (r *Runtime) Start(ctx context.Context, sandboxID string, authToken *string
 			return "", "", err
 		}
 		if err := r.setupNetwork(ctx, state); err != nil {
+			return "", "", err
+		}
+		if err := r.deleteRunscContainerIfExists(ctx, sandboxID); err != nil {
 			return "", "", err
 		}
 		if err := r.client.Run(ctx, sandboxID, state.BundleDir); err != nil {
@@ -542,6 +549,9 @@ func (r *Runtime) Fork(ctx context.Context, sourceSandboxID string, newSandboxID
 		return "", err
 	}
 	if err := r.saveState(&forked); err != nil {
+		return "", err
+	}
+	if err := r.deleteRunscContainerIfExists(ctx, newSandboxID); err != nil {
 		return "", err
 	}
 	if err := r.client.Restore(ctx, newSandboxID, bundleDir, checkpointDir, filesystemDir); err != nil {
@@ -916,6 +926,26 @@ func (r *Runtime) isRunning(ctx context.Context, sandboxID string) (bool, error)
 		return false, err
 	}
 	return state.Status == "running" || state.Status == "created", nil
+}
+
+func (r *Runtime) deleteRunscContainerIfExists(ctx context.Context, sandboxID string) error {
+	state, err := r.client.State(ctx, sandboxID)
+	if err != nil {
+		return nil
+	}
+
+	if state.Status == "running" || state.Status == "created" {
+		if err := r.client.Kill(ctx, sandboxID, "KILL"); err != nil {
+			r.logger.WarnContext(ctx, "runsc kill before recreate failed", "sandboxId", sandboxID, "error", err)
+		}
+	}
+	if err := r.client.Delete(ctx, sandboxID); err != nil {
+		if _, stateErr := r.client.State(ctx, sandboxID); stateErr != nil {
+			return nil
+		}
+		return fmt.Errorf("delete existing runsc container %s before recreate: %w", sandboxID, err)
+	}
+	return nil
 }
 
 func (r *Runtime) saveState(state *SandboxRuntimeState) error {
