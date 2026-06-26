@@ -1,0 +1,11 @@
+apiVersion: podsnapshot.gke.io/v1
+kind: PodSnapshotStorageConfig
+metadata:
+  name: daytona-sandbox-snapshots
+spec:
+  snapshotStorageConfig:
+    gcs:
+      bucket: "BUCKET_NAME"
+      path: "FOLDER_PATH"
+      tokenSource: "podKSA"
+

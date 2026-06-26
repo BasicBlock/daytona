@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-controller
+  namespace: daytona-system
+  labels:
+    app.kubernetes.io/name: sandbox-controller
+    app.kubernetes.io/managed-by: daytona
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sandbox-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sandbox-controller
+    spec:
+      serviceAccountName: sandbox-controller
+      containers:
+        - name: manager
+          image: ghcr.io/daytonaio/sandbox-controller:dev
+          imagePullPolicy: IfNotPresent
+          args:
+            - --leader-elect
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+            - --default-toolbox-image=ghcr.io/daytonaio/sandbox-controller:dev
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

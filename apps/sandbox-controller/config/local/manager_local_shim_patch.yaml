@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-controller
+  namespace: daytona-system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          args:
+            - --leader-elect
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+            - --default-toolbox-image=ghcr.io/daytonaio/sandbox-controller:dev
+            - --enable-local-podsnapshot-shim
+            - --local-podsnapshot-storage-endpoint=local-minio.daytona-system.svc.cluster.local:9000
+            - --local-podsnapshot-storage-bucket=daytona-local
+            - --local-podsnapshot-storage-prefix=snapshots
+            - --local-podsnapshot-storage-path=/var/lib/daytona-localrunsc

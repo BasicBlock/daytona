@@ -1,0 +1,17 @@
+apiVersion: compute.daytona.io/v1alpha1
+kind: Sandbox
+metadata:
+  name: agent-box-fork
+  namespace: sandboxes
+spec:
+  image: ubuntu:24.04
+  command: ["/bin/sh", "-lc"]
+  args: ["sleep infinity"]
+  desiredState: Running
+  runtimeClassName: gvisor
+  restore:
+    name: agent-box-warm
+    provider: GKEPodSnapshot
+    providerObjectName: "POD_SNAPSHOT_NAME"
+  toolbox:
+    image: ghcr.io/daytonaio/sandbox-controller:dev

@@ -1,0 +1,52 @@
+image:
+  repository: us-central1-docker.pkg.dev/basicblock/docker-images/daytona-sandbox-controller
+  tag: ""
+  pullPolicy: IfNotPresent
+
+systemNamespace: daytona-system
+sandboxNamespace: sandboxes
+
+namespaces:
+  create: true
+
+controller:
+  replicas: 1
+  defaultToolboxImage: ""
+  staleSandboxDeleteTimeout: 10m
+  staleSnapshotTimeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+api:
+  replicas: 1
+  publicBaseUrl: http://sandbox-api.daytona-system.svc.cluster.local:8090
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ingress:
+    enabled: false
+    className: tailscale
+    hostname: basicblock-daytona-stg
+    annotations:
+      tailscale.com/tags: tag:coder-k8s
+      tailscale.com/http-redirect: "true"
+
+gke:
+  podSnapshotStorageConfig:
+    enabled: false
+    name: daytona-sandbox-snapshots
+    bucket: ""
+    path: ""
+    tokenSource: podKSA
+
+networkPolicy:
+  enabled: true

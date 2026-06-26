@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: local-node-agent
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["compute.daytona.io"]
+    resources: ["localrunscsnapshots"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["compute.daytona.io"]
+    resources: ["localrunscsnapshots/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["compute.daytona.io"]
+    resources: ["localrunscsnapshots/finalizers"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

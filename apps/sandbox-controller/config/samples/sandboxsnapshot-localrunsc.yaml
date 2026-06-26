@@ -1,0 +1,13 @@
+apiVersion: compute.daytona.io/v1alpha1
+kind: SandboxSnapshot
+metadata:
+  name: ubuntu-agent-local
+  namespace: sandboxes
+spec:
+  provider: LocalRunsc
+  source:
+    sandboxName: ubuntu-agent
+  local:
+    storage:
+      mode: filesystem
+      path: /var/lib/daytona-localrunsc

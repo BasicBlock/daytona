@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: local-minio-credentials
+  namespace: daytona-system
+  labels:
+    app.kubernetes.io/name: local-minio
+    app.kubernetes.io/managed-by: daytona
+type: Opaque
+stringData:
+  MINIO_ROOT_USER: daytona
+  MINIO_ROOT_PASSWORD: daytona-local-password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: local-minio
+  namespace: daytona-system
+  labels:
+    app.kubernetes.io/name: local-minio
+    app.kubernetes.io/managed-by: daytona
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: local-minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: local-minio
+    spec:
+      containers:
+        - name: minio
+          image: quay.io/minio/minio:latest
+          args:
+            - server
+            - /data
+            - --console-address=:9001
+          envFrom:
+            - secretRef:
+                name: local-minio-credentials
+          ports:
+            - name: s3
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: s3
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: local-minio
+  namespace: daytona-system
+  labels:
+    app.kubernetes.io/name: local-minio
+    app.kubernetes.io/managed-by: daytona
+spec:
+  selector:
+    app.kubernetes.io/name: local-minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: s3
+    - name: console
+      port: 9001
+      targetPort: console

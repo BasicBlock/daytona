@@ -17,6 +17,8 @@ env:
   GONOSUMDB: github.com/daytonaio/daytona
   PROJECT_ID: basicblock
   GAR_LOCATION: us-central1
+  HELM_REPOSITORY: helm-charts
+  SANDBOX_CONTROLLER_CHART_PATH: charts/daytona-sandbox-controller
   WORKLOAD_IDENTITY_PROVIDER: projects/327281795986/locations/global/workloadIdentityPools/github-pool/providers/basicblock-repo
 
 jobs:
@@ -333,6 +335,64 @@ jobs:
         if: always()
         run: |
           docker logout "${GAR_LOCATION}-docker.pkg.dev" 2>/dev/null || true
+
+  publish_sandbox_controller_helm:
+    needs: docker_push_manifest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+
+      - name: Resolve chart version
+        id: chart
+        run: |
+          chart_version="${VERSION#v}"
+          if [[ ! "$chart_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid Helm chart version: $chart_version"
+            exit 1
+          fi
+          echo "version=$chart_version" >> "$GITHUB_OUTPUT"
+
+      - name: Lint chart
+        run: helm lint "$SANDBOX_CONTROLLER_CHART_PATH"
+
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          token_format: access_token
+          service_account: githubactions@basicblock.iam.gserviceaccount.com
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Log in to GAR for Helm
+        run: |
+          helm registry login \
+            -u oauth2accesstoken \
+            --password-stdin \
+            "${GAR_LOCATION}-docker.pkg.dev" <<<"${{ steps.auth.outputs.access_token }}"
+
+      - name: Package chart
+        run: |
+          mkdir -p "$RUNNER_TEMP/charts"
+          helm package "$SANDBOX_CONTROLLER_CHART_PATH" \
+            --version "${{ steps.chart.outputs.version }}" \
+            --app-version "${{ steps.chart.outputs.version }}" \
+            --destination "$RUNNER_TEMP/charts"
+
+      - name: Push chart to GAR
+        run: |
+          helm push \
+            "$RUNNER_TEMP/charts/daytona-sandbox-controller-${{ steps.chart.outputs.version }}.tgz" \
+            "oci://${GAR_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${HELM_REPOSITORY}"
 
   sync_gosum:
     needs: build_projects

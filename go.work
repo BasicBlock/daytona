@@ -6,6 +6,7 @@ use (
 	./apps/otel-collector/exporter
 	./apps/proxy
 	./apps/runner
+	./apps/sandbox-controller
 	./apps/snapshot-manager
 	./apps/ssh-gateway
 	./libs/api-client-go

@@ -1,0 +1,125 @@
+name: sandbox-controller
+
+on:
+  pull_request:
+    paths:
+      - "apps/sandbox-controller/**"
+      - "go.work"
+      - "go.work.sum"
+      - "flake.nix"
+      - ".github/workflows/sandbox-controller.yml"
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v35
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Unit tests
+        run: nix develop .#go --command bash -c "cd apps/sandbox-controller && go test ./..."
+
+  envtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v35
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Install envtest assets
+        run: |
+          nix develop .#go --command bash -c '
+            cd apps/sandbox-controller
+            go run sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.24.1 use -p env 1.36.x! > /tmp/envtest.env
+          '
+      - name: Envtest
+        run: |
+          nix develop .#go --command bash -c '
+            source /tmp/envtest.env
+            cd apps/sandbox-controller
+            DAYTONA_ENVTEST=1 go test ./internal/controller -run TestEnvtest
+          '
+
+  local-lima-e2e:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v35
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Install Lima
+        run: brew install lima
+      - name: Start local provider VM
+        run: limactl start --name daytona-sandbox apps/sandbox-controller/hack/local-provider/daytona-sandbox.lima.yaml
+      - name: Load dev image
+        run: apps/sandbox-controller/hack/local-provider/load-dev-image.sh daytona-sandbox
+      - name: Local provider preflight
+        run: apps/sandbox-controller/hack/local-provider/preflight.sh daytona-sandbox
+      - name: Raw runsc smoke
+        run: apps/sandbox-controller/hack/local-provider/raw-runsc-smoke.sh daytona-sandbox
+      - name: MinIO smoke
+        run: apps/sandbox-controller/hack/local-provider/minio-smoke.sh daytona-sandbox
+      - name: Local E2E
+        run: |
+          ssh -F "$HOME/.lima/daytona-sandbox/ssh.config" -N -L 16443:127.0.0.1:6443 lima-daytona-sandbox &
+          limactl shell --workdir / daytona-sandbox sudo cat /etc/rancher/k3s/k3s.yaml | sed 's#https://127.0.0.1:6443#https://127.0.0.1:16443#' > /tmp/daytona-k3s.yaml
+          nix develop .#go --command bash -c '
+            cd apps/sandbox-controller
+            KUBECONFIG=/tmp/daytona-k3s.yaml DAYTONA_E2E=1 DAYTONA_LOCAL_RUNSC_E2E=1 DAYTONA_E2E_NAMESPACE=sandboxes go test -tags e2e ./test/e2e -run "TestSandboxLifecycleE2E|TestLocalRunscSnapshotE2E"
+          '
+      - name: Cleanup diagnostics
+        if: always()
+        run: |
+          apps/sandbox-controller/hack/local-provider/cleanup-local-artifacts.sh daytona-sandbox || true
+          limactl shell daytona-sandbox sudo k3s kubectl get all -A || true
+
+  stg-gke-e2e:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v35
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "${{ secrets.STG_CLUSTER_KUBECONFIG }}" > "$HOME/.kube/config"
+      - name: GKE E2E preflight and restore tests
+        env:
+          DAYTONA_GKE_E2E: "1"
+          DAYTONA_GKE_STORAGE_BUCKET: ${{ secrets.DAYTONA_GKE_STORAGE_BUCKET }}
+          DAYTONA_GKE_STORAGE_PREFIX: sandbox-controller-e2e
+          DAYTONA_E2E_NAMESPACE: daytona-sandbox-e2e
+          DAYTONA_E2E_RUN_ID: pr-${{ github.event.pull_request.number }}-${{ github.run_id }}
+        run: |
+          nix develop .#go --command bash -c '
+            cd apps/sandbox-controller
+            go test -tags e2e ./test/e2e -run "TestGKEPreflightE2E|TestGKEPodSnapshotRestoreE2E"
+          '
+
+  api-acceptance:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v35
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "${{ secrets.STG_CLUSTER_KUBECONFIG }}" > "$HOME/.kube/config"
+      - name: API acceptance
+        env:
+          DAYTONA_API_ACCEPTANCE_E2E: "1"
+          DAYTONA_API_BASE_URL: ${{ secrets.DAYTONA_API_BASE_URL }}
+          DAYTONA_ACCEPTANCE_STORAGE_CONFIG: ${{ secrets.DAYTONA_ACCEPTANCE_STORAGE_CONFIG }}
+          DAYTONA_E2E_NAMESPACE: daytona-sandbox-e2e
+          DAYTONA_E2E_RUN_ID: pr-${{ github.event.pull_request.number }}-${{ github.run_id }}
+        run: |
+          nix develop .#go --command bash -c '
+            cd apps/sandbox-controller
+            go test -tags e2e ./test/e2e -run TestAPIProductAcceptanceE2E
+          '

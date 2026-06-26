@@ -1,0 +1,27 @@
+{{- if .Values.api.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-api-tailnet
+  namespace: {{ .Values.systemNamespace | quote }}
+  labels:
+    {{- include "daytona-sandbox-controller.apiLabels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.api.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.api.ingress.className | quote }}
+  tls:
+    - hosts:
+        - {{ required "api.ingress.hostname is required when api.ingress.enabled=true" .Values.api.ingress.hostname | quote }}
+  rules:
+    - host: {{ .Values.api.ingress.hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sandbox-api
+                port:
+                  name: http
+{{- end }}

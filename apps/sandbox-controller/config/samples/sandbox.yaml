@@ -1,0 +1,30 @@
+apiVersion: compute.daytona.io/v1alpha1
+kind: Sandbox
+metadata:
+  name: agent-box
+  namespace: sandboxes
+spec:
+  image: ubuntu:24.04
+  command: ["/bin/sh", "-lc"]
+  args: ["sleep infinity"]
+  desiredState: Running
+  runtimeClassName: gvisor
+  access:
+    sshEnabled: true
+  networkPolicy:
+    enabled: true
+    allowDNS: true
+    egressCIDRs:
+      - 0.0.0.0/0
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  ports:
+    - name: http
+      port: 8080
+  toolbox:
+    image: ghcr.io/daytonaio/sandbox-controller:dev

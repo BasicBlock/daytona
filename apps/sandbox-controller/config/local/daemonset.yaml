@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: local-node-agent
+  namespace: daytona-system
+  labels:
+    app.kubernetes.io/name: local-node-agent
+    app.kubernetes.io/managed-by: daytona
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: local-node-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: local-node-agent
+    spec:
+      serviceAccountName: local-node-agent
+      hostPID: true
+      containers:
+        - name: agent
+          image: ghcr.io/daytonaio/sandbox-controller:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - /local-node-agent
+          args:
+            - --node-name=$(NODE_NAME)
+            - --http-listen=:2281
+            - --runsc-path=/host/usr/bin/runsc
+            - --runsc-root=/run/containerd/runsc/k8s.io
+            - --artifact-root=/var/lib/daytona-localrunsc
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: local-minio-credentials
+                  key: MINIO_ROOT_USER
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: local-minio-credentials
+                  key: MINIO_ROOT_PASSWORD
+          ports:
+            - name: http
+              containerPort: 2281
+            - name: health
+              containerPort: 8081
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          volumeMounts:
+            - name: runsc-bin
+              mountPath: /host/usr/bin
+              readOnly: true
+            - name: runsc-state
+              mountPath: /run/runsc
+            - name: containerd-state
+              mountPath: /run/containerd
+            - name: artifacts
+              mountPath: /var/lib/daytona-localrunsc
+      volumes:
+        - name: runsc-bin
+          hostPath:
+            path: /usr/bin
+            type: Directory
+        - name: runsc-state
+          hostPath:
+            path: /run/runsc
+            type: DirectoryOrCreate
+        - name: containerd-state
+          hostPath:
+            path: /run/containerd
+            type: DirectoryOrCreate
+        - name: artifacts
+          hostPath:
+            path: /var/lib/daytona-localrunsc
+            type: DirectoryOrCreate

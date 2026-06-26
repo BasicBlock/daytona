@@ -1,0 +1,16 @@
+{{- if .Values.gke.podSnapshotStorageConfig.enabled }}
+apiVersion: podsnapshot.gke.io/v1
+kind: PodSnapshotStorageConfig
+metadata:
+  name: {{ .Values.gke.podSnapshotStorageConfig.name | quote }}
+  labels:
+    {{- include "daytona-sandbox-controller.labels" . | nindent 4 }}
+spec:
+  snapshotStorageConfig:
+    gcs:
+      bucket: {{ required "gke.podSnapshotStorageConfig.bucket is required when gke.podSnapshotStorageConfig.enabled=true" .Values.gke.podSnapshotStorageConfig.bucket | quote }}
+      {{- if .Values.gke.podSnapshotStorageConfig.path }}
+      path: {{ .Values.gke.podSnapshotStorageConfig.path | quote }}
+      {{- end }}
+      tokenSource: {{ .Values.gke.podSnapshotStorageConfig.tokenSource | quote }}
+{{- end }}

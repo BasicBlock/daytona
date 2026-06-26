@@ -1,0 +1,137 @@
+name: sandbox-controller-helm
+
+on:
+  pull_request:
+    paths:
+      - "charts/daytona-sandbox-controller/**"
+      - ".github/workflows/sandbox-controller-helm.yml"
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      chart_version:
+        description: Helm chart version to publish, without a leading "v"
+        required: true
+        default: "0.1.0-dev"
+      app_version:
+        description: App/image version recorded in the chart. Defaults to chart_version.
+        required: false
+        default: ""
+
+permissions: {}
+
+env:
+  PROJECT_ID: basicblock
+  GAR_LOCATION: us-central1
+  HELM_REPOSITORY: helm-charts
+  CHART_PATH: charts/daytona-sandbox-controller
+  WORKLOAD_IDENTITY_PROVIDER: projects/327281795986/locations/global/workloadIdentityPools/github-pool/providers/basicblock-repo
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+
+      - name: Lint chart
+        run: helm lint "$CHART_PATH"
+
+      - name: Render chart
+        run: |
+          helm template daytona-sandbox-controller "$CHART_PATH" \
+            --set image.tag=ci \
+            --set api.ingress.enabled=true \
+            --set api.ingress.hostname=basicblock-daytona-ci \
+            --set gke.podSnapshotStorageConfig.enabled=true \
+            --set gke.podSnapshotStorageConfig.bucket=basicblock-trigger-snapshots \
+            >/tmp/daytona-sandbox-controller.yaml
+
+  publish:
+    if: github.repository == 'BasicBlock/daytona' && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
+    needs:
+      - lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+
+      - name: Resolve versions
+        id: versions
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || '' }}
+          INPUT_CHART_VERSION: ${{ inputs.chart_version || '' }}
+          INPUT_APP_VERSION: ${{ inputs.app_version || '' }}
+        run: |
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            chart_version="${RELEASE_TAG#v}"
+            app_version="$chart_version"
+          else
+            chart_version="$INPUT_CHART_VERSION"
+            app_version="${INPUT_APP_VERSION:-$chart_version}"
+          fi
+
+          if [[ ! "$chart_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid Helm chart version: $chart_version"
+            exit 1
+          fi
+
+          echo "chart_version=$chart_version" >> "$GITHUB_OUTPUT"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          token_format: access_token
+          service_account: githubactions@basicblock.iam.gserviceaccount.com
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Log in to GAR for Helm
+        run: |
+          helm registry login \
+            -u oauth2accesstoken \
+            --password-stdin \
+            "${GAR_LOCATION}-docker.pkg.dev" <<<"${{ steps.auth.outputs.access_token }}"
+
+      - name: Package chart
+        run: |
+          mkdir -p "$RUNNER_TEMP/charts"
+          helm package "$CHART_PATH" \
+            --version "${{ steps.versions.outputs.chart_version }}" \
+            --app-version "${{ steps.versions.outputs.app_version }}" \
+            --destination "$RUNNER_TEMP/charts"
+
+      - name: Push chart to GAR
+        run: |
+          helm push \
+            "$RUNNER_TEMP/charts/daytona-sandbox-controller-${{ steps.versions.outputs.chart_version }}.tgz" \
+            "oci://${GAR_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${HELM_REPOSITORY}"
+
+      - name: Write summary
+        run: |
+          {
+            echo "Published Helm chart:"
+            echo
+            echo '```'
+            echo "oci://${GAR_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${HELM_REPOSITORY}/daytona-sandbox-controller:${{ steps.versions.outputs.chart_version }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

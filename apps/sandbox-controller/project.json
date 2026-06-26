@@ -1,0 +1,70 @@
+{
+  "name": "sandbox-controller",
+  "$schema": "../../runner_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/sandbox-controller",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx-go/nx-go:build",
+      "options": {
+        "main": "{projectRoot}/cmd/sandbox-controller/main.go",
+        "outputPath": "dist/apps/sandbox-controller"
+      },
+      "inputs": ["goProduction", "^goProduction"]
+    },
+    "build-api": {
+      "executor": "@nx-go/nx-go:build",
+      "options": {
+        "main": "{projectRoot}/cmd/sandbox-api/main.go",
+        "outputPath": "dist/apps/sandbox-api"
+      },
+      "inputs": ["goProduction", "^goProduction"]
+    },
+    "build-local-node-agent": {
+      "executor": "@nx-go/nx-go:build",
+      "options": {
+        "main": "{projectRoot}/cmd/local-node-agent/main.go",
+        "outputPath": "dist/apps/local-node-agent"
+      },
+      "inputs": ["goProduction", "^goProduction"]
+    },
+    "build-toolbox-sidecar": {
+      "executor": "@nx-go/nx-go:build",
+      "options": {
+        "main": "{projectRoot}/cmd/toolbox-sidecar/main.go",
+        "outputPath": "dist/apps/toolbox-sidecar"
+      },
+      "inputs": ["goProduction", "^goProduction"]
+    },
+    "test": {
+      "executor": "@nx-go/nx-go:test"
+    },
+    "test:envtest": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd {projectRoot} && DAYTONA_ENVTEST=1 go test ./internal/controller -run TestEnvtest"
+      }
+    },
+    "test:e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd {projectRoot} && go test -tags e2e ./test/e2e"
+      }
+    },
+    "lint": {
+      "executor": "@nx-go/nx-go:lint"
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd {projectRoot} && go fmt ./... && prettier --write \"**/*.{yaml,json}\""
+      }
+    },
+    "docker": {
+      "options": {
+        "target": "sandbox-controller"
+      }
+    }
+  }
+}

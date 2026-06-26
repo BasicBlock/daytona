@@ -1,0 +1,17 @@
+apiVersion: compute.daytona.io/v1alpha1
+kind: SandboxSnapshot
+metadata:
+  name: agent-box-warm
+  namespace: sandboxes
+spec:
+  provider: GKEPodSnapshot
+  source:
+    sandboxName: agent-box
+  gke:
+    storageConfigName: daytona-sandbox-snapshots
+    storage:
+      bucket: BUCKET_NAME
+      path: FOLDER_PATH
+      tokenSource: podKSA
+    postCheckpoint: resume
+    retention: 7d

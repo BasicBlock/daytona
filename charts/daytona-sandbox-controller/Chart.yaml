@@ -1,0 +1,6 @@
+apiVersion: v2
+name: daytona-sandbox-controller
+description: Kubernetes-native Daytona sandbox controller, API facade, and optional tailnet exposure.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-controller
+  namespace: {{ .Values.systemNamespace | quote }}
+  labels:
+    {{- include "daytona-sandbox-controller.controllerLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicas }}
+  selector:
+    matchLabels:
+      {{- include "daytona-sandbox-controller.controllerSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "daytona-sandbox-controller.controllerLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: sandbox-controller
+      containers:
+        - name: manager
+          image: {{ include "daytona-sandbox-controller.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --leader-elect
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+            - --default-toolbox-image={{ .Values.controller.defaultToolboxImage | default (include "daytona-sandbox-controller.image" .) }}
+            - --stale-sandbox-delete-timeout={{ .Values.controller.staleSandboxDeleteTimeout }}
+            - --stale-snapshot-timeout={{ .Values.controller.staleSnapshotTimeout }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          resources:
+            {{- toYaml .Values.controller.resources | nindent 12 }}

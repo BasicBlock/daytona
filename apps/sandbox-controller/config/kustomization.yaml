@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - crd/compute.daytona.io_sandboxes.yaml
+  - crd/compute.daytona.io_sandboxsnapshots.yaml
+  - crd/compute.daytona.io_localrunscsnapshots.yaml
+  - crd/compute.daytona.io_sandboxtemplates.yaml
+  - manager/namespace.yaml
+  - rbac/service_account.yaml
+  - rbac/cluster_role.yaml
+  - rbac/cluster_role_binding.yaml
+  - rbac/api_service_account.yaml
+  - rbac/api_cluster_role.yaml
+  - rbac/api_cluster_role_binding.yaml
+  - manager/deployment.yaml
+  - api/deployment.yaml
+  - api/service.yaml

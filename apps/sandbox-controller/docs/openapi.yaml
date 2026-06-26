@@ -1,0 +1,171 @@
+openapi: 3.1.0
+info:
+  title: Daytona Sandbox API
+  version: v1alpha1
+paths:
+  /healthz:
+    get:
+      responses:
+        "204":
+          description: healthy
+  /sandboxes:
+    get:
+      responses:
+        "200":
+          description: list sandboxes
+    post:
+      responses:
+        "201":
+          description: sandbox created
+  /sandboxes/{name}:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: sandbox
+    delete:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "204":
+          description: sandbox deleted
+  /sandboxes/{name}:start:
+    post:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: sandbox start requested
+  /sandboxes/{name}:stop:
+    post:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: sandbox stop requested
+  /sandboxes/{name}:snapshot:
+    post:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "201":
+          description: snapshot created
+  /sandboxes/{name}:fork:
+    post:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "201":
+          description: forked sandbox created
+  /sandboxes/{name}/access:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: access routes
+  /sandboxes/{name}/exec:
+    post:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: command executed
+        "202":
+          description: stopped sandbox was started; retry exec when ready
+  /sandboxes/{name}/files:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: file read
+    post:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: file written
+  /sandboxes/{name}/ports:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: exposed ports
+    post:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: port exposed
+  /sandboxes/{name}/ssh:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+      responses:
+        "200":
+          description: SSH details
+  /sandboxes/{name}/logs:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/SandboxName"
+        - name: container
+          in: query
+          schema:
+            type: string
+            default: workload
+        - name: follow
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: previous
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: timestamps
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: tailLines
+          in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: limitBytes
+          in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: sinceSeconds
+          in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: sinceTime
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: sandbox pod logs
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  parameters:
+    SandboxName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string

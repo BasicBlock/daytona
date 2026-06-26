@@ -1,0 +1,13 @@
+apiVersion: podsnapshot.gke.io/v1
+kind: PodSnapshotStorageConfig
+metadata:
+  name: local-minio
+  labels:
+    app.kubernetes.io/name: local-minio
+    app.kubernetes.io/managed-by: daytona
+spec:
+  snapshotStorageConfig:
+    gcs:
+      bucket: daytona-local
+      path: snapshots
+      tokenSource: podKSA

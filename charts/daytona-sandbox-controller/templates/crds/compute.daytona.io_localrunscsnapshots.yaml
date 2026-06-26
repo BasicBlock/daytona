@@ -1,0 +1,86 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: localrunscsnapshots.compute.daytona.io
+spec:
+  group: compute.daytona.io
+  names:
+    kind: LocalRunscSnapshot
+    listKind: LocalRunscSnapshotList
+    plural: localrunscsnapshots
+    singular: localrunscsnapshot
+    shortNames:
+      - lrsnap
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Node
+          type: string
+          jsonPath: .spec.nodeName
+        - name: SourcePod
+          type: string
+          jsonPath: .spec.sourcePodName
+        - name: Storage
+          type: string
+          jsonPath: .status.storageRef
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - sandboxName
+                - sourcePodName
+                - nodeName
+              properties:
+                sandboxName:
+                  type: string
+                sourcePodName:
+                  type: string
+                sourceContainerName:
+                  type: string
+                nodeName:
+                  type: string
+                storage:
+                  type: object
+                  properties:
+                    mode:
+                      type: string
+                    path:
+                      type: string
+                    endpoint:
+                      type: string
+                    bucket:
+                      type: string
+                    prefix:
+                      type: string
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                phase:
+                  type: string
+                storageRef:
+                  type: string
+                nodeName:
+                  type: string
+                error:
+                  type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true

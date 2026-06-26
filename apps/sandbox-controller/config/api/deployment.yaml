@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-api
+  namespace: daytona-system
+  labels:
+    app.kubernetes.io/name: sandbox-api
+    app.kubernetes.io/managed-by: daytona
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sandbox-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sandbox-api
+    spec:
+      serviceAccountName: sandbox-api
+      containers:
+        - name: api
+          image: ghcr.io/daytonaio/sandbox-controller:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - /sandbox-api
+          args:
+            - --listen=:8090
+            - --namespace=$(SANDBOX_NAMESPACE)
+            - --public-base-url=$(DAYTONA_PUBLIC_BASE_URL)
+          env:
+            - name: SANDBOX_NAMESPACE
+              value: sandboxes
+            - name: DAYTONA_PUBLIC_BASE_URL
+              value: http://sandbox-api.daytona-system.svc.cluster.local:8090
+          ports:
+            - name: http
+              containerPort: 8090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
