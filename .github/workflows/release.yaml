@@ -22,7 +22,7 @@ env:
 jobs:
   publish:
     if: github.repository == 'BasicBlock/daytona'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     env:
@@ -53,7 +53,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global --add safe.directory $GITHUB_WORKSPACE
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global user.name "Daytona Release Bot"
           git config --global user.email "daytona-release@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}"
@@ -107,7 +107,7 @@ jobs:
 
   build_projects:
     needs: publish
-    runs-on: blacksmith-16vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     env:
@@ -136,7 +136,7 @@ jobs:
 
       - name: Configure git
         run: |
-          git config --global --add safe.directory $GITHUB_WORKSPACE
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global user.name "Daytona Release Bot"
           git config --global user.email "daytona-release@users.noreply.github.com"
 
@@ -192,9 +192,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: blacksmith-16vcpu-ubuntu-2404
+          - runner: ubuntu-24.04
             arch: amd64
-          - runner: blacksmith-16vcpu-ubuntu-2404-arm
+          - runner: ubuntu-24.04-arm
             arch: arm64
     permissions:
       contents: read
@@ -256,14 +256,14 @@ jobs:
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
 
-      - name: Setup Blacksmith Builder
-        uses: useblacksmith/setup-docker-builder@ab5c1da94f53f5cd75c1038092aa276dddfccbba # v1.9.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Project dependencies
         run: corepack enable
       - name: Get yarn cache directory
         id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
@@ -285,7 +285,7 @@ jobs:
   # Push combined manifest
   docker_push_manifest:
     needs: docker_build
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
@@ -303,7 +303,7 @@ jobs:
         run: corepack enable
       - name: Get yarn cache directory
         id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
@@ -336,7 +336,7 @@ jobs:
 
   sync_gosum:
     needs: build_projects
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -371,7 +371,7 @@ jobs:
         run: corepack enable
       - name: Get yarn cache directory
         id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
@@ -383,10 +383,10 @@ jobs:
         run: |
           git checkout -b "sync-gosum-$VERSION"
           GONOSUMDB=github.com/daytonaio/daytona go work sync
-          if git diff --quiet -- **/go.sum; then
+          if git diff --quiet -- '**/go.sum'; then
             echo "No go.sum changes detected; skipping commit and PR creation."
           else
-            git add **/go.sum
+            git add -- '**/go.sum'
             git commit -s -m "chore: sync go.sum for $VERSION"
             git push origin "sync-gosum-$VERSION"
             gh pr create \

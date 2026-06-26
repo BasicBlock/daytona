@@ -21,9 +21,9 @@ concurrency:
 
 jobs:
   e2e-pr-tests:
-    if: github.repository == 'daytonaio/daytona'
+    if: github.repository == 'BasicBlock/daytona'
     name: E2E sandbox lifecycle (from source)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
@@ -41,7 +41,7 @@ jobs:
 
       - name: Get yarn cache directory
         id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -54,15 +54,15 @@ jobs:
       - name: Check if E2E-relevant projects are affected
         id: affected
         run: |
-          if ! AFFECTED=$(npx nx show projects --affected --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD); then
+          if ! AFFECTED=$(npx nx show projects --affected --base="origin/${{ github.event.pull_request.base.ref }}" --head=HEAD); then
             echo "Failed to determine affected projects"
             exit 1
           fi
           echo "Affected projects: $AFFECTED"
-          if echo "$AFFECTED" | grep -qE 'daytona-e2e|^api$|^runner$|^proxy$|^daemon$|api-client|toolbox-api-client'; then
-            echo "affected=true" >> $GITHUB_OUTPUT
+          if printf '%s\n' "$AFFECTED" | grep -qE 'daytona-e2e|^api$|^runner$|^proxy$|^daemon$|api-client|toolbox-api-client'; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
           else
-            echo "affected=false" >> $GITHUB_OUTPUT
+            echo "affected=false" >> "$GITHUB_OUTPUT"
             echo "No E2E-relevant projects affected — skipping"
           fi
 
@@ -240,7 +240,7 @@ jobs:
         run: |
           for svc in api runner proxy; do
             if [ -f /tmp/${svc}.pid ]; then
-              kill $(cat /tmp/${svc}.pid) 2>/dev/null || true
+              kill "$(cat "/tmp/${svc}.pid")" 2>/dev/null || true
             fi
           done
 

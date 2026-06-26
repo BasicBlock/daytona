@@ -15,8 +15,8 @@ env:
 
 jobs:
   prepare:
-    if: github.repository == 'daytonaio/daytona'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.repository == 'BasicBlock/daytona'
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -42,7 +42,7 @@ jobs:
 
       - name: Configure git
         run: |
-          git config --global --add safe.directory $GITHUB_WORKSPACE
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global user.name "Daytona Release Bot"
           git config --global user.email "daytona-release@users.noreply.github.com"
 

@@ -19,9 +19,9 @@ env:
 
 jobs:
   go-work:
-    if: github.repository == 'daytonaio/daytona'
+    if: github.repository == 'BasicBlock/daytona'
     name: Go work
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -37,9 +37,9 @@ jobs:
           git diff --exit-code -- 'go.work*' '*/go.mod' '*/go.sum' || (echo "Go workspace files are not up to date! Please run 'go work sync' and commit the changes." && exit 1)
 
   golangci:
-    if: github.repository == 'daytonaio/daytona'
+    if: github.repository == 'BasicBlock/daytona'
     name: Go lint
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         working-directory: [apps/daemon, apps/runner, apps/proxy, apps/otel-collector/exporter]
@@ -65,9 +65,9 @@ jobs:
           git diff --exit-code '**/*.go' || (echo "Code is not formatted! Please run 'go fmt ./...' and commit" && exit 1)
 
   lint-computer-use:
-    if: github.repository == 'daytonaio/daytona'
+    if: github.repository == 'BasicBlock/daytona'
     name: Go lint (Computer Use)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -91,9 +91,9 @@ jobs:
           args: --timeout=5m ./...
 
   format-lint-api-clients:
-    if: github.repository == 'daytonaio/daytona'
+    if: github.repository == 'BasicBlock/daytona'
     name: Format, lint and generate API clients
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -115,8 +115,8 @@ jobs:
           git diff --exit-code || (echo "Code not formatted or linting errors! Hint: 'yarn generate:api-client', 'yarn lint:fix' and commit" && exit 1)
 
   test:
-    if: github.repository == 'daytonaio/daytona'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.repository == 'BasicBlock/daytona'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -126,8 +126,8 @@ jobs:
         run: yarn test
 
   build:
-    if: github.repository == 'daytonaio/daytona'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.repository == 'BasicBlock/daytona'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -137,8 +137,8 @@ jobs:
         run: VERSION=v0.0.0-dev yarn build --nxBail=true
 
   license-check:
-    if: github.repository == 'daytonaio/daytona'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.repository == 'BasicBlock/daytona'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -159,9 +159,9 @@ jobs:
           mode: 'check'
 
   yarnrc-lint:
-    if: github.repository == 'daytonaio/daytona'
+    if: github.repository == 'BasicBlock/daytona'
     name: Yarnrc integrity check
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
