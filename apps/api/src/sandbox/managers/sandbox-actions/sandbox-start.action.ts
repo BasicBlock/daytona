@@ -357,16 +357,12 @@ export class SandboxStartAction extends SandboxAction {
   }
 
   async pullSnapshotToRunner(snapshot: Snapshot, runner: Runner) {
-    let internalRegistry: DockerRegistry | undefined
-    if (isRegistrySnapshotRef(snapshot.sandboxClass, snapshot.ref)) {
-      const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshot.ref, runner.target)
-      internalRegistry = found ?? undefined
-    }
+    const registry = await this.resolveSnapshotRegistry(snapshot.sandboxClass, snapshot.ref, runner.target)
 
     const runnerAdapter = await this.runnerAdapterFactory.create(runner)
 
     // Fire the pull request (runner returns 202 immediately)
-    await runnerAdapter.pullSnapshot(snapshot.ref, internalRegistry)
+    await runnerAdapter.pullSnapshot(snapshot.ref, registry)
 
     const pollTimeoutMs = 60 * 60 * 1_000 // 1 hour
     const pollIntervalMs = 5 * 1_000 // 5 seconds
@@ -441,7 +437,7 @@ export class SandboxStartAction extends SandboxAction {
 
     const runnerAdapter = await this.runnerAdapterFactory.create(runner)
 
-    let internalRegistry: DockerRegistry | undefined
+    let registry: DockerRegistry | undefined
     let entrypoint: string[]
     let snapshotRef: string
     if (!sandbox.buildInfo) {
@@ -449,10 +445,7 @@ export class SandboxStartAction extends SandboxAction {
       const snapshot = await this.snapshotService.getSnapshotByName(sandbox.snapshot)
       snapshotRef = snapshot.ref
 
-      if (isRegistrySnapshotRef(snapshot.sandboxClass, snapshotRef)) {
-        const found = await this.dockerRegistryService.findInternalRegistryBySnapshotRef(snapshotRef, runner.target)
-        internalRegistry = found ?? undefined
-      }
+      registry = await this.resolveSnapshotRegistry(snapshot.sandboxClass, snapshotRef, runner.target)
 
       entrypoint = snapshot.entrypoint
     } else {
@@ -467,7 +460,7 @@ export class SandboxStartAction extends SandboxAction {
     const result = await runnerAdapter.createSandbox(
       sandbox,
       snapshotRef,
-      internalRegistry,
+      registry,
       entrypoint,
       metadata,
       this.configService.get('otelCollector.endpointUrl'),
@@ -476,6 +469,19 @@ export class SandboxStartAction extends SandboxAction {
     await this.updateSandboxState(sandbox, SandboxState.CREATING, lockCode, undefined, undefined, result?.daemonVersion)
     //  sync states again immediately for sandbox
     return SYNC_AGAIN
+  }
+
+  private async resolveSnapshotRegistry(
+    sandboxClass: Snapshot['sandboxClass'],
+    snapshotRef: string | undefined | null,
+    target: string,
+  ): Promise<DockerRegistry | undefined> {
+    if (!snapshotRef || !isRegistrySnapshotRef(sandboxClass, snapshotRef)) {
+      return undefined
+    }
+
+    const found = await this.dockerRegistryService.findSourceRegistryBySnapshotImageName(snapshotRef, target)
+    return found ?? undefined
   }
 
   private async handleRunnerSandboxStoppedOrArchivedStateOnDesiredStateStart(
