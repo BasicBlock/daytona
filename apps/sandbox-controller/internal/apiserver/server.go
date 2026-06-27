@@ -117,6 +117,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 type SandboxRequest struct {
 	Name         string                `json:"name"`
+	Owner        string                `json:"owner,omitempty"`
 	EntryCommand string                `json:"entryCommand,omitempty"`
 	Spec         computev1.SandboxSpec `json:"spec"`
 }
@@ -152,12 +153,14 @@ type AccessResponse struct {
 
 type SandboxListItem struct {
 	computev1.Sandbox `json:",inline"`
+	Owner             string       `json:"owner,omitempty"`
 	EntryCommand      string       `json:"entryCommand,omitempty"`
 	Ports             []PortAccess `json:"ports"`
 }
 
 type SandboxResponse struct {
 	computev1.Sandbox `json:",inline"`
+	Owner             string       `json:"owner,omitempty"`
 	EntryCommand      string       `json:"entryCommand,omitempty"`
 	Ports             []PortAccess `json:"ports,omitempty"`
 }
@@ -195,7 +198,16 @@ type SSHResponse struct {
 
 func (s *Server) listSandboxes(w http.ResponseWriter, r *http.Request) {
 	var list computev1.SandboxList
-	if err := s.client.List(r.Context(), &list, client.InNamespace(s.namespace)); err != nil {
+	listOptions := []client.ListOption{client.InNamespace(s.namespace)}
+	if owner := r.URL.Query().Get("owner"); owner != "" {
+		normalizedOwner, err := normalizeOwner(owner)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		listOptions = append(listOptions, client.MatchingLabels{computev1.LabelOwner: normalizedOwner})
+	}
+	if err := s.client.List(r.Context(), &list, listOptions...); err != nil {
 		writeKubernetesError(w, err)
 		return
 	}
@@ -203,6 +215,7 @@ func (s *Server) listSandboxes(w http.ResponseWriter, r *http.Request) {
 	for i := range list.Items {
 		items = append(items, SandboxListItem{
 			Sandbox:      list.Items[i],
+			Owner:        sandboxOwner(&list.Items[i]),
 			EntryCommand: sandboxEntryCommand(&list.Items[i]),
 			Ports:        s.sandboxPortAccesses(&list.Items[i]),
 		})
@@ -217,6 +230,11 @@ func (s *Server) createSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validateName("name", req.Name); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	owner, err := normalizeOptionalOwner(req.Owner)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -240,6 +258,7 @@ func (s *Server) createSandbox(w http.ResponseWriter, r *http.Request) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name,
 			Namespace: s.namespace,
+			Labels:    ownerLabels(owner),
 		},
 		Spec: req.Spec,
 	}
@@ -523,9 +542,66 @@ func (s *Server) sandboxPortAccesses(sandbox *computev1.Sandbox) []PortAccess {
 func (s *Server) sandboxResponse(sandbox *computev1.Sandbox) SandboxResponse {
 	return SandboxResponse{
 		Sandbox:      *sandbox,
+		Owner:        sandboxOwner(sandbox),
 		EntryCommand: sandboxEntryCommand(sandbox),
 		Ports:        s.sandboxPortAccesses(sandbox),
 	}
+}
+
+func sandboxOwner(sandbox *computev1.Sandbox) string {
+	if sandbox.Labels == nil {
+		return ""
+	}
+	return sandbox.Labels[computev1.LabelOwner]
+}
+
+func ownerLabels(owner string) map[string]string {
+	if owner == "" {
+		return nil
+	}
+	return map[string]string{computev1.LabelOwner: owner}
+}
+
+func normalizeOptionalOwner(owner string) (string, error) {
+	if strings.TrimSpace(owner) == "" {
+		return "", nil
+	}
+	return normalizeOwner(owner)
+}
+
+func normalizeOwner(owner string) (string, error) {
+	normalized := ownerSlug(owner)
+	if normalized == "" {
+		return "", errors.New("owner must contain at least one DNS label character")
+	}
+	if errs := kvalidation.IsDNS1123Label(normalized); len(errs) > 0 {
+		return "", fmt.Errorf("owner must normalize to a DNS-1123 label: %s", strings.Join(errs, "; "))
+	}
+	return normalized, nil
+}
+
+func ownerSlug(owner string) string {
+	value := strings.ToLower(strings.TrimSpace(owner))
+	var builder strings.Builder
+	lastWasHyphen := false
+	for i := 0; i < len(value); i++ {
+		ch := value[i]
+		isLabelChar := (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')
+		if isLabelChar {
+			builder.WriteByte(ch)
+			lastWasHyphen = false
+			continue
+		}
+		if !lastWasHyphen {
+			builder.WriteByte('-')
+			lastWasHyphen = true
+		}
+	}
+	slug := strings.Trim(builder.String(), "-")
+	if len(slug) > 63 {
+		slug = strings.TrimRight(slug[:63], "-")
+	}
+	return slug
 }
 
 func applyEntryCommand(req *SandboxRequest) error {

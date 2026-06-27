@@ -10,6 +10,7 @@ const (
 	SandboxFinalizer = "compute.daytona.io/sandbox"
 
 	LabelSandboxName   = "compute.daytona.io/sandbox"
+	LabelOwner         = "compute.daytona.io/owner"
 	LabelManagedBy     = "app.kubernetes.io/managed-by"
 	ManagedByValue     = "daytona-sandbox-controller"
 	AnnotationSpecHash = "compute.daytona.io/spec-hash"

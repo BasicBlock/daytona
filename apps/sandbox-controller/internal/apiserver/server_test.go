@@ -72,6 +72,31 @@ func TestCreateSandboxEntryCommand(t *testing.T) {
 	}
 }
 
+func TestCreateSandboxOwner(t *testing.T) {
+	k8sClient := testClient(t)
+	server := New(k8sClient, "sandboxes")
+
+	createBody := `{"name":"agent","owner":"Paul.Nispel@example.com","spec":{"image":"ubuntu:24.04"}}`
+	res := request(t, server, http.MethodPost, "/sandboxes", createBody)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var response SandboxResponse
+	decode(t, res, &response)
+	if response.Owner != "paul-nispel-example-com" {
+		t.Fatalf("expected normalized owner in response, got %q", response.Owner)
+	}
+
+	var sandbox computev1.Sandbox
+	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: "sandboxes", Name: "agent"}, &sandbox); err != nil {
+		t.Fatal(err)
+	}
+	if got := sandbox.Labels[computev1.LabelOwner]; got != "paul-nispel-example-com" {
+		t.Fatalf("expected owner label, got %q", got)
+	}
+}
+
 func TestCreateSandboxRejectsAmbiguousEntryCommand(t *testing.T) {
 	k8sClient := testClient(t)
 	server := New(k8sClient, "sandboxes")
@@ -83,6 +108,51 @@ func TestCreateSandboxRejectsAmbiguousEntryCommand(t *testing.T) {
 	}
 	if !strings.Contains(res.Body.String(), "entryCommand cannot be used") {
 		t.Fatalf("expected entry command conflict error, got %s", res.Body.String())
+	}
+}
+
+func TestListSandboxesFiltersByOwner(t *testing.T) {
+	alice := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "alice-agent",
+			Namespace: "sandboxes",
+			Labels:    map[string]string{computev1.LabelOwner: "alice-example-com"},
+		},
+		Spec: computev1.SandboxSpec{Image: "ubuntu:24.04"},
+	}
+	bob := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bob-agent",
+			Namespace: "sandboxes",
+			Labels:    map[string]string{computev1.LabelOwner: "bob"},
+		},
+		Spec: computev1.SandboxSpec{Image: "ubuntu:24.04"},
+	}
+	unowned := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "unowned-agent", Namespace: "sandboxes"},
+		Spec:       computev1.SandboxSpec{Image: "ubuntu:24.04"},
+	}
+	k8sClient := testClient(t, alice, bob, unowned)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodGet, "/sandboxes?owner=Alice@example.com", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var filtered []SandboxListItem
+	decode(t, res, &filtered)
+	if len(filtered) != 1 || filtered[0].Name != "alice-agent" || filtered[0].Owner != "alice-example-com" {
+		t.Fatalf("expected only Alice-owned sandbox, got %#v", filtered)
+	}
+
+	res = request(t, server, http.MethodGet, "/sandboxes", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var all []SandboxListItem
+	decode(t, res, &all)
+	if len(all) != 3 {
+		t.Fatalf("expected unfiltered list to include all sandboxes, got %#v", all)
 	}
 }
 
