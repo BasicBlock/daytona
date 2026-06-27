@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"sort"
@@ -249,6 +251,8 @@ func (s *Server) handleSandbox(w http.ResponseWriter, r *http.Request) {
 		s.execSandbox(w, r, strings.TrimSuffix(remainder, "/exec"))
 	case strings.HasSuffix(remainder, "/files"):
 		writeError(w, http.StatusNotImplemented, "sandbox file API is not available without a toolbox sidecar")
+	case strings.Contains(remainder, "/ports/"):
+		s.proxySandboxPort(w, r, remainder)
 	case strings.HasSuffix(remainder, "/ports"):
 		s.portControl(w, r, strings.TrimSuffix(remainder, "/ports"))
 	case strings.HasSuffix(remainder, "/ssh"):
@@ -671,6 +675,18 @@ func (s *Server) portControl(w http.ResponseWriter, r *http.Request, name string
 		if protocol == "" {
 			protocol = string(corev1.ProtocolTCP)
 		}
+		if protocol != string(corev1.ProtocolTCP) {
+			writeError(w, http.StatusBadRequest, "only TCP port exposure is supported")
+			return
+		}
+		if err := s.upsertSandboxPort(r.Context(), sandbox.Name, computev1.SandboxPort{
+			Name:     req.Name,
+			Port:     req.Port,
+			Protocol: corev1.Protocol(protocol),
+		}); err != nil {
+			writeKubernetesError(w, err)
+			return
+		}
 		writeJSON(w, http.StatusOK, PortExposure{
 			Name:      req.Name,
 			Port:      req.Port,
@@ -680,6 +696,155 @@ func (s *Server) portControl(w http.ResponseWriter, r *http.Request, name string
 		})
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) proxySandboxPort(w http.ResponseWriter, r *http.Request, remainder string) {
+	name, portName, targetPath, ok := parsePortProxyPath(remainder)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if errs := kvalidation.IsDNS1123Label(portName); len(errs) > 0 {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("port name must be a DNS-1123 label: %s", strings.Join(errs, "; ")))
+		return
+	}
+
+	sandbox, err := s.getSandboxObject(r.Context(), name)
+	if err != nil {
+		writeKubernetesError(w, err)
+		return
+	}
+	if render.DesiredState(sandbox) == computev1.SandboxDesiredStateStopped {
+		if _, err := s.wakeSandbox(r.Context(), sandbox); err != nil {
+			writeKubernetesError(w, err)
+			return
+		}
+	}
+	sandbox, err = s.waitForSandboxRunning(r.Context(), name, 90*time.Second)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	if err := s.touchSandboxActivity(r.Context(), sandbox.Name); err != nil {
+		writeKubernetesError(w, err)
+		return
+	}
+
+	port, ok := sandboxPortNumber(sandbox, portName)
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("sandbox port %q is not exposed", portName))
+		return
+	}
+	podName := sandbox.Status.PodName
+	if podName == "" {
+		podName = render.PodName(sandbox)
+	}
+	namespace := sandbox.Namespace
+	if namespace == "" {
+		namespace = s.namespace
+	}
+	var pod corev1.Pod
+	if err := s.client.Get(r.Context(), types.NamespacedName{Name: podName, Namespace: namespace}, &pod); err != nil {
+		writeKubernetesError(w, err)
+		return
+	}
+	if pod.Status.PodIP == "" {
+		writeError(w, http.StatusServiceUnavailable, "sandbox pod does not have an IP yet")
+		return
+	}
+
+	target := &url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(int(port))),
+	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.URL.Path = targetPath
+		req.URL.RawPath = ""
+	}
+	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
+		writeError(w, http.StatusBadGateway, err.Error())
+	}
+	proxy.ServeHTTP(w, r)
+}
+
+func parsePortProxyPath(remainder string) (string, string, string, bool) {
+	name, rest, ok := strings.Cut(remainder, "/ports/")
+	if !ok || name == "" || rest == "" {
+		return "", "", "", false
+	}
+	portName, suffix, _ := strings.Cut(rest, "/")
+	if portName == "" {
+		return "", "", "", false
+	}
+	if suffix == "" {
+		return name, portName, "/", true
+	}
+	return name, portName, "/" + suffix, true
+}
+
+func sandboxPortNumber(sandbox *computev1.Sandbox, portName string) (int32, bool) {
+	for _, port := range sandbox.Spec.Ports {
+		if port.Name == portName {
+			return port.Port, true
+		}
+	}
+	if strings.HasPrefix(portName, "p") {
+		value, err := strconv.ParseInt(strings.TrimPrefix(portName, "p"), 10, 32)
+		if err == nil && value > 0 && value <= 65535 {
+			return int32(value), true
+		}
+	}
+	return 0, false
+}
+
+func (s *Server) upsertSandboxPort(ctx context.Context, name string, port computev1.SandboxPort) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := s.getSandboxObject(ctx, name)
+		if err != nil {
+			return err
+		}
+		next := current.DeepCopyObject().(*computev1.Sandbox)
+		for i := range next.Spec.Ports {
+			if next.Spec.Ports[i].Name == port.Name {
+				next.Spec.Ports[i] = port
+				return s.client.Update(ctx, next)
+			}
+		}
+		next.Spec.Ports = append(next.Spec.Ports, port)
+		return s.client.Update(ctx, next)
+	})
+}
+
+func (s *Server) waitForSandboxRunning(ctx context.Context, name string, timeout time.Duration) (*computev1.Sandbox, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	var lastPhase computev1.SandboxPhase
+	for {
+		sandbox, err := s.getSandboxObject(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		lastPhase = sandbox.Status.Phase
+		if sandbox.Status.Phase == computev1.SandboxPhaseRunning {
+			return sandbox, nil
+		}
+		if sandbox.Status.Phase == computev1.SandboxPhaseFailed {
+			return nil, fmt.Errorf("sandbox %s failed while starting", name)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timed out waiting for sandbox %s to run; last phase was %s", name, lastPhase)
+		case <-ticker.C:
+		}
 	}
 }
 

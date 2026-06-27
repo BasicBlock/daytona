@@ -6,6 +6,7 @@ import (
 	computev1 "github.com/daytonaio/sandbox-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestPodDefaultsToGvisorWorkloadOnly(t *testing.T) {
@@ -137,6 +138,51 @@ func TestCompatibilityHashIgnoresLifecycleFields(t *testing.T) {
 
 	if runningHash != stoppedHash {
 		t.Fatalf("expected hashes to match, got %s and %s", runningHash, stoppedHash)
+	}
+}
+
+func TestCompatibilityHashIgnoresPortExposures(t *testing.T) {
+	base := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+		},
+	}
+	withPort := base.DeepCopyObject().(*computev1.Sandbox)
+	withPort.Spec.Ports = []computev1.SandboxPort{{Name: "p80", Port: 80}}
+
+	baseHash, err := CompatibilityHash(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	portHash, err := CompatibilityHash(withPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if baseHash != portHash {
+		t.Fatalf("expected port exposure not to change hash, got %s and %s", baseHash, portHash)
+	}
+}
+
+func TestServiceTargetsNumericPorts(t *testing.T) {
+	sandbox := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			Ports: []computev1.SandboxPort{{
+				Name: "p80",
+				Port: 80,
+			}},
+		},
+	}
+
+	service := Service(sandbox)
+	if len(service.Spec.Ports) != 1 {
+		t.Fatalf("expected one service port, got %#v", service.Spec.Ports)
+	}
+	target := service.Spec.Ports[0].TargetPort
+	if target.Type != intstr.Int || target.IntVal != 80 {
+		t.Fatalf("expected numeric target port 80, got %#v", target)
 	}
 }
 

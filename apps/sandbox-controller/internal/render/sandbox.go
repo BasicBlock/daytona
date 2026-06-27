@@ -60,13 +60,8 @@ func CompatibilityHash(sandbox *computev1.Sandbox) (string, error) {
 	spec.TemplateName = ""
 	spec.StopPolicy = computev1.SandboxStopPolicySpec{}
 	spec.Restore = nil
+	spec.Ports = nil
 	normalizeEnv(spec.Env)
-	sort.Slice(spec.Ports, func(i, j int) bool {
-		if spec.Ports[i].Name == spec.Ports[j].Name {
-			return spec.Ports[i].Port < spec.Ports[j].Port
-		}
-		return spec.Ports[i].Name < spec.Ports[j].Name
-	})
 	data, err := json.Marshal(struct {
 		Version string                `json:"version"`
 		Spec    computev1.SandboxSpec `json:"spec"`
@@ -183,7 +178,7 @@ func Service(sandbox *computev1.Sandbox) *corev1.Service {
 		ports = append(ports, corev1.ServicePort{
 			Name:       port.Name,
 			Port:       port.Port,
-			TargetPort: intstr.FromString(port.Name),
+			TargetPort: intstr.FromInt32(port.Port),
 			Protocol:   protocol,
 		})
 	}

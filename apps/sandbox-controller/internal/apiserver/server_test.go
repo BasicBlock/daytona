@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -211,6 +214,87 @@ func TestListSandboxesReturnsOpenPorts(t *testing.T) {
 	}
 	if ports := byName["worker"].Ports; len(ports) != 0 {
 		t.Fatalf("expected worker to have no open ports, got %#v", ports)
+	}
+}
+
+func TestPortControlPersistsExposure(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec:       computev1.SandboxSpec{Image: "ubuntu:24.04"},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes", WithPublicBaseURL("https://sandbox-api.tailnet"))
+
+	res := request(t, server, http.MethodPost, "/sandboxes/agent/ports", `{"name":"p80","port":80}`)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var updated computev1.Sandbox
+	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: "sandboxes", Name: "agent"}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Spec.Ports) != 1 || updated.Spec.Ports[0].Name != "p80" || updated.Spec.Ports[0].Port != 80 {
+		t.Fatalf("expected persisted p80 exposure, got %#v", updated.Spec.Ports)
+	}
+}
+
+func TestProxySandboxPortRoutesToWorkloadPod(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/hello" || r.URL.RawQuery != "x=1" {
+			t.Fatalf("unexpected upstream URL %s", r.URL.String())
+		}
+		w.Header().Set("X-Upstream", "ok")
+		_, _ = w.Write([]byte("proxied"))
+	}))
+	defer upstream.Close()
+
+	upstreamURL, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, portValue, err := net.SplitHostPort(upstreamURL.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.ParseInt(portValue, 10, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			Ports: []computev1.SandboxPort{{
+				Name: "web",
+				Port: int32(port),
+			}},
+		},
+		Status: computev1.SandboxStatus{
+			Phase:   computev1.SandboxPhaseRunning,
+			PodName: "sandbox-agent",
+		},
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "sandbox-agent", Namespace: "sandboxes"},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			PodIP: host,
+		},
+	}
+	k8sClient := testClient(t, source, pod)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodGet, "/sandboxes/agent/ports/web/hello?x=1", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("X-Upstream"); got != "ok" {
+		t.Fatalf("expected upstream header, got %q", got)
+	}
+	if got := res.Body.String(); got != "proxied" {
+		t.Fatalf("expected proxied body, got %q", got)
 	}
 }
 
