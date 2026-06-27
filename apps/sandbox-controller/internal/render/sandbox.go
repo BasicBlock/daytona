@@ -10,18 +10,14 @@ import (
 	computev1 "github.com/daytonaio/sandbox-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
 	DefaultRuntimeClassName = "gvisor"
-	DefaultToolboxImage     = "ghcr.io/daytonaio/sandbox-controller:dev"
-	DefaultToolboxCommand   = "/toolbox-sidecar"
-	DefaultToolboxPort      = int32(2280)
 	WorkloadContainerName   = "workload"
-	ToolboxContainerName    = "toolbox"
+	CompatibilityVersion    = "workload-only-v2"
 )
 
 func DesiredState(sandbox *computev1.Sandbox) computev1.SandboxDesiredState {
@@ -58,23 +54,6 @@ func RuntimeClassName(sandbox *computev1.Sandbox) string {
 	return DefaultRuntimeClassName
 }
 
-func ToolboxImage(sandbox *computev1.Sandbox, defaultImage string) string {
-	if sandbox.Spec.Toolbox.Image != "" {
-		return sandbox.Spec.Toolbox.Image
-	}
-	if defaultImage != "" {
-		return defaultImage
-	}
-	return DefaultToolboxImage
-}
-
-func ToolboxPort(sandbox *computev1.Sandbox) int32 {
-	if sandbox.Spec.Toolbox.Port > 0 {
-		return sandbox.Spec.Toolbox.Port
-	}
-	return DefaultToolboxPort
-}
-
 func CompatibilityHash(sandbox *computev1.Sandbox) (string, error) {
 	spec := sandbox.Spec.DeepCopy()
 	spec.DesiredState = ""
@@ -88,7 +67,13 @@ func CompatibilityHash(sandbox *computev1.Sandbox) (string, error) {
 		}
 		return spec.Ports[i].Name < spec.Ports[j].Name
 	})
-	data, err := json.Marshal(spec)
+	data, err := json.Marshal(struct {
+		Version string                `json:"version"`
+		Spec    computev1.SandboxSpec `json:"spec"`
+	}{
+		Version: CompatibilityVersion,
+		Spec:    spec,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -96,7 +81,7 @@ func CompatibilityHash(sandbox *computev1.Sandbox) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-func Pod(sandbox *computev1.Sandbox, defaultToolboxImage string) (*corev1.Pod, string, error) {
+func Pod(sandbox *computev1.Sandbox, _ string) (*corev1.Pod, string, error) {
 	if sandbox.Spec.Image == "" {
 		return nil, "", fmt.Errorf("sandbox image is required")
 	}
@@ -122,8 +107,6 @@ func Pod(sandbox *computev1.Sandbox, defaultToolboxImage string) (*corev1.Pod, s
 
 	runtimeClassName := RuntimeClassName(sandbox)
 	enableServiceLinks := false
-	shareProcessNamespace := true
-	toolboxUser := int64(0)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -133,14 +116,13 @@ func Pod(sandbox *computev1.Sandbox, defaultToolboxImage string) (*corev1.Pod, s
 			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
-			RuntimeClassName:      &runtimeClassName,
-			ServiceAccountName:    sandbox.Spec.ServiceAccountName,
-			RestartPolicy:         corev1.RestartPolicyNever,
-			EnableServiceLinks:    &enableServiceLinks,
-			ShareProcessNamespace: &shareProcessNamespace,
-			NodeSelector:          copyStringMap(sandbox.Spec.Scheduling.NodeSelector),
-			Tolerations:           append([]corev1.Toleration(nil), sandbox.Spec.Scheduling.Tolerations...),
-			Affinity:              sandbox.Spec.Scheduling.Affinity,
+			RuntimeClassName:   &runtimeClassName,
+			ServiceAccountName: sandbox.Spec.ServiceAccountName,
+			RestartPolicy:      corev1.RestartPolicyNever,
+			EnableServiceLinks: &enableServiceLinks,
+			NodeSelector:       copyStringMap(sandbox.Spec.Scheduling.NodeSelector),
+			Tolerations:        append([]corev1.Toleration(nil), sandbox.Spec.Scheduling.Tolerations...),
+			Affinity:           sandbox.Spec.Scheduling.Affinity,
 			Containers: []corev1.Container{
 				{
 					Name:         WorkloadContainerName,
@@ -152,32 +134,6 @@ func Pod(sandbox *computev1.Sandbox, defaultToolboxImage string) (*corev1.Pod, s
 					Resources:    *sandbox.Spec.Resources.DeepCopy(),
 					Ports:        workloadContainerPorts(sandbox),
 					VolumeMounts: workloadVolumeMounts(sandbox),
-				},
-				{
-					Name:    ToolboxContainerName,
-					Image:   ToolboxImage(sandbox, defaultToolboxImage),
-					Command: []string{DefaultToolboxCommand},
-					SecurityContext: &corev1.SecurityContext{
-						RunAsUser: &toolboxUser,
-						Capabilities: &corev1.Capabilities{
-							Add: []corev1.Capability{"SYS_ADMIN", "SYS_PTRACE"},
-						},
-					},
-					Env: []corev1.EnvVar{
-						{Name: "DAYTONA_SANDBOX_NAME", Value: sandbox.Name},
-						{Name: "DAYTONA_WORKLOAD_CONTAINER", Value: WorkloadContainerName},
-						{Name: "DAYTONA_SSH_ENABLED", Value: fmt.Sprintf("%t", sandbox.Spec.Access.SSHEnabled)},
-						{Name: "DAYTONA_ROUTE_BASE_URL", Value: sandbox.Spec.Access.RouteBaseURL},
-						{Name: "DAYTONA_CREDENTIAL_VERSION", Value: sandbox.Spec.Access.CredentialVersion},
-						{Name: "DAYTONA_DOPPLER_PROJECT", Value: sandbox.Spec.Secrets.DopplerProject},
-						{Name: "DAYTONA_DOPPLER_CONFIG", Value: sandbox.Spec.Secrets.DopplerConfig},
-					},
-					Resources: toolboxResources(sandbox),
-					Ports: []corev1.ContainerPort{{
-						Name:          "toolbox",
-						ContainerPort: ToolboxPort(sandbox),
-						Protocol:      corev1.ProtocolTCP,
-					}},
 				},
 			},
 			Volumes: sandboxVolumes(sandbox),
@@ -218,12 +174,7 @@ func workloadEnvFrom(sandbox *computev1.Sandbox) []corev1.EnvFromSource {
 }
 
 func Service(sandbox *computev1.Sandbox) *corev1.Service {
-	ports := []corev1.ServicePort{{
-		Name:       "toolbox",
-		Port:       ToolboxPort(sandbox),
-		TargetPort: intstr.FromString("toolbox"),
-		Protocol:   corev1.ProtocolTCP,
-	}}
+	ports := make([]corev1.ServicePort, 0, len(sandbox.Spec.Ports))
 	for _, port := range sandbox.Spec.Ports {
 		protocol := port.Protocol
 		if protocol == "" {
@@ -338,22 +289,6 @@ func sandboxVolumes(sandbox *computev1.Sandbox) []corev1.Volume {
 		})
 	}
 	return volumes
-}
-
-func toolboxResources(sandbox *computev1.Sandbox) corev1.ResourceRequirements {
-	if len(sandbox.Spec.Toolbox.Resources.Requests) > 0 || len(sandbox.Spec.Toolbox.Resources.Limits) > 0 {
-		return *sandbox.Spec.Toolbox.Resources.DeepCopy()
-	}
-	return corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("50m"),
-			corev1.ResourceMemory: resource.MustParse("64Mi"),
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("256Mi"),
-		},
-	}
 }
 
 func normalizeEnv(values []corev1.EnvVar) {

@@ -60,16 +60,16 @@ func TestSandboxReconcilerCreatesPodAndService(t *testing.T) {
 	if pod.Spec.RuntimeClassName == nil || *pod.Spec.RuntimeClassName != render.DefaultRuntimeClassName {
 		t.Fatalf("expected gvisor runtime class, got %#v", pod.Spec.RuntimeClassName)
 	}
-	if len(pod.Spec.Containers) != 2 {
-		t.Fatalf("expected workload plus toolbox containers, got %d", len(pod.Spec.Containers))
+	if len(pod.Spec.Containers) != 1 {
+		t.Fatalf("expected workload container only, got %d", len(pod.Spec.Containers))
 	}
 
 	var service corev1.Service
 	if err := k8sClient.Get(ctx, types.NamespacedName{Name: render.ServiceName(sandbox), Namespace: sandbox.Namespace}, &service); err != nil {
 		t.Fatal(err)
 	}
-	if len(service.Spec.Ports) != 2 {
-		t.Fatalf("expected toolbox plus user service ports, got %d", len(service.Spec.Ports))
+	if len(service.Spec.Ports) != 1 {
+		t.Fatalf("expected user service port only, got %d", len(service.Spec.Ports))
 	}
 
 	var policy networkingv1.NetworkPolicy

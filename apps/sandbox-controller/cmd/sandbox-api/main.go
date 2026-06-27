@@ -48,7 +48,10 @@ func main() {
 	}
 
 	ctrl.Log.Info("starting sandbox API", "listen", listenAddr, "namespace", namespace)
-	options := []apiserver.Option{apiserver.WithPodLogStreamer(apiserver.NewKubernetesPodLogStreamer(clientset))}
+	options := []apiserver.Option{
+		apiserver.WithPodLogStreamer(apiserver.NewKubernetesPodLogStreamer(clientset)),
+		apiserver.WithPodExecutor(apiserver.NewKubernetesPodExecutor(config, clientset)),
+	}
 	if publicBaseURL != "" {
 		options = append(options, apiserver.WithPublicBaseURL(publicBaseURL))
 	}

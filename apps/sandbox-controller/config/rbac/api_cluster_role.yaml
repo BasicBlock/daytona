@@ -3,12 +3,18 @@ kind: ClusterRole
 metadata:
   name: sandbox-api
 rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
   - apiGroups: ["compute.daytona.io"]
     resources: ["sandboxes", "sandboxsnapshots"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["compute.daytona.io"]
     resources: ["sandboxes/status", "sandboxsnapshots/status"]
     verbs: ["get", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["pods/log"]
-    verbs: ["get"]

@@ -1,7 +1,6 @@
 package apiserver
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,9 +29,8 @@ import (
 type Server struct {
 	client        client.Client
 	namespace     string
-	httpClient    *http.Client
 	logStreamer   PodLogStreamer
-	toolboxURL    func(*computev1.Sandbox) string
+	podExecutor   PodExecutor
 	publicBaseURL string
 }
 
@@ -54,24 +52,16 @@ func (s *KubernetesPodLogStreamer) StreamPodLogs(ctx context.Context, namespace 
 
 type Option func(*Server)
 
-func WithHTTPClient(httpClient *http.Client) Option {
-	return func(s *Server) {
-		if httpClient != nil {
-			s.httpClient = httpClient
-		}
-	}
-}
-
 func WithPodLogStreamer(streamer PodLogStreamer) Option {
 	return func(s *Server) {
 		s.logStreamer = streamer
 	}
 }
 
-func WithToolboxURL(fn func(*computev1.Sandbox) string) Option {
+func WithPodExecutor(executor PodExecutor) Option {
 	return func(s *Server) {
-		if fn != nil {
-			s.toolboxURL = fn
+		if executor != nil {
+			s.podExecutor = executor
 		}
 	}
 }
@@ -89,10 +79,8 @@ func New(client client.Client, namespace string, options ...Option) *Server {
 	server := &Server{
 		client:        client,
 		namespace:     namespace,
-		httpClient:    &http.Client{Timeout: 30 * time.Second},
 		publicBaseURL: strings.TrimRight(envDefault("DAYTONA_PUBLIC_BASE_URL", "http://sandbox-api.daytona-system.svc.cluster.local:8090"), "/"),
 	}
-	server.toolboxURL = server.defaultToolboxURL
 	for _, option := range options {
 		option(server)
 	}
@@ -164,6 +152,30 @@ type PortAccess struct {
 	URL  string `json:"url"`
 }
 
+type PortExposeRequest struct {
+	Name             string `json:"name"`
+	Port             int32  `json:"port"`
+	Protocol         string `json:"protocol,omitempty"`
+	Signed           bool   `json:"signed,omitempty"`
+	ExpiresInSeconds int    `json:"expiresInSeconds,omitempty"`
+}
+
+type PortExposure struct {
+	Name      string    `json:"name"`
+	Port      int32     `json:"port"`
+	Protocol  string    `json:"protocol"`
+	URL       string    `json:"url"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type SSHResponse struct {
+	Enabled  bool   `json:"enabled"`
+	Host     string `json:"host,omitempty"`
+	Port     int    `json:"port,omitempty"`
+	Username string `json:"username,omitempty"`
+	Command  string `json:"command,omitempty"`
+}
+
 func (s *Server) listSandboxes(w http.ResponseWriter, r *http.Request) {
 	var list computev1.SandboxList
 	if err := s.client.List(r.Context(), &list, client.InNamespace(s.namespace)); err != nil {
@@ -221,13 +233,13 @@ func (s *Server) handleSandbox(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(remainder, ":fork"):
 		s.forkSandbox(w, r, strings.TrimSuffix(remainder, ":fork"))
 	case strings.HasSuffix(remainder, "/exec"):
-		s.proxyToolbox(w, r, strings.TrimSuffix(remainder, "/exec"), "/exec")
+		s.execSandbox(w, r, strings.TrimSuffix(remainder, "/exec"))
 	case strings.HasSuffix(remainder, "/files"):
-		s.proxyToolbox(w, r, strings.TrimSuffix(remainder, "/files"), "/files")
+		writeError(w, http.StatusNotImplemented, "sandbox file API is not available without a toolbox sidecar")
 	case strings.HasSuffix(remainder, "/ports"):
-		s.proxyToolbox(w, r, strings.TrimSuffix(remainder, "/ports"), "/ports")
+		s.portControl(w, r, strings.TrimSuffix(remainder, "/ports"))
 	case strings.HasSuffix(remainder, "/ssh"):
-		s.proxyToolbox(w, r, strings.TrimSuffix(remainder, "/ssh"), "/ssh")
+		s.sshSandbox(w, r, strings.TrimSuffix(remainder, "/ssh"))
 	case strings.HasSuffix(remainder, "/logs"):
 		s.getLogs(w, r, strings.TrimSuffix(remainder, "/logs"))
 	case strings.HasSuffix(remainder, "/access"):
@@ -449,7 +461,6 @@ func (s *Server) getAccess(w http.ResponseWriter, r *http.Request, name string) 
 	if sandbox.Status.ServiceName != "" {
 		serviceName = sandbox.Status.ServiceName
 	}
-	toolboxURL := strings.TrimRight(s.toolboxURL(sandbox), "/")
 	ports := make([]PortAccess, 0, len(sandbox.Spec.Ports))
 	for _, port := range sandbox.Spec.Ports {
 		ports = append(ports, PortAccess{
@@ -462,7 +473,7 @@ func (s *Server) getAccess(w http.ResponseWriter, r *http.Request, name string) 
 		SandboxName: sandbox.Name,
 		Phase:       string(sandbox.Status.Phase),
 		ServiceName: serviceName,
-		ToolboxURL:  toolboxURL,
+		ToolboxURL:  "",
 		Ports:       ports,
 	})
 }
@@ -507,25 +518,33 @@ func (s *Server) getLogs(w http.ResponseWriter, r *http.Request, name string) {
 	_ = copyLogs(w, logs, options.Follow)
 }
 
-func (s *Server) proxyToolbox(w http.ResponseWriter, r *http.Request, name string, path string) {
+func (s *Server) execSandbox(w http.ResponseWriter, r *http.Request, name string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req ExecRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	timeout := time.Duration(req.TimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	if timeout > 10*time.Minute {
+		writeError(w, http.StatusBadRequest, "timeoutSeconds must be at most 600")
+		return
+	}
+
 	sandbox, err := s.getSandboxObject(r.Context(), name)
 	if err != nil {
 		writeKubernetesError(w, err)
 		return
 	}
-	if (path == "/exec" || path == "/ssh") && render.DesiredState(sandbox) == computev1.SandboxDesiredStateStopped {
-		if err := s.touchSandboxActivity(r.Context(), sandbox.Name); err != nil {
-			writeKubernetesError(w, err)
-			return
-		}
-		sandbox, err = s.getSandboxObject(r.Context(), name)
-		if err != nil {
-			writeKubernetesError(w, err)
-			return
-		}
-		sandbox.Spec.DesiredState = computev1.SandboxDesiredStateRunning
-		prepareWake(sandbox)
-		if err := s.client.Update(r.Context(), sandbox); err != nil {
+
+	if render.DesiredState(sandbox) == computev1.SandboxDesiredStateStopped {
+		if _, err := s.wakeSandbox(r.Context(), sandbox); err != nil {
 			writeKubernetesError(w, err)
 			return
 		}
@@ -535,41 +554,113 @@ func (s *Server) proxyToolbox(w http.ResponseWriter, r *http.Request, name strin
 		})
 		return
 	}
-	_ = s.touchSandboxActivity(r.Context(), sandbox.Name)
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+
+	if s.podExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "pod executor is not configured")
 		return
 	}
-	defer r.Body.Close()
 
-	target := strings.TrimRight(s.toolboxURL(sandbox), "/") + path
-	if r.URL.RawQuery != "" {
-		target += "?" + r.URL.RawQuery
-	}
-	req, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(body))
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+	if err := s.touchSandboxActivity(r.Context(), sandbox.Name); err != nil {
+		writeKubernetesError(w, err)
 		return
 	}
-	req.Header.Set("Content-Type", r.Header.Get("Content-Type"))
-	req.Header.Set("X-Daytona-Sandbox", sandbox.Name)
-	req.Header.Set("X-Daytona-Public-Base-URL", s.publicBaseURL)
+	podName := sandbox.Status.PodName
+	if podName == "" {
+		podName = render.PodName(sandbox)
+	}
+	namespace := sandbox.Namespace
+	if namespace == "" {
+		namespace = s.namespace
+	}
 
-	res, err := s.httpClient.Do(req)
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+	res, err := s.podExecutor.Exec(ctx, namespace, podName, render.WorkloadContainerName, req)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	defer res.Body.Close()
+	writeJSON(w, http.StatusOK, res)
+}
 
-	for key, values := range res.Header {
-		for _, value := range values {
-			w.Header().Add(key, value)
-		}
+func (s *Server) sshSandbox(w http.ResponseWriter, r *http.Request, name string) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
 	}
-	w.WriteHeader(res.StatusCode)
-	_, _ = io.Copy(w, io.LimitReader(res.Body, 4<<20))
+	sandbox, err := s.getSandboxObject(r.Context(), name)
+	if err != nil {
+		writeKubernetesError(w, err)
+		return
+	}
+	if render.DesiredState(sandbox) == computev1.SandboxDesiredStateStopped {
+		if _, err := s.wakeSandbox(r.Context(), sandbox); err != nil {
+			writeKubernetesError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]string{
+			"status":  "starting",
+			"message": "sandbox was stopped and is starting before the request can be retried",
+		})
+		return
+	}
+	if err := s.touchSandboxActivity(r.Context(), sandbox.Name); err != nil {
+		writeKubernetesError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, sandboxSSHResponse(sandbox))
+}
+
+func (s *Server) portControl(w http.ResponseWriter, r *http.Request, name string) {
+	sandbox, err := s.getSandboxObject(r.Context(), name)
+	if err != nil {
+		writeKubernetesError(w, err)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		exposures := make([]PortExposure, 0, len(sandbox.Spec.Ports))
+		for _, port := range sandbox.Spec.Ports {
+			exposures = append(exposures, PortExposure{
+				Name:      port.Name,
+				Port:      port.Port,
+				Protocol:  string(portProtocol(port.Protocol)),
+				URL:       portURL(s.publicBaseURL, sandbox.Name, port.Name),
+				CreatedAt: time.Now().UTC(),
+			})
+		}
+		writeJSON(w, http.StatusOK, exposures)
+	case http.MethodPost:
+		var req PortExposeRequest
+		if err := readJSON(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if req.Name == "" {
+			req.Name = fmt.Sprintf("p%d", req.Port)
+		}
+		if errs := kvalidation.IsDNS1123Label(req.Name); len(errs) > 0 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("name must be a DNS-1123 label: %s", strings.Join(errs, "; ")))
+			return
+		}
+		if req.Port <= 0 || req.Port > 65535 {
+			writeError(w, http.StatusBadRequest, "port must be between 1 and 65535")
+			return
+		}
+		protocol := req.Protocol
+		if protocol == "" {
+			protocol = string(corev1.ProtocolTCP)
+		}
+		writeJSON(w, http.StatusOK, PortExposure{
+			Name:      req.Name,
+			Port:      req.Port,
+			Protocol:  protocol,
+			URL:       portURL(s.publicBaseURL, sandbox.Name, req.Name),
+			CreatedAt: time.Now().UTC(),
+		})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 func prepareWake(sandbox *computev1.Sandbox) {
@@ -594,12 +685,47 @@ func (s *Server) touchSandboxActivity(ctx context.Context, name string) error {
 	})
 }
 
-func (s *Server) defaultToolboxURL(sandbox *computev1.Sandbox) string {
-	serviceName := render.ServiceName(sandbox)
-	if sandbox.Status.ServiceName != "" {
-		serviceName = sandbox.Status.ServiceName
+func (s *Server) wakeSandbox(ctx context.Context, sandbox *computev1.Sandbox) (*computev1.Sandbox, error) {
+	if err := s.touchSandboxActivity(ctx, sandbox.Name); err != nil {
+		return nil, err
 	}
-	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", serviceName, s.namespace, render.ToolboxPort(sandbox))
+	current, err := s.getSandboxObject(ctx, sandbox.Name)
+	if err != nil {
+		return nil, err
+	}
+	current.Spec.DesiredState = computev1.SandboxDesiredStateRunning
+	prepareWake(current)
+	if err := s.client.Update(ctx, current); err != nil {
+		return nil, err
+	}
+	return current, nil
+}
+
+func sandboxSSHResponse(sandbox *computev1.Sandbox) SSHResponse {
+	if !sandbox.Spec.Access.SSHEnabled {
+		return SSHResponse{Enabled: false}
+	}
+	host := sandbox.Name + ".sandbox.tailnet"
+	port := 22
+	username := "daytona"
+	return SSHResponse{
+		Enabled:  true,
+		Host:     host,
+		Port:     port,
+		Username: username,
+		Command:  fmt.Sprintf("ssh -p %d %s@%s", port, username, host),
+	}
+}
+
+func portProtocol(protocol corev1.Protocol) corev1.Protocol {
+	if protocol == "" {
+		return corev1.ProtocolTCP
+	}
+	return protocol
+}
+
+func portURL(baseURL string, sandboxName string, portName string) string {
+	return strings.TrimRight(baseURL, "/") + "/sandboxes/" + sandboxName + "/ports/" + portName
 }
 
 func (s *Server) getSandboxObject(ctx context.Context, name string) (*computev1.Sandbox, error) {

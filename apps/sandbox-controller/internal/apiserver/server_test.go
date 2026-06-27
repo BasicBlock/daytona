@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	computev1 "github.com/daytonaio/sandbox-controller/api/v1alpha1"
+	"github.com/daytonaio/sandbox-controller/internal/render"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,31 +121,28 @@ func TestForkSandboxUsesReadySnapshot(t *testing.T) {
 	}
 }
 
-func TestProxyExecToToolbox(t *testing.T) {
+func TestExecUsesPodExecutor(t *testing.T) {
 	source := &computev1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
 		Spec:       computev1.SandboxSpec{Image: "ubuntu:24.04"},
-		Status:     computev1.SandboxStatus{ServiceName: "sandbox-agent"},
+		Status: computev1.SandboxStatus{
+			Phase:       computev1.SandboxPhaseRunning,
+			PodName:     "sandbox-agent",
+			ServiceName: "sandbox-agent",
+		},
 	}
 	k8sClient := testClient(t, source)
-	toolbox := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/exec" {
-			t.Fatalf("expected /exec, got %s", r.URL.Path)
-		}
-		body, _ := io.ReadAll(r.Body)
-		if string(body) != `{"command":["echo","ok"]}` {
-			t.Fatalf("unexpected proxy body %s", body)
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"exitCode": 0, "stdout": "ok\n"})
-	}))
-	defer toolbox.Close()
-
-	server := New(k8sClient, "sandboxes", WithToolboxURL(func(*computev1.Sandbox) string {
-		return toolbox.URL
-	}))
+	executor := &fakePodExecutor{response: ExecResponse{ExitCode: 0, Stdout: "ok\n"}}
+	server := New(k8sClient, "sandboxes", WithPodExecutor(executor))
 	res := request(t, server, http.MethodPost, "/sandboxes/agent/exec", `{"command":["echo","ok"]}`)
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if executor.namespace != "sandboxes" || executor.podName != "sandbox-agent" || executor.containerName != render.WorkloadContainerName {
+		t.Fatalf("unexpected executor target namespace=%s pod=%s container=%s", executor.namespace, executor.podName, executor.containerName)
+	}
+	if len(executor.request.Command) != 2 || executor.request.Command[0] != "echo" || executor.request.Command[1] != "ok" {
+		t.Fatalf("unexpected exec request %#v", executor.request)
 	}
 }
 
@@ -352,6 +350,31 @@ func TestSSHWakesStoppedSandbox(t *testing.T) {
 	}
 }
 
+func TestSSHReturnsKubernetesFallbackForRunningSandbox(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			Access: computev1.SandboxAccessSpec{
+				SSHEnabled: true,
+			},
+		},
+		Status: computev1.SandboxStatus{Phase: computev1.SandboxPhaseRunning},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodGet, "/sandboxes/agent/ssh", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var ssh SSHResponse
+	decode(t, res, &ssh)
+	if !ssh.Enabled || ssh.Host != "agent.sandbox.tailnet" || ssh.Port != 22 || ssh.Username != "daytona" {
+		t.Fatalf("unexpected ssh response %#v", ssh)
+	}
+}
+
 func testClient(t *testing.T, objects ...client.Object) client.Client {
 	t.Helper()
 	scheme := runtime.NewScheme()
@@ -377,6 +400,26 @@ type fakeLogStreamer struct {
 	options   *corev1.PodLogOptions
 	body      string
 	err       error
+}
+
+type fakePodExecutor struct {
+	namespace     string
+	podName       string
+	containerName string
+	request       ExecRequest
+	response      ExecResponse
+	err           error
+}
+
+func (f *fakePodExecutor) Exec(_ context.Context, namespace string, podName string, containerName string, req ExecRequest) (ExecResponse, error) {
+	f.namespace = namespace
+	f.podName = podName
+	f.containerName = containerName
+	f.request = req
+	if f.err != nil {
+		return ExecResponse{}, f.err
+	}
+	return f.response, nil
 }
 
 func (f *fakeLogStreamer) StreamPodLogs(_ context.Context, namespace string, podName string, options *corev1.PodLogOptions) (io.ReadCloser, error) {
