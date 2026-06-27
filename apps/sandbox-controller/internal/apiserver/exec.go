@@ -83,12 +83,24 @@ func (e *KubernetesPodExecutor) Exec(ctx context.Context, namespace string, podN
 			TTY:       false,
 		}, clientgoscheme.ParameterCodec)
 
-	executor, err := remotecommand.NewSPDYExecutor(e.config, "POST", execReq.URL())
+	websocketExecutor, err := remotecommand.NewWebSocketExecutor(e.config, "GET", execReq.URL().String())
 	if err != nil {
 		return ExecResponse{}, err
 	}
+	spdyExecutor, err := remotecommand.NewSPDYExecutor(e.config, "POST", execReq.URL())
+	if err != nil {
+		return ExecResponse{}, err
+	}
+	executor, err := remotecommand.NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return true })
+	if err != nil {
+		return ExecResponse{}, err
+	}
+	var stdin *bytes.Buffer
+	if req.Stdin != "" {
+		stdin = bytes.NewBufferString(req.Stdin)
+	}
 	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
-		Stdin:  bytes.NewBufferString(req.Stdin),
+		Stdin:  stdin,
 		Stdout: &stdout,
 		Stderr: &stderr,
 		Tty:    false,
