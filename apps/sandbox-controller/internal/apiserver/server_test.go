@@ -275,6 +275,9 @@ func TestExecWakesStoppedSandbox(t *testing.T) {
 	if updated.Spec.DesiredState != computev1.SandboxDesiredStateRunning {
 		t.Fatalf("expected exec to wake sandbox, got %s", updated.Spec.DesiredState)
 	}
+	if updated.Status.LastActivityTime == nil {
+		t.Fatal("expected exec wake to update last activity time")
+	}
 }
 
 func TestStartWakesFromSleepSnapshot(t *testing.T) {
@@ -312,6 +315,9 @@ func TestStartWakesFromSleepSnapshot(t *testing.T) {
 	if updated.Spec.StopPolicy.SnapshotName != "" {
 		t.Fatalf("expected stale sleep snapshot name to be cleared, got %#v", updated.Spec.StopPolicy)
 	}
+	if updated.Status.LastActivityTime == nil {
+		t.Fatal("expected start wake to update last activity time")
+	}
 }
 
 func TestSSHWakesStoppedSandbox(t *testing.T) {
@@ -340,6 +346,9 @@ func TestSSHWakesStoppedSandbox(t *testing.T) {
 	}
 	if updated.Spec.Restore == nil || updated.Spec.Restore.Name != "agent-sleep-new" {
 		t.Fatalf("expected ssh wake restore from sleep snapshot, got %#v", updated.Spec.Restore)
+	}
+	if updated.Status.LastActivityTime == nil {
+		t.Fatal("expected ssh wake to update last activity time")
 	}
 }
 

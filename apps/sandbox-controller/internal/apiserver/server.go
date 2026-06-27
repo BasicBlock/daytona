@@ -316,6 +316,17 @@ func (s *Server) patchDesiredState(w http.ResponseWriter, r *http.Request, name 
 		writeKubernetesError(w, err)
 		return
 	}
+	if desired == computev1.SandboxDesiredStateRunning {
+		if err := s.touchSandboxActivity(r.Context(), sandbox.Name); err != nil {
+			writeKubernetesError(w, err)
+			return
+		}
+		sandbox, err = s.getSandboxObject(r.Context(), name)
+		if err != nil {
+			writeKubernetesError(w, err)
+			return
+		}
+	}
 	sandbox.Spec.DesiredState = desired
 	if mutate != nil {
 		mutate(sandbox)
@@ -323,9 +334,6 @@ func (s *Server) patchDesiredState(w http.ResponseWriter, r *http.Request, name 
 	if err := s.client.Update(r.Context(), sandbox); err != nil {
 		writeKubernetesError(w, err)
 		return
-	}
-	if desired == computev1.SandboxDesiredStateRunning {
-		s.touchSandboxActivity(r.Context(), sandbox)
 	}
 	writeJSON(w, http.StatusOK, sandbox)
 }
@@ -506,20 +514,28 @@ func (s *Server) proxyToolbox(w http.ResponseWriter, r *http.Request, name strin
 		return
 	}
 	if (path == "/exec" || path == "/ssh") && render.DesiredState(sandbox) == computev1.SandboxDesiredStateStopped {
+		if err := s.touchSandboxActivity(r.Context(), sandbox.Name); err != nil {
+			writeKubernetesError(w, err)
+			return
+		}
+		sandbox, err = s.getSandboxObject(r.Context(), name)
+		if err != nil {
+			writeKubernetesError(w, err)
+			return
+		}
 		sandbox.Spec.DesiredState = computev1.SandboxDesiredStateRunning
 		prepareWake(sandbox)
 		if err := s.client.Update(r.Context(), sandbox); err != nil {
 			writeKubernetesError(w, err)
 			return
 		}
-		s.touchSandboxActivity(r.Context(), sandbox)
 		writeJSON(w, http.StatusAccepted, map[string]string{
 			"status":  "starting",
 			"message": "sandbox was stopped and is starting before the request can be retried",
 		})
 		return
 	}
-	s.touchSandboxActivity(r.Context(), sandbox)
+	_ = s.touchSandboxActivity(r.Context(), sandbox.Name)
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -565,9 +581,9 @@ func prepareWake(sandbox *computev1.Sandbox) {
 	}
 }
 
-func (s *Server) touchSandboxActivity(ctx context.Context, sandbox *computev1.Sandbox) {
-	_ = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		current, err := s.getSandboxObject(ctx, sandbox.Name)
+func (s *Server) touchSandboxActivity(ctx context.Context, name string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := s.getSandboxObject(ctx, name)
 		if err != nil {
 			return err
 		}
