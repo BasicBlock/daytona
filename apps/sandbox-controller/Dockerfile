@@ -12,6 +12,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/sandbox-api ./cmd/sandbox-api
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/local-node-agent ./cmd/local-node-agent
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/toolbox-sidecar ./cmd/toolbox-sidecar
 
+FROM registry.k8s.io/kubectl:v1.34.1 AS kubectl
+
 FROM debian:bookworm-slim
 
 RUN apt-get update \
@@ -22,5 +24,6 @@ COPY --from=build /out/sandbox-controller /sandbox-controller
 COPY --from=build /out/sandbox-api /sandbox-api
 COPY --from=build /out/local-node-agent /local-node-agent
 COPY --from=build /out/toolbox-sidecar /toolbox-sidecar
+COPY --from=kubectl /bin/kubectl /usr/local/bin/kubectl
 USER 65532:65532
 ENTRYPOINT ["/sandbox-controller"]

@@ -172,6 +172,48 @@ func TestAccessReturnsPublicPortRoutes(t *testing.T) {
 	}
 }
 
+func TestListSandboxesReturnsOpenPorts(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			Ports: []computev1.SandboxPort{
+				{Name: "http", Port: 8080},
+				{Name: "metrics", Port: 9090, Protocol: corev1.ProtocolTCP},
+			},
+		},
+		Status: computev1.SandboxStatus{Phase: computev1.SandboxPhaseRunning},
+	}
+	withoutPorts := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "sandboxes"},
+		Spec:       computev1.SandboxSpec{Image: "ubuntu:24.04"},
+	}
+	k8sClient := testClient(t, source, withoutPorts)
+	server := New(k8sClient, "sandboxes", WithPublicBaseURL("https://sandbox-api.tailnet"))
+
+	res := request(t, server, http.MethodGet, "/sandboxes", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var sandboxes []SandboxListItem
+	decode(t, res, &sandboxes)
+	byName := map[string]SandboxListItem{}
+	for _, sandbox := range sandboxes {
+		byName[sandbox.Name] = sandbox
+	}
+	agent := byName["agent"]
+	if len(agent.Ports) != 2 {
+		t.Fatalf("expected two open ports, got %#v", agent.Ports)
+	}
+	if agent.Ports[0].Name != "http" || agent.Ports[0].Port != 8080 || agent.Ports[0].Protocol != "TCP" ||
+		agent.Ports[0].URL != "https://sandbox-api.tailnet/sandboxes/agent/ports/http" {
+		t.Fatalf("unexpected first port %#v", agent.Ports[0])
+	}
+	if ports := byName["worker"].Ports; len(ports) != 0 {
+		t.Fatalf("expected worker to have no open ports, got %#v", ports)
+	}
+}
+
 func TestSandboxLogsStreamsWorkloadLogs(t *testing.T) {
 	source := &computev1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},

@@ -12,7 +12,7 @@ paths:
     get:
       responses:
         "200":
-          description: list sandboxes
+          description: list sandboxes with open port routes
     post:
       responses:
         "201":

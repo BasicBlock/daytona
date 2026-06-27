@@ -146,10 +146,16 @@ type AccessResponse struct {
 	Ports       []PortAccess `json:"ports"`
 }
 
+type SandboxListItem struct {
+	computev1.Sandbox `json:",inline"`
+	Ports             []PortAccess `json:"ports"`
+}
+
 type PortAccess struct {
-	Name string `json:"name"`
-	Port int32  `json:"port"`
-	URL  string `json:"url"`
+	Name     string `json:"name"`
+	Port     int32  `json:"port"`
+	Protocol string `json:"protocol"`
+	URL      string `json:"url"`
 }
 
 type PortExposeRequest struct {
@@ -182,7 +188,14 @@ func (s *Server) listSandboxes(w http.ResponseWriter, r *http.Request) {
 		writeKubernetesError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, list.Items)
+	items := make([]SandboxListItem, 0, len(list.Items))
+	for i := range list.Items {
+		items = append(items, SandboxListItem{
+			Sandbox: list.Items[i],
+			Ports:   s.sandboxPortAccesses(&list.Items[i]),
+		})
+	}
+	writeJSON(w, http.StatusOK, items)
 }
 
 func (s *Server) createSandbox(w http.ResponseWriter, r *http.Request) {
@@ -462,13 +475,7 @@ func (s *Server) getAccess(w http.ResponseWriter, r *http.Request, name string) 
 		serviceName = sandbox.Status.ServiceName
 	}
 	ports := make([]PortAccess, 0, len(sandbox.Spec.Ports))
-	for _, port := range sandbox.Spec.Ports {
-		ports = append(ports, PortAccess{
-			Name: port.Name,
-			Port: port.Port,
-			URL:  fmt.Sprintf("%s/sandboxes/%s/ports/%s", s.publicBaseURL, sandbox.Name, port.Name),
-		})
-	}
+	ports = append(ports, s.sandboxPortAccesses(sandbox)...)
 	writeJSON(w, http.StatusOK, AccessResponse{
 		SandboxName: sandbox.Name,
 		Phase:       string(sandbox.Status.Phase),
@@ -476,6 +483,19 @@ func (s *Server) getAccess(w http.ResponseWriter, r *http.Request, name string) 
 		ToolboxURL:  "",
 		Ports:       ports,
 	})
+}
+
+func (s *Server) sandboxPortAccesses(sandbox *computev1.Sandbox) []PortAccess {
+	ports := make([]PortAccess, 0, len(sandbox.Spec.Ports))
+	for _, port := range sandbox.Spec.Ports {
+		ports = append(ports, PortAccess{
+			Name:     port.Name,
+			Port:     port.Port,
+			Protocol: string(portProtocol(port.Protocol)),
+			URL:      portURL(s.publicBaseURL, sandbox.Name, port.Name),
+		})
+	}
+	return ports
 }
 
 func (s *Server) getLogs(w http.ResponseWriter, r *http.Request, name string) {

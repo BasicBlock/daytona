@@ -4,14 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os/exec"
 	"time"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/remotecommand"
-	kexec "k8s.io/client-go/util/exec"
 )
 
 type ExecRequest struct {
@@ -34,20 +28,22 @@ type PodExecutor interface {
 	Exec(ctx context.Context, namespace string, podName string, containerName string, req ExecRequest) (ExecResponse, error)
 }
 
-type KubernetesPodExecutor struct {
-	config    *rest.Config
-	clientset kubernetes.Interface
+type KubectlPodExecutor struct {
+	binary string
 }
 
-func NewKubernetesPodExecutor(config *rest.Config, clientset kubernetes.Interface) *KubernetesPodExecutor {
-	return &KubernetesPodExecutor{config: config, clientset: clientset}
+func NewKubectlPodExecutor(binary string) *KubectlPodExecutor {
+	if binary == "" {
+		binary = "kubectl"
+	}
+	return &KubectlPodExecutor{binary: binary}
 }
 
-func (e *KubernetesPodExecutor) Exec(ctx context.Context, namespace string, podName string, containerName string, req ExecRequest) (ExecResponse, error) {
+func (e *KubectlPodExecutor) Exec(ctx context.Context, namespace string, podName string, containerName string, req ExecRequest) (ExecResponse, error) {
 	if len(req.Command) == 0 || req.Command[0] == "" {
 		return ExecResponse{}, errors.New("command is required")
 	}
-	if e == nil || e.config == nil || e.clientset == nil {
+	if e == nil || e.binary == "" {
 		return ExecResponse{}, errors.New("pod executor is not configured")
 	}
 
@@ -56,7 +52,7 @@ func (e *KubernetesPodExecutor) Exec(ctx context.Context, namespace string, podN
 		command = append([]string{"/bin/sh", "-lc", "cd " + shellQuote(req.Workdir) + " && exec \"$@\"", "--"}, command...)
 	}
 	if len(req.Env) > 0 {
-		envCommand := make([]string, 0, len(req.Env)*2+len(command)+2)
+		envCommand := make([]string, 0, len(req.Env)*2+len(command)+1)
 		envCommand = append(envCommand, "env")
 		for key, value := range req.Env {
 			envCommand = append(envCommand, key+"="+value)
@@ -65,46 +61,19 @@ func (e *KubernetesPodExecutor) Exec(ctx context.Context, namespace string, podN
 		command = envCommand
 	}
 
+	args := []string{"exec", "-n", namespace, podName, "-c", containerName, "--"}
+	args = append(args, command...)
+
 	started := time.Now().UTC()
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	execReq := e.clientset.CoreV1().RESTClient().
-		Post().
-		Resource("pods").
-		Namespace(namespace).
-		Name(podName).
-		SubResource("exec").
-		VersionedParams(&corev1.PodExecOptions{
-			Container: containerName,
-			Command:   command,
-			Stdin:     req.Stdin != "",
-			Stdout:    true,
-			Stderr:    true,
-			TTY:       false,
-		}, clientgoscheme.ParameterCodec)
-
-	websocketExecutor, err := remotecommand.NewWebSocketExecutor(e.config, "GET", execReq.URL().String())
-	if err != nil {
-		return ExecResponse{}, err
-	}
-	spdyExecutor, err := remotecommand.NewSPDYExecutor(e.config, "POST", execReq.URL())
-	if err != nil {
-		return ExecResponse{}, err
-	}
-	executor, err := remotecommand.NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return true })
-	if err != nil {
-		return ExecResponse{}, err
-	}
-	var stdin *bytes.Buffer
+	cmd := exec.CommandContext(ctx, e.binary, args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	if req.Stdin != "" {
-		stdin = bytes.NewBufferString(req.Stdin)
+		cmd.Stdin = bytes.NewBufferString(req.Stdin)
 	}
-	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
-		Stdin:  stdin,
-		Stdout: &stdout,
-		Stderr: &stderr,
-		Tty:    false,
-	})
+	err := cmd.Run()
 	finished := time.Now().UTC()
 
 	response := ExecResponse{
@@ -117,9 +86,9 @@ func (e *KubernetesPodExecutor) Exec(ctx context.Context, namespace string, podN
 	if err == nil {
 		return response, nil
 	}
-	var exitErr kexec.ExitError
+	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		response.ExitCode = exitErr.ExitStatus()
+		response.ExitCode = exitErr.ExitCode()
 		return response, nil
 	}
 	return response, err
