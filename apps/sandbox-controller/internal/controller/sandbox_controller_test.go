@@ -216,6 +216,140 @@ func TestSandboxReconcilerSnapshotsBeforeStop(t *testing.T) {
 	}
 }
 
+func TestSandboxReconcilerAutoStopsIdleSandbox(t *testing.T) {
+	ctx := context.Background()
+	scheme := testScheme(t)
+	now := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
+	lastActivity := metav1.NewTime(now.Add(-2 * time.Minute))
+
+	sandbox := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "default"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			StopPolicy: computev1.SandboxStopPolicySpec{
+				AutoStopMinutes: 1,
+			},
+		},
+		Status: computev1.SandboxStatus{LastActivityTime: &lastActivity},
+	}
+	controllerutil.AddFinalizer(sandbox, computev1.SandboxFinalizer)
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: render.PodName(sandbox), Namespace: sandbox.Namespace}}
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&computev1.Sandbox{}).
+		WithObjects(sandbox, pod).
+		Build()
+	reconciler := &SandboxReconciler{Client: k8sClient, Scheme: scheme, Now: func() time.Time { return now }}
+
+	_, err := reconciler.Reconcile(ctx, ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: sandbox.Name, Namespace: sandbox.Namespace},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var updated computev1.Sandbox
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: sandbox.Name, Namespace: sandbox.Namespace}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Spec.DesiredState != computev1.SandboxDesiredStateStopped {
+		t.Fatalf("expected idle sandbox to stop, got %s", updated.Spec.DesiredState)
+	}
+	if !updated.Spec.StopPolicy.SnapshotBeforeStop || updated.Spec.StopPolicy.SnapshotName != "agent-sleep-1782475200" {
+		t.Fatalf("expected generated sleep snapshot policy, got %#v", updated.Spec.StopPolicy)
+	}
+}
+
+func TestSandboxReconcilerCreatesPodForActiveAutoStopSandbox(t *testing.T) {
+	ctx := context.Background()
+	scheme := testScheme(t)
+	now := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
+	lastActivity := metav1.NewTime(now)
+
+	sandbox := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "default"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			StopPolicy: computev1.SandboxStopPolicySpec{
+				AutoStopMinutes: 1,
+			},
+		},
+		Status: computev1.SandboxStatus{LastActivityTime: &lastActivity},
+	}
+	controllerutil.AddFinalizer(sandbox, computev1.SandboxFinalizer)
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&computev1.Sandbox{}).
+		WithObjects(sandbox).
+		Build()
+	reconciler := &SandboxReconciler{Client: k8sClient, Scheme: scheme, Now: func() time.Time { return now }}
+
+	result, err := reconciler.Reconcile(ctx, ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: sandbox.Name, Namespace: sandbox.Namespace},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter != time.Minute {
+		t.Fatalf("expected idle requeue in one minute, got %s", result.RequeueAfter)
+	}
+
+	var pod corev1.Pod
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: render.PodName(sandbox), Namespace: sandbox.Namespace}, &pod); err != nil {
+		t.Fatalf("expected active auto-stop sandbox to create pod: %v", err)
+	}
+}
+
+func TestSandboxReconcilerRecordsSleepSnapshotWhenStopped(t *testing.T) {
+	ctx := context.Background()
+	scheme := testScheme(t)
+
+	sandbox := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "default"},
+		Spec: computev1.SandboxSpec{
+			Image:        "ubuntu:24.04",
+			DesiredState: computev1.SandboxDesiredStateStopped,
+			StopPolicy: computev1.SandboxStopPolicySpec{
+				SnapshotBeforeStop: true,
+				SnapshotName:       "agent-sleep-1",
+			},
+		},
+	}
+	controllerutil.AddFinalizer(sandbox, computev1.SandboxFinalizer)
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: render.PodName(sandbox), Namespace: sandbox.Namespace}}
+	snapshot := &computev1.SandboxSnapshot{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent-sleep-1", Namespace: "default"},
+		Status: computev1.SandboxSnapshotStatus{
+			Phase:              computev1.SandboxSnapshotPhaseReady,
+			ProviderObjectName: "podsnapshot-a",
+		},
+	}
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&computev1.Sandbox{}).
+		WithObjects(sandbox, pod, snapshot).
+		Build()
+	reconciler := &SandboxReconciler{Client: k8sClient, Scheme: scheme}
+
+	_, err := reconciler.Reconcile(ctx, ctrl.Request{
+		NamespacedName: types.NamespacedName{Name: sandbox.Name, Namespace: sandbox.Namespace},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var updated computev1.Sandbox
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: sandbox.Name, Namespace: sandbox.Namespace}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status.Phase != computev1.SandboxPhaseStopped || updated.Status.SleepSnapshotName != "agent-sleep-1" {
+		t.Fatalf("expected stopped sleep snapshot status, got %#v", updated.Status)
+	}
+}
+
 func TestSandboxReconcilerBlocksRestoreUntilSnapshotReady(t *testing.T) {
 	ctx := context.Background()
 	scheme := testScheme(t)

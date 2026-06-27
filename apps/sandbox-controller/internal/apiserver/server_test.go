@@ -277,6 +277,72 @@ func TestExecWakesStoppedSandbox(t *testing.T) {
 	}
 }
 
+func TestStartWakesFromSleepSnapshot(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image:        "ubuntu:24.04",
+			DesiredState: computev1.SandboxDesiredStateStopped,
+			StopPolicy: computev1.SandboxStopPolicySpec{
+				SnapshotBeforeStop: true,
+				SnapshotName:       "agent-sleep-old",
+				AutoStopMinutes:    60,
+			},
+		},
+		Status: computev1.SandboxStatus{SleepSnapshotName: "agent-sleep-new"},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodPost, "/sandboxes/agent:start", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var updated computev1.Sandbox
+	if err := k8sClient.Get(t.Context(), client.ObjectKey{Name: "agent", Namespace: "sandboxes"}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Spec.DesiredState != computev1.SandboxDesiredStateRunning {
+		t.Fatalf("expected start to wake sandbox, got %s", updated.Spec.DesiredState)
+	}
+	if updated.Spec.Restore == nil || updated.Spec.Restore.Name != "agent-sleep-new" {
+		t.Fatalf("expected wake restore from sleep snapshot, got %#v", updated.Spec.Restore)
+	}
+	if updated.Spec.StopPolicy.SnapshotName != "" {
+		t.Fatalf("expected stale sleep snapshot name to be cleared, got %#v", updated.Spec.StopPolicy)
+	}
+}
+
+func TestSSHWakesStoppedSandbox(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image:        "ubuntu:24.04",
+			DesiredState: computev1.SandboxDesiredStateStopped,
+		},
+		Status: computev1.SandboxStatus{SleepSnapshotName: "agent-sleep-new"},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodGet, "/sandboxes/agent/ssh", "")
+	if res.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var updated computev1.Sandbox
+	if err := k8sClient.Get(t.Context(), client.ObjectKey{Name: "agent", Namespace: "sandboxes"}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Spec.DesiredState != computev1.SandboxDesiredStateRunning {
+		t.Fatalf("expected ssh to wake sandbox, got %s", updated.Spec.DesiredState)
+	}
+	if updated.Spec.Restore == nil || updated.Spec.Restore.Name != "agent-sleep-new" {
+		t.Fatalf("expected ssh wake restore from sleep snapshot, got %#v", updated.Spec.Restore)
+	}
+}
+
 func testClient(t *testing.T, objects ...client.Object) client.Client {
 	t.Helper()
 	scheme := runtime.NewScheme()

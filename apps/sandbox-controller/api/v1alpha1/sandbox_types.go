@@ -70,6 +70,7 @@ type SandboxAccessSpec struct {
 type SandboxStopPolicySpec struct {
 	SnapshotBeforeStop bool                   `json:"snapshotBeforeStop,omitempty"`
 	SnapshotName       string                 `json:"snapshotName,omitempty"`
+	AutoStopMinutes    int32                  `json:"autoStopMinutes,omitempty"`
 	Provider           SnapshotProvider       `json:"provider,omitempty"`
 	GKE                GKEPodSnapshotSpec     `json:"gke,omitempty"`
 	Local              LocalRunscProviderSpec `json:"local,omitempty"`
@@ -129,6 +130,8 @@ type SandboxStatus struct {
 	ServiceName        string             `json:"serviceName,omitempty"`
 	SpecHash           string             `json:"specHash,omitempty"`
 	RestoredSnapshot   string             `json:"restoredSnapshot,omitempty"`
+	SleepSnapshotName  string             `json:"sleepSnapshotName,omitempty"`
+	LastActivityTime   *metav1.Time       `json:"lastActivityTime,omitempty"`
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
@@ -227,6 +230,9 @@ func (in SandboxVolumeSpec) DeepCopy() SandboxVolumeSpec {
 
 func (in SandboxStatus) DeepCopy() SandboxStatus {
 	out := in
+	if in.LastActivityTime != nil {
+		out.LastActivityTime = in.LastActivityTime.DeepCopy()
+	}
 	out.Conditions = make([]metav1.Condition, len(in.Conditions))
 	for i := range in.Conditions {
 		out.Conditions[i] = in.Conditions[i]

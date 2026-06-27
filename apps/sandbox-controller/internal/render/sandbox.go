@@ -79,6 +79,7 @@ func CompatibilityHash(sandbox *computev1.Sandbox) (string, error) {
 	spec := sandbox.Spec.DeepCopy()
 	spec.DesiredState = ""
 	spec.TemplateName = ""
+	spec.StopPolicy = computev1.SandboxStopPolicySpec{}
 	spec.Restore = nil
 	normalizeEnv(spec.Env)
 	sort.Slice(spec.Ports, func(i, j int) bool {
@@ -153,10 +154,15 @@ func Pod(sandbox *computev1.Sandbox, defaultToolboxImage string) (*corev1.Pod, s
 					VolumeMounts: workloadVolumeMounts(sandbox),
 				},
 				{
-					Name:            ToolboxContainerName,
-					Image:           ToolboxImage(sandbox, defaultToolboxImage),
-					Command:         []string{DefaultToolboxCommand},
-					SecurityContext: &corev1.SecurityContext{RunAsUser: &toolboxUser},
+					Name:    ToolboxContainerName,
+					Image:   ToolboxImage(sandbox, defaultToolboxImage),
+					Command: []string{DefaultToolboxCommand},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: &toolboxUser,
+						Capabilities: &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_ADMIN", "SYS_PTRACE"},
+						},
+					},
 					Env: []corev1.EnvVar{
 						{Name: "DAYTONA_SANDBOX_NAME", Value: sandbox.Name},
 						{Name: "DAYTONA_WORKLOAD_CONTAINER", Value: WorkloadContainerName},

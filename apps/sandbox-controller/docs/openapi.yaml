@@ -107,6 +107,8 @@ paths:
       responses:
         "200":
           description: SSH details
+        "202":
+          description: stopped sandbox was started; retry SSH when ready
   /sandboxes/{name}/logs:
     get:
       parameters:

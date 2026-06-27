@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	computev1 "github.com/daytonaio/sandbox-controller/api/v1alpha1"
@@ -53,6 +54,11 @@ func (r *SandboxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		return r.reconcileStopped(ctx, &sandbox)
 	}
 
+	idleHandled, idleResult, err := r.reconcileIdleStop(ctx, &sandbox)
+	if idleHandled || err != nil {
+		return idleResult, err
+	}
+
 	if err := r.reconcileService(ctx, &sandbox); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -60,7 +66,11 @@ func (r *SandboxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		return ctrl.Result{}, err
 	}
 
-	return r.reconcileRunning(ctx, &sandbox)
+	result, err = r.reconcileRunning(ctx, &sandbox)
+	if err == nil && !result.Requeue && result.RequeueAfter == 0 && idleResult.RequeueAfter > 0 {
+		result.RequeueAfter = idleResult.RequeueAfter
+	}
+	return result, err
 }
 
 func (r *SandboxReconciler) reconcileDelete(ctx context.Context, sandbox *computev1.Sandbox) (ctrl.Result, error) {
@@ -109,6 +119,14 @@ func (r *SandboxReconciler) reconcileStopped(ctx context.Context, sandbox *compu
 	err := r.Get(ctx, types.NamespacedName{Name: render.PodName(sandbox), Namespace: sandbox.Namespace}, &pod)
 	if err == nil {
 		if sandbox.Spec.StopPolicy.SnapshotBeforeStop {
+			if sandbox.Spec.StopPolicy.SnapshotName == "" {
+				next := sandbox.DeepCopyObject().(*computev1.Sandbox)
+				next.Spec.StopPolicy.SnapshotName = sleepSnapshotName(sandbox, r.now())
+				if err := r.Update(ctx, next); err != nil {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{Requeue: true}, nil
+			}
 			ready, patch, err := r.ensureStopSnapshot(ctx, sandbox)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -127,10 +145,44 @@ func (r *SandboxReconciler) reconcileStopped(ctx context.Context, sandbox *compu
 	serviceName := render.ServiceName(sandbox)
 	phase := computev1.SandboxPhaseStopped
 	return ctrl.Result{}, r.updateSandboxStatus(ctx, sandbox, SandboxStatusPatch{
-		Phase:       &phase,
-		PodName:     ptr(""),
-		ServiceName: &serviceName,
+		Phase:             &phase,
+		PodName:           ptr(""),
+		ServiceName:       &serviceName,
+		SleepSnapshotName: stoppedSnapshotName(sandbox),
 	})
+}
+
+func (r *SandboxReconciler) reconcileIdleStop(ctx context.Context, sandbox *computev1.Sandbox) (bool, ctrl.Result, error) {
+	if sandbox.Spec.StopPolicy.AutoStopMinutes <= 0 {
+		return false, ctrl.Result{}, nil
+	}
+
+	if sandbox.Status.LastActivityTime == nil {
+		now := metav1.NewTime(r.now())
+		return true, ctrl.Result{}, r.updateSandboxStatus(ctx, sandbox, SandboxStatusPatch{LastActivityTime: &now})
+	}
+
+	timeout := time.Duration(sandbox.Spec.StopPolicy.AutoStopMinutes) * time.Minute
+	deadline := sandbox.Status.LastActivityTime.Time.Add(timeout)
+	remaining := time.Until(deadline)
+	if r.Now != nil {
+		remaining = deadline.Sub(r.now())
+	}
+	if remaining > 0 {
+		return false, ctrl.Result{RequeueAfter: remaining}, nil
+	}
+
+	next := sandbox.DeepCopyObject().(*computev1.Sandbox)
+	next.Spec.DesiredState = computev1.SandboxDesiredStateStopped
+	next.Spec.StopPolicy.SnapshotBeforeStop = true
+	next.Spec.StopPolicy.SnapshotName = sleepSnapshotName(sandbox, r.now())
+	if next.Spec.StopPolicy.Provider == "" {
+		next.Spec.StopPolicy.Provider = computev1.SnapshotProviderGKEPodSnapshot
+	}
+	if err := r.Update(ctx, next); err != nil {
+		return true, ctrl.Result{}, err
+	}
+	return true, ctrl.Result{Requeue: true}, nil
 }
 
 func (r *SandboxReconciler) ensureStopSnapshot(ctx context.Context, sandbox *computev1.Sandbox) (bool, SandboxStatusPatch, error) {
@@ -503,12 +555,14 @@ func (r *SandboxReconciler) templateCompatibilityHash(ctx context.Context, names
 }
 
 type SandboxStatusPatch struct {
-	Phase            *computev1.SandboxPhase
-	PodName          *string
-	ServiceName      *string
-	SpecHash         *string
-	RestoredSnapshot *string
-	Condition        *metav1.Condition
+	Phase             *computev1.SandboxPhase
+	PodName           *string
+	ServiceName       *string
+	SpecHash          *string
+	RestoredSnapshot  *string
+	SleepSnapshotName *string
+	LastActivityTime  *metav1.Time
+	Condition         *metav1.Condition
 }
 
 func (r *SandboxReconciler) updateSandboxStatus(ctx context.Context, sandbox *computev1.Sandbox, patch SandboxStatusPatch) error {
@@ -528,6 +582,13 @@ func (r *SandboxReconciler) updateSandboxStatus(ctx context.Context, sandbox *co
 	}
 	if patch.RestoredSnapshot != nil {
 		next.Status.RestoredSnapshot = *patch.RestoredSnapshot
+	}
+	if patch.SleepSnapshotName != nil {
+		next.Status.SleepSnapshotName = *patch.SleepSnapshotName
+	}
+	if patch.LastActivityTime != nil {
+		value := patch.LastActivityTime.DeepCopy()
+		next.Status.LastActivityTime = value
 	}
 	if patch.Condition != nil {
 		meta.SetStatusCondition(&next.Status.Conditions, *patch.Condition)
@@ -592,6 +653,25 @@ func restoredSnapshotName(sandbox *computev1.Sandbox) *string {
 		return nil
 	}
 	return &sandbox.Spec.Restore.Name
+}
+
+func stoppedSnapshotName(sandbox *computev1.Sandbox) *string {
+	if sandbox.Spec.StopPolicy.SnapshotBeforeStop && sandbox.Spec.StopPolicy.SnapshotName != "" {
+		return &sandbox.Spec.StopPolicy.SnapshotName
+	}
+	return nil
+}
+
+func sleepSnapshotName(sandbox *computev1.Sandbox, now time.Time) string {
+	suffix := fmt.Sprintf("-sleep-%d", now.UTC().Unix())
+	prefix := sandbox.Name
+	if maxPrefix := 63 - len(suffix); len(prefix) > maxPrefix {
+		prefix = strings.TrimRight(prefix[:maxPrefix], "-")
+	}
+	if prefix == "" {
+		prefix = "sandbox"
+	}
+	return prefix + suffix
 }
 
 func ptr[T any](value T) *T {

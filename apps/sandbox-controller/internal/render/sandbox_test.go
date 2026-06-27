@@ -97,7 +97,7 @@ func TestPodAddsLocalRunscRestoreAnnotations(t *testing.T) {
 	}
 }
 
-func TestCompatibilityHashIgnoresDesiredStateAndRestore(t *testing.T) {
+func TestCompatibilityHashIgnoresLifecycleFields(t *testing.T) {
 	running := &computev1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
 		Spec: computev1.SandboxSpec{
@@ -115,6 +115,11 @@ func TestCompatibilityHashIgnoresDesiredStateAndRestore(t *testing.T) {
 	}
 	stopped := running.DeepCopyObject().(*computev1.Sandbox)
 	stopped.Spec.DesiredState = computev1.SandboxDesiredStateStopped
+	stopped.Spec.StopPolicy = computev1.SandboxStopPolicySpec{
+		SnapshotBeforeStop: true,
+		SnapshotName:       "agent-sleep",
+		AutoStopMinutes:    60,
+	}
 	stopped.Spec.Restore = &computev1.SandboxSnapshotRestoreRef{
 		Name:               "snap-b",
 		ProviderObjectName: "provider-b",

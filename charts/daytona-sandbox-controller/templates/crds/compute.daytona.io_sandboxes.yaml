@@ -131,6 +131,10 @@ spec:
                       type: boolean
                     snapshotName:
                       type: string
+                    autoStopMinutes:
+                      type: integer
+                      format: int32
+                      minimum: 0
                     provider:
                       type: string
                       enum: ["GKEPodSnapshot", "LocalRunsc"]
@@ -237,6 +241,11 @@ spec:
                   type: string
                 restoredSnapshot:
                   type: string
+                sleepSnapshotName:
+                  type: string
+                lastActivityTime:
+                  type: string
+                  format: date-time
                 conditions:
                   type: array
                   items:

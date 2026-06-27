@@ -212,7 +212,7 @@ func (s *Server) handleSandbox(w http.ResponseWriter, r *http.Request) {
 	remainder := strings.TrimPrefix(r.URL.Path, "/sandboxes/")
 	switch {
 	case strings.HasSuffix(remainder, ":start"):
-		s.patchDesiredState(w, r, strings.TrimSuffix(remainder, ":start"), computev1.SandboxDesiredStateRunning, nil)
+		s.startSandbox(w, r, strings.TrimSuffix(remainder, ":start"))
 	case strings.HasSuffix(remainder, ":stop"):
 		s.stopSandbox(w, r, strings.TrimSuffix(remainder, ":stop"))
 	case strings.HasSuffix(remainder, ":snapshot"):
@@ -283,15 +283,26 @@ func (s *Server) stopSandbox(w http.ResponseWriter, r *http.Request, name string
 			sandbox.Spec.StopPolicy = computev1.SandboxStopPolicySpec{
 				SnapshotBeforeStop: true,
 				SnapshotName:       req.SnapshotName,
+				AutoStopMinutes:    sandbox.Spec.StopPolicy.AutoStopMinutes,
 				Provider:           req.Provider,
 				GKE:                req.GKE,
 				Local:              req.Local,
 			}
 		} else {
-			sandbox.Spec.StopPolicy = computev1.SandboxStopPolicySpec{}
+			sandbox.Spec.StopPolicy.SnapshotBeforeStop = false
+			sandbox.Spec.StopPolicy.SnapshotName = ""
+			sandbox.Spec.StopPolicy.Provider = ""
+			sandbox.Spec.StopPolicy.GKE = computev1.GKEPodSnapshotSpec{}
+			sandbox.Spec.StopPolicy.Local = computev1.LocalRunscProviderSpec{}
 		}
 	}
 	s.patchDesiredState(w, r, name, computev1.SandboxDesiredStateStopped, mutate)
+}
+
+func (s *Server) startSandbox(w http.ResponseWriter, r *http.Request, name string) {
+	s.patchDesiredState(w, r, name, computev1.SandboxDesiredStateRunning, func(sandbox *computev1.Sandbox) {
+		prepareWake(sandbox)
+	})
 }
 
 func (s *Server) patchDesiredState(w http.ResponseWriter, r *http.Request, name string, desired computev1.SandboxDesiredState, mutate func(*computev1.Sandbox)) {
@@ -311,6 +322,9 @@ func (s *Server) patchDesiredState(w http.ResponseWriter, r *http.Request, name 
 	if err := s.client.Update(r.Context(), sandbox); err != nil {
 		writeKubernetesError(w, err)
 		return
+	}
+	if desired == computev1.SandboxDesiredStateRunning {
+		s.touchSandboxActivity(r.Context(), sandbox)
 	}
 	writeJSON(w, http.StatusOK, sandbox)
 }
@@ -490,18 +504,21 @@ func (s *Server) proxyToolbox(w http.ResponseWriter, r *http.Request, name strin
 		writeKubernetesError(w, err)
 		return
 	}
-	if path == "/exec" && render.DesiredState(sandbox) == computev1.SandboxDesiredStateStopped {
+	if (path == "/exec" || path == "/ssh") && render.DesiredState(sandbox) == computev1.SandboxDesiredStateStopped {
 		sandbox.Spec.DesiredState = computev1.SandboxDesiredStateRunning
+		prepareWake(sandbox)
 		if err := s.client.Update(r.Context(), sandbox); err != nil {
 			writeKubernetesError(w, err)
 			return
 		}
+		s.touchSandboxActivity(r.Context(), sandbox)
 		writeJSON(w, http.StatusAccepted, map[string]string{
 			"status":  "starting",
-			"message": "sandbox was stopped and is starting before exec can be retried",
+			"message": "sandbox was stopped and is starting before the request can be retried",
 		})
 		return
 	}
+	s.touchSandboxActivity(r.Context(), sandbox)
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -536,6 +553,22 @@ func (s *Server) proxyToolbox(w http.ResponseWriter, r *http.Request, name strin
 	}
 	w.WriteHeader(res.StatusCode)
 	_, _ = io.Copy(w, io.LimitReader(res.Body, 4<<20))
+}
+
+func prepareWake(sandbox *computev1.Sandbox) {
+	if sandbox.Status.SleepSnapshotName != "" {
+		sandbox.Spec.Restore = &computev1.SandboxSnapshotRestoreRef{Name: sandbox.Status.SleepSnapshotName}
+	}
+	if sandbox.Spec.StopPolicy.SnapshotBeforeStop {
+		sandbox.Spec.StopPolicy.SnapshotName = ""
+	}
+}
+
+func (s *Server) touchSandboxActivity(ctx context.Context, sandbox *computev1.Sandbox) {
+	now := metav1.Now()
+	next := sandbox.DeepCopyObject().(*computev1.Sandbox)
+	next.Status.LastActivityTime = &now
+	_ = s.client.Status().Patch(ctx, next, client.MergeFrom(sandbox))
 }
 
 func (s *Server) defaultToolboxURL(sandbox *computev1.Sandbox) string {
