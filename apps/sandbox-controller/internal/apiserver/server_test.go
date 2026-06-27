@@ -49,6 +49,43 @@ func TestCreateAndStopSandbox(t *testing.T) {
 	}
 }
 
+func TestCreateSandboxEntryCommand(t *testing.T) {
+	k8sClient := testClient(t)
+	server := New(k8sClient, "sandboxes")
+
+	createBody := `{"name":"agent","entryCommand":"nginx -g 'daemon off;'","spec":{"image":"nginx:1.27-alpine"}}`
+	res := request(t, server, http.MethodPost, "/sandboxes", createBody)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var response SandboxResponse
+	decode(t, res, &response)
+	if response.EntryCommand != "nginx -g 'daemon off;'" {
+		t.Fatalf("expected entry command in response, got %q", response.EntryCommand)
+	}
+	if len(response.Spec.Command) != 2 || response.Spec.Command[0] != "/bin/sh" || response.Spec.Command[1] != "-lc" {
+		t.Fatalf("expected shell command, got %#v", response.Spec.Command)
+	}
+	if len(response.Spec.Args) != 1 || response.Spec.Args[0] != "nginx -g 'daemon off;'" {
+		t.Fatalf("expected entry command arg, got %#v", response.Spec.Args)
+	}
+}
+
+func TestCreateSandboxRejectsAmbiguousEntryCommand(t *testing.T) {
+	k8sClient := testClient(t)
+	server := New(k8sClient, "sandboxes")
+
+	createBody := `{"name":"agent","entryCommand":"sleep infinity","spec":{"image":"ubuntu:24.04","command":["/bin/sleep"],"args":["infinity"]}}`
+	res := request(t, server, http.MethodPost, "/sandboxes", createBody)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "entryCommand cannot be used") {
+		t.Fatalf("expected entry command conflict error, got %s", res.Body.String())
+	}
+}
+
 func TestStopSandboxForceSkipsSnapshot(t *testing.T) {
 	source := &computev1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
@@ -234,7 +271,9 @@ func TestListSandboxesReturnsOpenPorts(t *testing.T) {
 	source := &computev1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
 		Spec: computev1.SandboxSpec{
-			Image: "ubuntu:24.04",
+			Image:   "ubuntu:24.04",
+			Command: []string{"/bin/sh", "-lc"},
+			Args:    []string{"sleep infinity"},
 			Ports: []computev1.SandboxPort{
 				{Name: "http", Port: 8080},
 				{Name: "metrics", Port: 9090, Protocol: corev1.ProtocolTCP},
@@ -269,6 +308,9 @@ func TestListSandboxesReturnsOpenPorts(t *testing.T) {
 	}
 	if ports := byName["worker"].Ports; len(ports) != 0 {
 		t.Fatalf("expected worker to have no open ports, got %#v", ports)
+	}
+	if agent.EntryCommand != "sleep infinity" {
+		t.Fatalf("expected list entry command, got %q", agent.EntryCommand)
 	}
 }
 

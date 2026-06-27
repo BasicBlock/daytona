@@ -116,8 +116,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type SandboxRequest struct {
-	Name string                `json:"name"`
-	Spec computev1.SandboxSpec `json:"spec"`
+	Name         string                `json:"name"`
+	EntryCommand string                `json:"entryCommand,omitempty"`
+	Spec         computev1.SandboxSpec `json:"spec"`
 }
 
 type StopRequest struct {
@@ -151,7 +152,14 @@ type AccessResponse struct {
 
 type SandboxListItem struct {
 	computev1.Sandbox `json:",inline"`
+	EntryCommand      string       `json:"entryCommand,omitempty"`
 	Ports             []PortAccess `json:"ports"`
+}
+
+type SandboxResponse struct {
+	computev1.Sandbox `json:",inline"`
+	EntryCommand      string       `json:"entryCommand,omitempty"`
+	Ports             []PortAccess `json:"ports,omitempty"`
 }
 
 type PortAccess struct {
@@ -194,8 +202,9 @@ func (s *Server) listSandboxes(w http.ResponseWriter, r *http.Request) {
 	items := make([]SandboxListItem, 0, len(list.Items))
 	for i := range list.Items {
 		items = append(items, SandboxListItem{
-			Sandbox: list.Items[i],
-			Ports:   s.sandboxPortAccesses(&list.Items[i]),
+			Sandbox:      list.Items[i],
+			EntryCommand: sandboxEntryCommand(&list.Items[i]),
+			Ports:        s.sandboxPortAccesses(&list.Items[i]),
 		})
 	}
 	writeJSON(w, http.StatusOK, items)
@@ -208,6 +217,10 @@ func (s *Server) createSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validateName("name", req.Name); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := applyEntryCommand(&req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -234,7 +247,7 @@ func (s *Server) createSandbox(w http.ResponseWriter, r *http.Request) {
 		writeKubernetesError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, sandbox)
+	writeJSON(w, http.StatusCreated, s.sandboxResponse(sandbox))
 }
 
 func (s *Server) handleSandbox(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +297,7 @@ func (s *Server) getSandbox(w http.ResponseWriter, r *http.Request, name string)
 		writeKubernetesError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, sandbox)
+	writeJSON(w, http.StatusOK, s.sandboxResponse(sandbox))
 }
 
 func (s *Server) deleteSandbox(w http.ResponseWriter, r *http.Request, name string) {
@@ -505,6 +518,55 @@ func (s *Server) sandboxPortAccesses(sandbox *computev1.Sandbox) []PortAccess {
 		})
 	}
 	return ports
+}
+
+func (s *Server) sandboxResponse(sandbox *computev1.Sandbox) SandboxResponse {
+	return SandboxResponse{
+		Sandbox:      *sandbox,
+		EntryCommand: sandboxEntryCommand(sandbox),
+		Ports:        s.sandboxPortAccesses(sandbox),
+	}
+}
+
+func applyEntryCommand(req *SandboxRequest) error {
+	entryCommand := strings.TrimSpace(req.EntryCommand)
+	if entryCommand == "" {
+		return nil
+	}
+	if len(req.Spec.Command) > 0 || len(req.Spec.Args) > 0 {
+		return errors.New("entryCommand cannot be used with spec.command or spec.args")
+	}
+	req.EntryCommand = entryCommand
+	req.Spec.Command = []string{"/bin/sh", "-lc"}
+	req.Spec.Args = []string{entryCommand}
+	return nil
+}
+
+func sandboxEntryCommand(sandbox *computev1.Sandbox) string {
+	command := sandbox.Spec.Command
+	args := sandbox.Spec.Args
+	if len(command) == 2 && command[0] == "/bin/sh" && command[1] == "-lc" && len(args) == 1 {
+		return args[0]
+	}
+	return commandLine(append(append([]string(nil), command...), args...))
+}
+
+func commandLine(parts []string) string {
+	quoted := make([]string, 0, len(parts))
+	for _, part := range parts {
+		quoted = append(quoted, quoteCommandToken(part))
+	}
+	return strings.Join(quoted, " ")
+}
+
+func quoteCommandToken(value string) string {
+	if value == "" {
+		return `""`
+	}
+	if strings.ContainsAny(value, " \t\r\n\"'\\$`") {
+		return strconv.Quote(value)
+	}
+	return value
 }
 
 func (s *Server) getLogs(w http.ResponseWriter, r *http.Request, name string) {

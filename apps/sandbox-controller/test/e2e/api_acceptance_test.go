@@ -36,11 +36,10 @@ func TestAPIProductAcceptanceE2E(t *testing.T) {
 	snapshotName := uniqueName("api-snapshot")
 
 	apiPost(t, ctx, apiBaseURL+"/sandboxes", map[string]any{
-		"name": name,
+		"name":         name,
+		"entryCommand": "nginx -g 'daemon off;'",
 		"spec": map[string]any{
-			"image":   "nginx:1.27-alpine",
-			"command": []string{"/bin/sh", "-lc"},
-			"args":    []string{"nginx -g 'daemon off;'"},
+			"image": "nginx:1.27-alpine",
 			"ports": []map[string]any{{
 				"name": "p80",
 				"port": 80,
@@ -65,6 +64,7 @@ func TestAPIProductAcceptanceE2E(t *testing.T) {
 	apiPostEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports", map[string]any{"name": "p80", "port": 80}, http.StatusOK, nil)
 	apiGetEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports/p80", http.StatusOK, nil)
 	apiGetEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ssh", http.StatusOK, nil)
+	assertSandboxListEntryCommand(t, ctx, apiBaseURL, name, "nginx -g 'daemon off;'")
 
 	apiPost(t, ctx, apiBaseURL+"/sandboxes/"+name+":snapshot", map[string]any{
 		"name":     snapshotName,
@@ -124,6 +124,26 @@ func waitForSandboxPhase(ctx context.Context, t *testing.T, apiBaseURL string, n
 		}
 		return sandbox.Status.Phase == phase, nil
 	})
+}
+
+func assertSandboxListEntryCommand(t *testing.T, ctx context.Context, apiBaseURL string, name string, entryCommand string) {
+	t.Helper()
+	var sandboxes []struct {
+		Metadata struct {
+			Name string `json:"name"`
+		} `json:"metadata"`
+		EntryCommand string `json:"entryCommand"`
+	}
+	apiGet(t, ctx, apiBaseURL+"/sandboxes", http.StatusOK, &sandboxes)
+	for _, sandbox := range sandboxes {
+		if sandbox.Metadata.Name == name {
+			if sandbox.EntryCommand != entryCommand {
+				t.Fatalf("expected list entry command %q, got %q", entryCommand, sandbox.EntryCommand)
+			}
+			return
+		}
+	}
+	t.Fatalf("sandbox %s was not returned by list API", name)
 }
 
 func waitForSnapshotReady(ctx context.Context, t *testing.T, k8sClient client.Client, namespace string, name string) {
