@@ -8,7 +8,7 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["compute.daytona.io"]
     resources: ["sandboxes/status", "sandboxsnapshots/status"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "update", "patch"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
