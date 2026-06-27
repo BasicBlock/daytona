@@ -38,12 +38,12 @@ func TestAPIProductAcceptanceE2E(t *testing.T) {
 	apiPost(t, ctx, apiBaseURL+"/sandboxes", map[string]any{
 		"name": name,
 		"spec": map[string]any{
-			"image":   "ubuntu:24.04",
+			"image":   "nginx:1.27-alpine",
 			"command": []string{"/bin/sh", "-lc"},
-			"args":    []string{"while true; do printf ok >/tmp/daytona-port; sleep 5; done"},
+			"args":    []string{"nginx -g 'daemon off;'"},
 			"ports": []map[string]any{{
-				"name": "http",
-				"port": 8080,
+				"name": "p80",
+				"port": 80,
 			}},
 			"access": map[string]any{
 				"sshEnabled":   true,
@@ -62,7 +62,8 @@ func TestAPIProductAcceptanceE2E(t *testing.T) {
 
 	waitForSandboxPhase(ctx, t, apiBaseURL, name, computev1.SandboxPhaseRunning)
 	apiPostEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/exec", map[string]any{"command": []string{"/bin/sh", "-lc", "echo api-ok"}}, http.StatusOK, nil)
-	apiPostEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports", map[string]any{"name": "http", "port": 8080}, http.StatusOK, nil)
+	apiPostEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports", map[string]any{"name": "p80", "port": 80}, http.StatusOK, nil)
+	apiGetEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports/p80", http.StatusOK, nil)
 	apiGetEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ssh", http.StatusOK, nil)
 
 	apiPost(t, ctx, apiBaseURL+"/sandboxes/"+name+":snapshot", map[string]any{
@@ -81,7 +82,7 @@ func TestAPIProductAcceptanceE2E(t *testing.T) {
 	}, http.StatusCreated, nil)
 	waitForSandboxPhase(ctx, t, apiBaseURL, forkName, computev1.SandboxPhaseRunning)
 	apiPostEventually(t, ctx, apiBaseURL+"/sandboxes/"+forkName+"/exec", map[string]any{"command": []string{"/bin/sh", "-lc", "echo restored"}}, http.StatusOK, nil)
-	apiPostEventually(t, ctx, apiBaseURL+"/sandboxes/"+forkName+"/ports", map[string]any{"name": "http", "port": 8080}, http.StatusOK, nil)
+	apiPostEventually(t, ctx, apiBaseURL+"/sandboxes/"+forkName+"/ports", map[string]any{"name": "p80", "port": 80}, http.StatusOK, nil)
 	apiGet(t, ctx, apiBaseURL+"/sandboxes", http.StatusOK, nil)
 
 	apiPost(t, ctx, apiBaseURL+"/sandboxes/"+name+":stop", map[string]any{}, http.StatusOK, nil)
@@ -93,6 +94,19 @@ func TestAPIProductAcceptanceE2E(t *testing.T) {
 	waitForSandboxPhase(ctx, t, apiBaseURL, name, computev1.SandboxPhaseStopped)
 	apiPost(t, ctx, apiBaseURL+"/sandboxes/"+name+":start", map[string]any{}, http.StatusOK, nil)
 	waitForSandboxPhase(ctx, t, apiBaseURL, name, computev1.SandboxPhaseRunning)
+
+	apiPost(t, ctx, apiBaseURL+"/sandboxes/"+name+":stop", map[string]any{"force": false}, http.StatusOK, nil)
+	waitForSandboxPhase(ctx, t, apiBaseURL, name, computev1.SandboxPhaseStopped)
+	apiGetEventually(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports/p80", http.StatusOK, nil)
+	waitForSandboxPhase(ctx, t, apiBaseURL, name, computev1.SandboxPhaseRunning)
+
+	apiDelete(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports/p80")
+	var updated computev1.Sandbox
+	apiGet(t, ctx, apiBaseURL+"/sandboxes/"+name, http.StatusOK, &updated)
+	if len(updated.Spec.Ports) != 0 {
+		t.Fatalf("expected deleted port exposure, got %#v", updated.Spec.Ports)
+	}
+	apiGet(t, ctx, apiBaseURL+"/sandboxes/"+name+"/ports/p80", http.StatusNotFound, nil)
 
 	apiDelete(t, ctx, apiBaseURL+"/sandboxes/"+forkName)
 	apiDelete(t, ctx, apiBaseURL+"/sandboxes/"+name)

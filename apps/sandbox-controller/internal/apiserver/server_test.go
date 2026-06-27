@@ -33,7 +33,7 @@ func TestCreateAndStopSandbox(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
 	}
 
-	stopBody := `{"snapshotBeforeStop":true,"snapshotName":"agent-stop","gke":{"storageConfigName":"storage","postCheckpoint":"stop"}}`
+	stopBody := `{"force":false,"snapshotBeforeStop":true,"snapshotName":"agent-stop","gke":{"storageConfigName":"storage","postCheckpoint":"stop"}}`
 	res = request(t, server, http.MethodPost, "/sandboxes/agent:stop", stopBody)
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
@@ -46,6 +46,38 @@ func TestCreateAndStopSandbox(t *testing.T) {
 	}
 	if !sandbox.Spec.StopPolicy.SnapshotBeforeStop || sandbox.Spec.StopPolicy.SnapshotName != "agent-stop" {
 		t.Fatalf("expected stop snapshot policy, got %#v", sandbox.Spec.StopPolicy)
+	}
+}
+
+func TestStopSandboxForceSkipsSnapshot(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			StopPolicy: computev1.SandboxStopPolicySpec{
+				AutoStopMinutes: 60,
+			},
+		},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes")
+
+	stopBody := `{"force":true,"snapshotBeforeStop":true,"snapshotName":"agent-stop","gke":{"storageConfigName":"storage","postCheckpoint":"stop"}}`
+	res := request(t, server, http.MethodPost, "/sandboxes/agent:stop", stopBody)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var sandbox computev1.Sandbox
+	decode(t, res, &sandbox)
+	if sandbox.Spec.DesiredState != computev1.SandboxDesiredStateStopped {
+		t.Fatalf("expected stopped desired state, got %s", sandbox.Spec.DesiredState)
+	}
+	if sandbox.Spec.StopPolicy.SnapshotBeforeStop || sandbox.Spec.StopPolicy.SnapshotName != "" || sandbox.Spec.StopPolicy.Provider != "" {
+		t.Fatalf("expected force stop to skip snapshot policy, got %#v", sandbox.Spec.StopPolicy)
+	}
+	if sandbox.Spec.StopPolicy.AutoStopMinutes != 60 {
+		t.Fatalf("expected force stop to preserve auto-stop minutes, got %#v", sandbox.Spec.StopPolicy)
 	}
 }
 
@@ -175,6 +207,29 @@ func TestAccessReturnsPublicPortRoutes(t *testing.T) {
 	}
 }
 
+func TestAccessOmitsServiceNameWithoutPorts(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec:       computev1.SandboxSpec{Image: "ubuntu:24.04"},
+		Status:     computev1.SandboxStatus{Phase: computev1.SandboxPhaseRunning},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes", WithPublicBaseURL("https://sandbox-api.tailnet"))
+
+	res := request(t, server, http.MethodGet, "/sandboxes/agent/access", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var access AccessResponse
+	decode(t, res, &access)
+	if access.ServiceName != "" {
+		t.Fatalf("expected empty service name, got %q", access.ServiceName)
+	}
+	if len(access.Ports) != 0 {
+		t.Fatalf("expected no ports, got %#v", access.Ports)
+	}
+}
+
 func TestListSandboxesReturnsOpenPorts(t *testing.T) {
 	source := &computev1.Sandbox{
 		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
@@ -239,6 +294,34 @@ func TestPortControlPersistsExposure(t *testing.T) {
 	}
 }
 
+func TestPortControlDeletesExposure(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image: "ubuntu:24.04",
+			Ports: []computev1.SandboxPort{
+				{Name: "http", Port: 3000},
+				{Name: "p80", Port: 80},
+			},
+		},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodDelete, "/sandboxes/agent/ports/p80", "")
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var updated computev1.Sandbox
+	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: "sandboxes", Name: "agent"}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Spec.Ports) != 1 || updated.Spec.Ports[0].Name != "http" || updated.Spec.Ports[0].Port != 3000 {
+		t.Fatalf("expected only http exposure to remain, got %#v", updated.Spec.Ports)
+	}
+}
+
 func TestProxySandboxPortRoutesToWorkloadPod(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/hello" || r.URL.RawQuery != "x=1" {
@@ -295,6 +378,92 @@ func TestProxySandboxPortRoutesToWorkloadPod(t *testing.T) {
 	}
 	if got := res.Body.String(); got != "proxied" {
 		t.Fatalf("expected proxied body, got %q", got)
+	}
+}
+
+func TestProxySandboxPortRequiresPersistedExposure(t *testing.T) {
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec:       computev1.SandboxSpec{Image: "ubuntu:24.04"},
+		Status:     computev1.SandboxStatus{Phase: computev1.SandboxPhaseRunning},
+	}
+	k8sClient := testClient(t, source)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodGet, "/sandboxes/agent/ports/p80", "")
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
+func TestProxySandboxPortWakesStoppedSandbox(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			t.Fatalf("unexpected upstream URL %s", r.URL.String())
+		}
+		_, _ = w.Write([]byte("awake"))
+	}))
+	defer upstream.Close()
+
+	upstreamURL, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, portValue, err := net.SplitHostPort(upstreamURL.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.ParseInt(portValue, 10, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	source := &computev1.Sandbox{
+		ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "sandboxes"},
+		Spec: computev1.SandboxSpec{
+			Image:        "ubuntu:24.04",
+			DesiredState: computev1.SandboxDesiredStateStopped,
+			Ports: []computev1.SandboxPort{{
+				Name: "web",
+				Port: int32(port),
+			}},
+		},
+		Status: computev1.SandboxStatus{
+			Phase:             computev1.SandboxPhaseRunning,
+			PodName:           "sandbox-agent",
+			SleepSnapshotName: "agent-sleep",
+		},
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "sandbox-agent", Namespace: "sandboxes"},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			PodIP: host,
+		},
+	}
+	k8sClient := testClient(t, source, pod)
+	server := New(k8sClient, "sandboxes")
+
+	res := request(t, server, http.MethodGet, "/sandboxes/agent/ports/web", "")
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if got := res.Body.String(); got != "awake" {
+		t.Fatalf("expected proxied body, got %q", got)
+	}
+
+	var updated computev1.Sandbox
+	if err := k8sClient.Get(context.Background(), client.ObjectKey{Namespace: "sandboxes", Name: "agent"}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Spec.DesiredState != computev1.SandboxDesiredStateRunning {
+		t.Fatalf("expected port proxy to wake sandbox, got %s", updated.Spec.DesiredState)
+	}
+	if updated.Spec.Restore == nil || updated.Spec.Restore.Name != "agent-sleep" {
+		t.Fatalf("expected port proxy wake to restore from sleep snapshot, got %#v", updated.Spec.Restore)
+	}
+	if updated.Status.LastActivityTime == nil {
+		t.Fatal("expected port proxy wake to touch activity")
 	}
 }
 

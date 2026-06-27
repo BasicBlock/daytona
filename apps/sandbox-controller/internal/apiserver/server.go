@@ -121,6 +121,7 @@ type SandboxRequest struct {
 }
 
 type StopRequest struct {
+	Force              bool                             `json:"force,omitempty"`
 	SnapshotBeforeStop bool                             `json:"snapshotBeforeStop,omitempty"`
 	SnapshotName       string                           `json:"snapshotName,omitempty"`
 	Provider           computev1.SnapshotProvider       `json:"provider,omitempty"`
@@ -252,7 +253,11 @@ func (s *Server) handleSandbox(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(remainder, "/files"):
 		writeError(w, http.StatusNotImplemented, "sandbox file API is not available without a toolbox sidecar")
 	case strings.Contains(remainder, "/ports/"):
-		s.proxySandboxPort(w, r, remainder)
+		if r.Method == http.MethodDelete {
+			s.deleteSandboxPort(w, r, remainder)
+		} else {
+			s.proxySandboxPort(w, r, remainder)
+		}
 	case strings.HasSuffix(remainder, "/ports"):
 		s.portControl(w, r, strings.TrimSuffix(remainder, "/ports"))
 	case strings.HasSuffix(remainder, "/ssh"):
@@ -309,7 +314,7 @@ func (s *Server) stopSandbox(w http.ResponseWriter, r *http.Request, name string
 	}
 	mutate := func(sandbox *computev1.Sandbox) {
 		sandbox.Spec.DesiredState = computev1.SandboxDesiredStateStopped
-		if req.SnapshotBeforeStop || req.SnapshotName != "" {
+		if !req.Force && (req.SnapshotBeforeStop || req.SnapshotName != "") {
 			sandbox.Spec.StopPolicy = computev1.SandboxStopPolicySpec{
 				SnapshotBeforeStop: true,
 				SnapshotName:       req.SnapshotName,
@@ -474,9 +479,9 @@ func (s *Server) getAccess(w http.ResponseWriter, r *http.Request, name string) 
 		writeKubernetesError(w, err)
 		return
 	}
-	serviceName := render.ServiceName(sandbox)
-	if sandbox.Status.ServiceName != "" {
-		serviceName = sandbox.Status.ServiceName
+	serviceName := sandbox.Status.ServiceName
+	if serviceName == "" && len(sandbox.Spec.Ports) > 0 {
+		serviceName = render.ServiceName(sandbox)
 	}
 	ports := make([]PortAccess, 0, len(sandbox.Spec.Ports))
 	ports = append(ports, s.sandboxPortAccesses(sandbox)...)
@@ -699,6 +704,23 @@ func (s *Server) portControl(w http.ResponseWriter, r *http.Request, name string
 	}
 }
 
+func (s *Server) deleteSandboxPort(w http.ResponseWriter, r *http.Request, remainder string) {
+	name, portName, targetPath, ok := parsePortProxyPath(remainder)
+	if !ok || targetPath != "/" {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if errs := kvalidation.IsDNS1123Label(portName); len(errs) > 0 {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("port name must be a DNS-1123 label: %s", strings.Join(errs, "; ")))
+		return
+	}
+	if err := s.removeSandboxPort(r.Context(), name, portName); err != nil {
+		writeKubernetesError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) proxySandboxPort(w http.ResponseWriter, r *http.Request, remainder string) {
 	name, portName, targetPath, ok := parsePortProxyPath(remainder)
 	if !ok {
@@ -794,12 +816,6 @@ func sandboxPortNumber(sandbox *computev1.Sandbox, portName string) (int32, bool
 			return port.Port, true
 		}
 	}
-	if strings.HasPrefix(portName, "p") {
-		value, err := strconv.ParseInt(strings.TrimPrefix(portName, "p"), 10, 32)
-		if err == nil && value > 0 && value <= 65535 {
-			return int32(value), true
-		}
-	}
 	return 0, false
 }
 
@@ -817,6 +833,30 @@ func (s *Server) upsertSandboxPort(ctx context.Context, name string, port comput
 			}
 		}
 		next.Spec.Ports = append(next.Spec.Ports, port)
+		return s.client.Update(ctx, next)
+	})
+}
+
+func (s *Server) removeSandboxPort(ctx context.Context, name string, portName string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := s.getSandboxObject(ctx, name)
+		if err != nil {
+			return err
+		}
+		next := current.DeepCopyObject().(*computev1.Sandbox)
+		ports := next.Spec.Ports[:0]
+		removed := false
+		for _, port := range next.Spec.Ports {
+			if port.Name == portName {
+				removed = true
+				continue
+			}
+			ports = append(ports, port)
+		}
+		if !removed {
+			return nil
+		}
+		next.Spec.Ports = ports
 		return s.client.Update(ctx, next)
 	})
 }
