@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -565,10 +566,16 @@ func prepareWake(sandbox *computev1.Sandbox) {
 }
 
 func (s *Server) touchSandboxActivity(ctx context.Context, sandbox *computev1.Sandbox) {
-	now := metav1.Now()
-	next := sandbox.DeepCopyObject().(*computev1.Sandbox)
-	next.Status.LastActivityTime = &now
-	_ = s.client.Status().Patch(ctx, next, client.MergeFrom(sandbox))
+	_ = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		current, err := s.getSandboxObject(ctx, sandbox.Name)
+		if err != nil {
+			return err
+		}
+		now := metav1.Now()
+		next := current.DeepCopyObject().(*computev1.Sandbox)
+		next.Status.LastActivityTime = &now
+		return s.client.Status().Patch(ctx, next, client.MergeFrom(current))
+	})
 }
 
 func (s *Server) defaultToolboxURL(sandbox *computev1.Sandbox) string {

@@ -156,6 +156,9 @@ func (r *SandboxReconciler) reconcileIdleStop(ctx context.Context, sandbox *comp
 	if sandbox.Spec.StopPolicy.AutoStopMinutes <= 0 {
 		return false, ctrl.Result{}, nil
 	}
+	if sandbox.Status.Phase != computev1.SandboxPhaseRunning {
+		return false, ctrl.Result{}, nil
+	}
 
 	if sandbox.Status.LastActivityTime == nil {
 		now := metav1.NewTime(r.now())
